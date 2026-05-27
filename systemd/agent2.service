@@ -1,0 +1,17 @@
+[Unit]
+Description=Agent 2 Smart Home Display
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/agent2-display
+ExecStart=/home/pi/agent2-display/.venv/bin/python -m app.main
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

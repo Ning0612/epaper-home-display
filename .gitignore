@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+.env
+
+# Config (contains secrets)
+config.yaml
+config.local.yaml
+
+# Data
+data/*.db
+data/*.log
+
+# Waveshare driver — download from GitHub and place in lib/waveshare_epd/
+lib/waveshare_epd/epd7in5_V2.py
+lib/waveshare_epd/epdconfig.py
+
+# Sounds — add your own audio files
+assets/sounds/*.wav
+assets/sounds/*.mp3
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

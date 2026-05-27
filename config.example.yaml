@@ -1,0 +1,56 @@
+mqtt:
+  broker_host: "192.168.1.100"
+  broker_port: 1883
+  client_id: "agent2-display"
+
+weather:
+  api_key: "your_openweathermap_api_key"
+  city_id: 1668341        # Taipei
+  units: "metric"
+  fetch_interval_seconds: 600
+
+sensors:
+  dht22:
+    gpio_pin: 4
+    use_mock: false
+  light:
+    spi_bus: 0
+    spi_device: 0          # CE0
+    adc_channel: 0
+    bright_threshold: 500  # MCP3008 10-bit (0–1023)
+    use_mock: false
+  button:
+    gpio_pin: 17
+    use_mock: false
+
+display:
+  model: "epd7in5_V2"
+  use_mock: false
+  dashboard_update_interval: 60
+  weather_update_interval: 600
+  full_refresh_interval: 3600
+
+voice:
+  enabled: true
+  player: "aplay"
+  sounds_dir: "assets/sounds"
+
+discord:
+  webhook_url: ""
+
+storage:
+  db_path: "data/agent2.db"
+
+webui:
+  host: "0.0.0.0"
+  port: 8000
+
+timezone: "Asia/Taipei"
+
+presence:
+  light_weight: 1.0
+  door_weight: 1.0
+  face_weight: 2.0
+  threshold: 2.0
+  door_window_seconds: 300
+  face_window_seconds: 600
