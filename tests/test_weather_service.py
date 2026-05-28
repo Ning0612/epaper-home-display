@@ -10,7 +10,7 @@ from app.services.weather import WeatherService
 
 @pytest.fixture
 def config():
-    return WeatherConfig(api_key="test_key", city_name="Taipei")
+    return WeatherConfig(api_key="test_key", lat=25.05, lon=121.53)
 
 
 def _make_mock_response(json_data: dict):
@@ -74,11 +74,13 @@ async def test_forecast_returns_all_slots(config):
 
     calls = mock_session.get.call_args_list
     assert len(calls) == 2
-    _url, kwargs_current = calls[0][0][0], calls[0][1]
-    _url2, kwargs_forecast = calls[1][0][0], calls[1][1]
-    assert kwargs_current["params"]["q"] == "Taipei,TW"
-    assert kwargs_forecast["params"]["q"] == "Taipei,TW"
-    assert kwargs_forecast["params"]["cnt"] == 40
+    params_current = calls[0][1]["params"]
+    params_forecast = calls[1][1]["params"]
+    assert params_current["lat"] == 25.05
+    assert params_current["lon"] == 121.53
+    assert params_forecast["lat"] == 25.05
+    assert params_forecast["lon"] == 121.53
+    assert params_forecast["cnt"] == 40
 
 
 def _make_slots(day_offset: int, conditions: list[str], temps: list[float], pops: list[float]) -> list[dict]:

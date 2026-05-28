@@ -18,8 +18,8 @@ class MQTTConfig:
 @dataclass
 class WeatherConfig:
     api_key: str = ""
-    city_id: int = 1668341
-    city_name: str = "Taipei"
+    lat: float = 25.05       # Taipei default
+    lon: float = 121.53
     units: str = "metric"
     fetch_interval_seconds: int = 600
 
@@ -133,11 +133,27 @@ def _apply_env_overrides(settings: Settings) -> None:
         settings.display.use_mock = True
 
 
+def _deep_merge(base: dict, override: dict) -> dict:
+    result = dict(base)
+    for k, v in override.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            result[k] = _deep_merge(result[k], v)
+        else:
+            result[k] = v
+    return result
+
+
 def load_settings(path: str = "config.yaml") -> Settings:
     raw: dict = {}
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
+    stem, _ = os.path.splitext(path)
+    local_path = stem + ".local.yaml"
+    if os.path.exists(local_path):
+        with open(local_path, "r", encoding="utf-8") as f:
+            local_raw = yaml.safe_load(f) or {}
+        raw = _deep_merge(raw, local_raw)
     settings = _from_dict(Settings, raw)
     _apply_env_overrides(settings)
     return settings

@@ -5,8 +5,8 @@ mqtt:
 
 weather:
   api_key: "your_openweathermap_api_key"
-  city_name: "Taipei"     # city name for q={city_name},TW query
-  # city_id: 1668341      # deprecated; use city_name instead
+  lat: 25.05              # latitude (change via WebUI /settings or edit here)
+  lon: 121.53             # longitude
   units: "metric"
   fetch_interval_seconds: 600
 

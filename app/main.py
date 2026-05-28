@@ -192,7 +192,7 @@ async def main() -> None:
 
     import uvicorn
     uvicorn_config = uvicorn.Config(
-        create_app(settings),
+        create_app(settings, weather_service),
         host=settings.webui.host,
         port=settings.webui.port,
         log_level="warning",

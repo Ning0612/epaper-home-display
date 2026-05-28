@@ -18,31 +18,28 @@ class WeatherService:
         self._cached_current: dict | None = None
         self._cached_forecast: list[dict] = []
         self._last_fetch: datetime | None = None
-        if self._config.city_id != 1668341:
-            logger.warning(
-                "city_id=%d is set but ignored; set city_name in config instead",
-                self._config.city_id,
-            )
+
+    def set_location(self, lat: float, lon: float) -> None:
+        self._config.lat = round(lat, 5)
+        self._config.lon = round(lon, 5)
 
     async def fetch(self) -> tuple[dict, list[dict]]:
-        q = f"{self._config.city_name},TW"
-        current_params = {
-            "q": q,
+        base_params = {
+            "lat": self._config.lat,
+            "lon": self._config.lon,
             "appid": self._config.api_key,
             "units": self._config.units,
-        }
-        forecast_params = {
-            "q": q,
-            "appid": self._config.api_key,
-            "units": self._config.units,
-            "cnt": 40,
         }
         timeout = aiohttp.ClientTimeout(total=10)
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"{_BASE}/weather", params=current_params, timeout=timeout) as resp:
+            async with session.get(f"{_BASE}/weather", params=base_params, timeout=timeout) as resp:
                 resp.raise_for_status()
                 current: dict = await resp.json()
-            async with session.get(f"{_BASE}/forecast", params=forecast_params, timeout=timeout) as resp:
+            async with session.get(
+                f"{_BASE}/forecast",
+                params={**base_params, "cnt": 40},
+                timeout=timeout,
+            ) as resp:
                 resp.raise_for_status()
                 forecast_body: dict = await resp.json()
 
