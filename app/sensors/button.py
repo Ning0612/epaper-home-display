@@ -25,6 +25,11 @@ class RealButton:
         return not self._gpio.input(self._pin)
 
     def register_callback(self, fn: Callable[[], None]) -> None:
+        # Remove any stale edge detection left by a previous process
+        try:
+            self._gpio.remove_event_detect(self._pin)
+        except Exception:
+            pass
         self._gpio.add_event_detect(
             self._pin,
             self._gpio.FALLING,
