@@ -95,7 +95,7 @@ async def _presence_loop(settings, display_queue: asyncio.Queue) -> None:
 async def _display_loop(
     epaper, executor: ThreadPoolExecutor, display_queue: asyncio.Queue, settings
 ) -> None:
-    # Every 3rd update is a full refresh (clears ghosting); the other two use
+    # Every 10th update is a full refresh (clears ghosting); the other nine use
     # init_fast() for a faster partial update.
     refresh_count = 0
     loop = asyncio.get_event_loop()
@@ -109,7 +109,7 @@ async def _display_loop(
         if state.display_busy:
             continue
 
-        full_refresh = (refresh_count % 3 == 0)
+        full_refresh = (refresh_count % 10 == 0)
         state.display_busy = True
         try:
             image = render_dashboard(state, settings)
