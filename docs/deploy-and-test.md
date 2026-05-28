@@ -185,3 +185,20 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scr
 | 硬體測試失敗 | 確認接線，再確認 `.venv/bin/pip install -r requirements.txt` 有跑過 |
 | 單元測試匯入 GPIO 錯誤 | 檢查 `tests/conftest.py` 的 mock 是否正確覆蓋硬體模組 |
 | MQTT 無法連線 | 確認 `config.yaml` 的 `mqtt_broker_host` 設定正確 |
+| `Failed to add edge detection` | Pi OS Trixie/Bookworm 需要 lgpio，執行下方修復步驟 |
+
+### Pi OS Trixie / Bookworm：lgpio 修復
+
+Pi OS Trixie（Debian 13）預設 GPIO 後端改為 lgpio，RPi.GPIO 的 edge detection 會失敗。
+
+```bash
+# 1. 安裝系統套件
+sudo apt-get install -y swig python3-lgpio
+
+# 2. 將系統 lgpio 路徑加入 venv
+SITE=$(cd ~/epaper-home-display && .venv/bin/python -c "import site; print(site.getsitepackages()[0])")
+echo "/usr/lib/python3/dist-packages" > "$SITE/system-lgpio.pth"
+
+# 3. 執行硬體腳本時加上環境變數
+GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_epaper
+```

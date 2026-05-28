@@ -33,43 +33,106 @@
 
 ## 1. Waveshare 7.5" e-Paper (V2)
 
-直接插上 Pi 的 40-pin 排針即可（HAT 形式）。
+### 1-1. 實體組裝
 
-若使用排線連接，對應腳位如下：
+連接鏈為：**電子紙面板 → 排線 → e-Paper Adapter → e-Paper Driver HAT (Rev2.3) → Pi 40-pin 排針**
 
-| e-Paper 標籤 | Pi 腳位 | GPIO (BCM) |
+1. 將排線一端插入電子紙面板的 FPC 座（金屬觸點朝下）
+2. 排線另一端插入 e-Paper Adapter
+3. e-Paper Adapter 接到 Driver HAT 的排線插座
+4. Driver HAT 直接插上 Pi Zero 2W 的 40-pin 排針
+
+### 1-2. Driver HAT 撥碼開關設定
+
+Driver HAT (Rev2.3) 上有兩組撥碼開關，**必須在上電前設定正確**：
+
+| 開關 | 設定值 | 說明 |
+|------|--------|------|
+| **Display Config** | **B (0.47R)** | 7.5" 面板使用 B；A (3R) 僅用於小尺寸黑白款 |
+| **Interface Config** | **0 (4-line SPI)** | 程式碼預設 4-line；撥到 1 為 3-line SPI |
+
+> 開關位置標示在 PCB 板面上，數字 0 和 1 對應撥桿方向。
+
+### 1-3. GPIO 腳位對應
+
+Driver HAT 透過排針佔用以下 GPIO，**這些腳位不可給其他元件使用**：
+
+| e-Paper 信號 | Pi 腳位 | GPIO (BCM) |
 |-------------|---------|-----------|
 | VCC | Pin 1 | 3.3V |
 | GND | Pin 6 | GND |
-| DIN | Pin 19 | GPIO 10 (SPI MOSI) |
-| CLK | Pin 23 | GPIO 11 (SPI SCLK) |
+| DIN (MOSI) | Pin 19 | GPIO 10 |
+| CLK (SCLK) | Pin 23 | GPIO 11 |
 | CS | Pin 24 | GPIO 8 (CE0) |
 | DC | Pin 22 | GPIO 25 |
-| RST | Pin 11 | GPIO 17 |
+| **RST** | **Pin 11** | **GPIO 17 ← 按鈕不可用此腳** |
 | BUSY | Pin 18 | GPIO 24 |
 
-> **⚠️ 注意**：GPIO 17 (Pin 11) 已被 e-Paper RST 佔用，**按鈕不可使用此腳位**。
-
-### 安裝 Waveshare 驅動
-
-驅動未包含在 repo，需手動下載：
+### 1-4. 啟用 SPI
 
 ```bash
-ssh pi@epaper-display.local
-cd ~/epaper-home-display/lib/waveshare_epd
-
-# 下載兩個必要檔案
-wget https://raw.githubusercontent.com/waveshare/e-Paper/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epd7in5_V2.py
-wget https://raw.githubusercontent.com/waveshare/e-Paper/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epdconfig.py
+ssh pi@epaper-display.local 'ls /dev/spi*'
+# 看到 /dev/spidev0.0 和 /dev/spidev0.1 表示已啟用
 ```
 
-啟用 SPI（若尚未啟用）：
+若未出現，執行：
 
 ```bash
-sudo raspi-config
-# Interface Options → SPI → Enable
-sudo reboot
+ssh pi@epaper-display.local 'sudo raspi-config'
+# Interface Options → SPI → Enable → 重開機
 ```
+
+### 1-5. 安裝 Waveshare 驅動
+
+驅動檔案未包含在 repo，需手動下載到 Pi：
+
+```bash
+ssh pi@epaper-display.local '
+cd ~/epaper-home-display/lib/waveshare_epd &&
+wget -q https://raw.githubusercontent.com/waveshare/e-Paper/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epd7in5_V2.py &&
+wget -q https://raw.githubusercontent.com/waveshare/e-Paper/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epdconfig.py &&
+echo "驅動下載完成"
+'
+```
+
+### 1-6. Pi OS Trixie / Bookworm：lgpio 設定
+
+Pi OS Trixie（Debian 13）與 Bookworm 的 GPIO 後端改為 lgpio，需額外設定：
+
+```bash
+# 安裝系統套件
+ssh pi@epaper-display.local 'sudo apt-get install -y swig python3-lgpio'
+
+# 將系統 lgpio 加入 venv 可見範圍（只需做一次）
+ssh pi@epaper-display.local '
+SITE=$(cd ~/epaper-home-display && .venv/bin/python -c "import site; print(site.getsitepackages()[0])")
+echo "/usr/lib/python3/dist-packages" > "$SITE/system-lgpio.pth"
+echo "lgpio 路徑設定完成"
+'
+```
+
+### 1-7. 測試電子紙
+
+```bash
+ssh pi@epaper-display.local '
+cd ~/epaper-home-display &&
+GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_epaper
+'
+```
+
+預期輸出：
+```
+Initialising e-Paper 7.5" V2 ...
+  init OK
+Clearing display ...
+  clear OK
+Drawing test image ...
+  display OK
+  sleep OK
+PASS
+```
+
+畫面顯示：黑色矩形外框 + 中央文字 `ePaper Home Display Test OK`。
 
 ---
 
@@ -153,8 +216,8 @@ ssh pi@epaper-display.local 'aplay -l'
 ## 接線完成後的測試順序
 
 ```bash
-# 1. 電子紙
-ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_epaper'
+# 1. 電子紙（需 lgpio，見 1-6 節）
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_epaper'
 
 # 2. DHT22
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_dht22'
@@ -163,7 +226,7 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scr
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_light'
 
 # 4. 按鈕
-ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_button'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_button'
 
 # 5. 喇叭
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_speaker'
