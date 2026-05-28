@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+import functools
 from concurrent.futures import ThreadPoolExecutor
 
 from app.config import load_settings
@@ -94,8 +95,9 @@ async def _presence_loop(settings, display_queue: asyncio.Queue) -> None:
 async def _display_loop(
     epaper, executor: ThreadPoolExecutor, display_queue: asyncio.Queue, settings
 ) -> None:
-    import time
-    last_full = 0.0
+    # Every 3rd update is a full refresh (clears ghosting); the other two use
+    # init_fast() for a faster partial update.
+    refresh_count = 0
     loop = asyncio.get_event_loop()
 
     while True:
@@ -107,14 +109,14 @@ async def _display_loop(
         if state.display_busy:
             continue
 
-        now = time.monotonic()
-        full_refresh = (now - last_full) >= settings.display.full_refresh_interval
+        full_refresh = (refresh_count % 3 == 0)
         state.display_busy = True
         try:
             image = render_dashboard(state, settings)
-            await loop.run_in_executor(executor, lambda: epaper.display(image, full_refresh))
-            if full_refresh:
-                last_full = now
+            await loop.run_in_executor(
+                executor, functools.partial(epaper.display, image, full_refresh)
+            )
+            refresh_count += 1  # only advance cadence on successful panel write
         except Exception as exc:
             logger.error("Display update failed: %s", exc)
         finally:

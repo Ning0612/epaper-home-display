@@ -57,7 +57,6 @@ class DisplayConfig:
     use_mock: bool = False
     dashboard_update_interval: int = 60
     weather_update_interval: int = 600
-    full_refresh_interval: int = 3600
 
 
 @dataclass

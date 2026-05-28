@@ -28,7 +28,6 @@ display:
   use_mock: false
   dashboard_update_interval: 60
   weather_update_interval: 600
-  full_refresh_interval: 3600
 
 voice:
   enabled: true
