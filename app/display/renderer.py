@@ -25,16 +25,16 @@ _CW = DISPLAY_W - 2 * MARGIN       # 784
 _CH = DISPLAY_H - 2 * MARGIN       # 464
 _GAP = 8                            # gap between adjacent cards
 
-_LEFT_W = 520                       # width of left column
+_LEFT_W = 480                       # width of left column
 
 # ── Weather card: top-left, starts at screen margin ───────────────────────
 WEATHER_X, WEATHER_Y = _CX, _CY    # 8, 8
 WEATHER_W, WEATHER_H = _LEFT_W, 340
 
 # ── Image card: right column, spans full content height ───────────────────
-IMAGE_X = _CX + _LEFT_W + _GAP     # 536
+IMAGE_X = _CX + _LEFT_W + _GAP     # 496
 IMAGE_Y = _CY                       # 8
-IMAGE_W = (_CX + _CW) - IMAGE_X    # 256
+IMAGE_W = (_CX + _CW) - IMAGE_X    # 296
 IMAGE_H = _CH                       # 464
 
 # ── Row2: below weather card ──────────────────────────────────────────────
@@ -50,12 +50,13 @@ AGENT1_W, AGENT1_H = 115, ROW2_H
 
 USAGE_X = AGENT1_X + AGENT1_W + _GAP   # 229
 USAGE_Y = ROW2_Y
-USAGE_W = (_CX + _LEFT_W) - USAGE_X    # 299
+USAGE_W = (_CX + _LEFT_W) - USAGE_X    # 259
 USAGE_H = ROW2_H
 
 # Weather card: height of date/time section (inner coords, not counting PAD)
 _WX_TOP_H = 215
 
+_WEEKDAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 _FONT_CACHE: dict[tuple[int, bool], ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
 _FONT_PATH = "assets/fonts/DejaVuSans.ttf"
 _FONT_BOLD_PATH = "assets/fonts/DejaVuSans-Bold.ttf"
@@ -203,8 +204,8 @@ def _draw_card_weather(
     # Allocate: date=36px, gap=10, time=160px → content=206px in _WX_TOP_H=215
     dt_top = iy + (_WX_TOP_H - 206) // 2   # iy+4
 
-    date_str = now.strftime("%Y/%m/%d %a")
-    _cx_text(draw, date_str, ix, inner_w, dt_top, _font(36))
+    date_str = now.strftime("%Y/%m/%d %A")
+    _cx_text(draw, date_str, ix, inner_w, dt_top, _font(36, bold=True))
 
     time_str = now.strftime("%H:%M")
     _cx_text(draw, time_str, ix, inner_w, dt_top + 46, _font(160, bold=True))
@@ -214,8 +215,8 @@ def _draw_card_weather(
     draw.line([(WEATHER_X + 1, div_y), (WEATHER_X + WEATHER_W - 2, div_y)], fill=FG, width=1)
 
     # ── Forecast section: Now column + 4 daily columns ────────────────────
-    # Layout: [Now=96px] [gap=12px] [4×daily, each=99px]
-    now_w = 96
+    # Layout: [Now=80px] [gap=12px] [4×daily, each=93px]
+    now_w = 80
     fc_gap = 12    # separator gap between Now and daily
     daily_w = (inner_w - now_w - fc_gap) // 4   # 99
 
@@ -234,14 +235,14 @@ def _draw_card_weather(
     now_temp = (state.weather_current.get("main", {}).get("temp")
                 if state.weather_current else None)
 
-    _cx_text(draw, "Now", now_x, now_w, fc_y0 + LBL, _font(16))
+    _cx_text(draw, "Now", now_x, now_w, fc_y0 + LBL, _font(16, bold=True))
 
     icon_x = now_x + (now_w - 36) // 2
     if not _paste_icon(img, now_main, 36, icon_x, fc_y0 + ICO):
-        _cx_text(draw, now_main[:4], now_x, now_w, fc_y0 + ICO + 10, _font(14))
+        _cx_text(draw, now_main[:4], now_x, now_w, fc_y0 + ICO + 10, _font(14, bold=True))
 
     now_temp_str = f"{now_temp:.0f}°" if isinstance(now_temp, (int, float)) else "--"
-    _cx_text(draw, now_temp_str, now_x, now_w, fc_y0 + TMP, _font(18))
+    _cx_text(draw, now_temp_str, now_x, now_w, fc_y0 + TMP, _font(18, bold=True))
 
     # Light dashed separator between Now and daily
     sep_x = ix + now_w + fc_gap // 2   # 16+96+6=118
@@ -260,26 +261,26 @@ def _draw_card_weather(
 
         dt_txt = entry.get("dt_txt", "")
         try:
-            day_str = datetime.strptime(dt_txt[:10], "%Y-%m-%d").strftime("%a")
+            day_str = _WEEKDAYS[datetime.strptime(dt_txt[:10], "%Y-%m-%d").weekday()]
         except ValueError:
             day_str = "---"
-        _cx_text(draw, day_str, col_x, daily_w, fc_y0 + LBL, _font(16))
+        _cx_text(draw, day_str, col_x, daily_w, fc_y0 + LBL, _font(14, bold=True))
 
         fc_main = _weather_item(entry).get("main", "")
         icon_x = col_x + (daily_w - 36) // 2
         if not _paste_icon(img, fc_main, 36, icon_x, fc_y0 + ICO):
-            _cx_text(draw, fc_main[:4], col_x, daily_w, fc_y0 + ICO + 10, _font(14))
+            _cx_text(draw, fc_main[:4], col_x, daily_w, fc_y0 + ICO + 10, _font(14, bold=True))
 
         fc_temp = entry.get("main", {}).get("temp")
         fc_temp_str = f"{fc_temp:.0f}°" if isinstance(fc_temp, (int, float)) else "--"
-        _cx_text(draw, fc_temp_str, col_x, daily_w, fc_y0 + TMP, _font(18))
+        _cx_text(draw, fc_temp_str, col_x, daily_w, fc_y0 + TMP, _font(18, bold=True))
 
         pop = entry.get("pop") or 0
         try:
             pop_str = f"{int(float(pop) * 100)}%"
         except (TypeError, ValueError):
             pop_str = "--%"
-        _cx_text(draw, pop_str, col_x, daily_w, fc_y0 + POP, _font(16))
+        _cx_text(draw, pop_str, col_x, daily_w, fc_y0 + POP, _font(16, bold=True))
 
 
 def _draw_card_image(img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
@@ -292,9 +293,9 @@ def _draw_card_image(img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentS
 
     if state.custom_image_path is None:
         placeholder = "[ No Image ]"
-        bb = draw.textbbox((0, 0), placeholder, font=_font(16))
+        bb = draw.textbbox((0, 0), placeholder, font=_font(16, bold=True))
         tw, th = bb[2] - bb[0], bb[3] - bb[1]
-        draw.text((ix + (iw - tw) // 2, iy + (ih - th) // 2), placeholder, font=_font(16), fill=FG)
+        draw.text((ix + (iw - tw) // 2, iy + (ih - th) // 2), placeholder, font=_font(16, bold=True), fill=FG)
         return
 
     try:
@@ -306,7 +307,7 @@ def _draw_card_image(img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentS
             img.paste(custom, (px, py))
     except (OSError, IOError) as e:
         logger.warning("custom image load failed: %s", e)
-        draw.text((ix + 4, iy + 4), "Image Error", font=_font(16), fill=FG)
+        draw.text((ix + 4, iy + 4), "Image Error", font=_font(16, bold=True), fill=FG)
 
 
 def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
@@ -327,9 +328,9 @@ def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     sy = iy + max(0, (ih - content_h) // 2)
 
     _cx_text(draw, "Indoor", ix, iw, sy, _font(14, bold=True))
-    _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17))
-    _cx_text(draw, hum_str, ix, iw, sy + 41, _font(17))
-    _cx_text(draw, light_str, ix, iw, sy + 63, _font(12))
+    _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17, bold=True))
+    _cx_text(draw, hum_str, ix, iw, sy + 41, _font(17, bold=True))
+    _cx_text(draw, light_str, ix, iw, sy + 63, _font(12, bold=True))
 
 
 def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
@@ -356,10 +357,10 @@ def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     sy = iy + max(0, (ih - content_h) // 2)
 
     _cx_text(draw, "Agent 1", ix, iw, sy, _font(14, bold=True))
-    _cx_text(draw, f"D {door_st}", ix, iw, sy + 20, _font(14))
-    _cx_text(draw, f"F {face_id}", ix, iw, sy + 20 + line_h, _font(14))
-    _cx_text(draw, f"A {alert_lvl}", ix, iw, sy + 20 + 2 * line_h, _font(14))
-    _cx_text(draw, f"M {mode_str}", ix, iw, sy + 20 + 3 * line_h, _font(14))
+    _cx_text(draw, f"D {door_st}", ix, iw, sy + 20, _font(14, bold=True))
+    _cx_text(draw, f"F {face_id}", ix, iw, sy + 20 + line_h, _font(14, bold=True))
+    _cx_text(draw, f"A {alert_lvl}", ix, iw, sy + 20 + 2 * line_h, _font(14, bold=True))
+    _cx_text(draw, f"M {mode_str}", ix, iw, sy + 20 + 3 * line_h, _font(14, bold=True))
 
 
 def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
@@ -373,8 +374,8 @@ def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
 
     label_w = 72
     gap = 4
-    pct_w = 32
-    bar_w = iw - label_w - 2 * gap - pct_w   # 171
+    pct_w = 38
+    bar_w = iw - label_w - 2 * gap - pct_w
     bar_h = 12
     bar_spacing = 20
 
@@ -393,12 +394,12 @@ def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
 
     for i, (label, pct) in enumerate(rows):
         row_y = sy + 24 + i * bar_spacing
-        draw.text((ix, row_y), label, font=_font(14), fill=FG)
+        draw.text((ix, row_y), label, font=_font(14, bold=True), fill=FG)
 
         bar_x = ix + label_w + gap
         if pct is None:
-            draw.text((bar_x, row_y), "N/A", font=_font(14), fill=FG)
+            draw.text((bar_x, row_y), "N/A", font=_font(14, bold=True), fill=FG)
         else:
             bar_y = row_y + (16 - bar_h) // 2
             _draw_progress_bar(draw, bar_x, bar_y, bar_w, bar_h, pct)
-            draw.text((bar_x + bar_w + gap, row_y), f"{int(pct * 100)}%", font=_font(14), fill=FG)
+            draw.text((bar_x + bar_w + gap, row_y), f"{min(100, max(0, int(pct * 100)))}%", font=_font(14, bold=True), fill=FG)
