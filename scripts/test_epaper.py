@@ -33,7 +33,7 @@ def main() -> None:
         font = ImageFont.truetype("assets/fonts/DejaVuSans.ttf", 40)
     except (IOError, OSError):
         font = ImageFont.load_default()
-    draw.text((50, 200), "Agent 2 e-Paper Test OK", font=font, fill=0)
+    draw.text((50, 200), "ePaper Home Display Test OK", font=font, fill=0)
 
     epd.display(epd.getbuffer(img))
     print("  display OK")

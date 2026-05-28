@@ -1,7 +1,7 @@
 mqtt:
   broker_host: "192.168.1.100"
   broker_port: 1883
-  client_id: "agent2-display"
+  client_id: "epaper-home-display"
 
 weather:
   api_key: "your_openweathermap_api_key"
@@ -39,7 +39,7 @@ discord:
   webhook_url: ""
 
 storage:
-  db_path: "data/agent2.db"
+  db_path: "data/epaper-home-display.db"
 
 webui:
   host: "0.0.0.0"

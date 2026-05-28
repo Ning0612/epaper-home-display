@@ -9,7 +9,7 @@ import aiosqlite
 
 logger = logging.getLogger(__name__)
 
-_DB_PATH = "data/agent2.db"
+_DB_PATH = "data/epaper-home-display.db"
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS indoor_env_logs (
@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_indoor_env_ts    ON indoor_env_logs(ts);
 """
 
 
-async def init_db(path: str = "data/agent2.db") -> None:
+async def init_db(path: str = "data/epaper-home-display.db") -> None:
     global _DB_PATH
     _DB_PATH = path
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)

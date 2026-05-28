@@ -12,7 +12,7 @@ import yaml
 class MQTTConfig:
     broker_host: str = "localhost"
     broker_port: int = 1883
-    client_id: str = "agent2-display"
+    client_id: str = "epaper-home-display"
 
 
 @dataclass
@@ -74,7 +74,7 @@ class DiscordConfig:
 
 @dataclass
 class StorageConfig:
-    db_path: str = "data/agent2.db"
+    db_path: str = "data/epaper-home-display.db"
 
 
 @dataclass

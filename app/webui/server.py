@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_app(settings: "Settings") -> FastAPI:
-    app = FastAPI(title="Agent 2 Display", version="0.1.0")
+    app = FastAPI(title="ePaper Home Display", version="0.1.0")
 
     @app.get("/health")
     async def health():

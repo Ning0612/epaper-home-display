@@ -12,8 +12,8 @@ def main() -> None:
 
     if not wav_files:
         print("No .wav files found in assets/sounds/ — generating test tone ...")
-        _generate_test_tone("/tmp/agent2_test.wav")
-        test_file = "/tmp/agent2_test.wav"
+        _generate_test_tone("/tmp/epaper_test.wav")
+        test_file = "/tmp/epaper_test.wav"
     else:
         test_file = os.path.join(sound_dir, wav_files[0])
         print(f"Playing: {test_file}")

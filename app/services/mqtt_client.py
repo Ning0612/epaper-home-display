@@ -55,7 +55,7 @@ class MQTTService:
 
     def publish(self, topic: str, payload: dict) -> None:
         # agent/timestamp placed last to be authoritative; caller cannot override them
-        out = {**payload, "agent": "agent2-display", "timestamp": datetime.now().isoformat()}
+        out = {**payload, "agent": "epaper-home-display", "timestamp": datetime.now().isoformat()}
         self._client.publish(topic, json.dumps(out), qos=1)
 
     def _on_connect(self, client: mqtt.Client, userdata, flags, rc: int) -> None:

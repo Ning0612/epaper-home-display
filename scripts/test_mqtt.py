@@ -21,13 +21,13 @@ def main() -> None:
     received: list[dict] = []
     connected = threading.Event()
 
-    client = mqtt.Client(client_id="agent2-test-probe")
+    client = mqtt.Client(client_id="epaper-test-probe")
 
     def on_connect(c, userdata, flags, rc):
         if rc == 0:
             print("  Connected")
             connected.set()
-            c.subscribe("agent2/test", qos=1)
+            c.subscribe("epaper/test", qos=1)
         else:
             print(f"  Connect failed rc={rc}")
 
@@ -46,8 +46,8 @@ def main() -> None:
         client.loop_stop()
         sys.exit(1)
 
-    test_payload = {"agent": "agent2-test", "value": 42}
-    client.publish("agent2/test", json.dumps(test_payload), qos=1)
+    test_payload = {"agent": "epaper-test", "value": 42}
+    client.publish("epaper/test", json.dumps(test_payload), qos=1)
     print("  Published test message")
 
     time.sleep(2)

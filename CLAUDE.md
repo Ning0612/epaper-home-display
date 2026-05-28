@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**Agent 2: Smart Home Information Display Agent** running on Raspberry Pi Zero 2W with a Waveshare 7.5" e-Paper display, DHT22 sensor, light sensor, button, and buzzer/USB speaker.
+**ePaper Home Display** running on Raspberry Pi Zero 2W with a Waveshare 7.5" e-Paper display, DHT22 sensor, light sensor, button, and buzzer/USB speaker.
 
-Agent 2 operates independently from Agent 1 and communicates via MQTT.
+Operates independently from Agent 1 and communicates via MQTT.
 
 ---
 
@@ -16,12 +16,12 @@ Claude Code runs on the **laptop**. The Raspberry Pi is only the deployment and 
 
 ```
 Laptop  →  edit code, run unit tests (mocked), commit
-Pi Zero →  git pull, run hardware tests, run agent2 service
+Pi Zero →  git pull, run hardware tests, run epaper-home-display service
 ```
 
 Do not assume Claude Code is installed on the Pi. Use SSH for Pi-side execution.
 
-Pi hostname: `pi@agent2.local`
+Pi hostname: `pi@epaper-display.local`
 
 ---
 
@@ -50,32 +50,32 @@ pytest tests/test_presence.py::test_occupied_when_light_bright
 
 ```bash
 # Deploy latest code
-ssh pi@agent2.local 'cd ~/agent2-display && git pull'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && git pull'
 
 # Install/update dependencies
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/pip install -r requirements.txt'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/pip install -r requirements.txt'
 
 # Restart service
-ssh pi@agent2.local 'sudo systemctl restart agent2'
+ssh pi@epaper-display.local 'sudo systemctl restart epaper-home-display'
 
 # Check service status
-ssh pi@agent2.local 'systemctl status agent2 --no-pager'
+ssh pi@epaper-display.local 'systemctl status epaper-home-display --no-pager'
 
 # Tail logs
-ssh pi@agent2.local 'journalctl -u agent2 -n 100 --no-pager'
-ssh pi@agent2.local 'journalctl -u agent2 -f'
+ssh pi@epaper-display.local 'journalctl -u epaper-home-display -n 100 --no-pager'
+ssh pi@epaper-display.local 'journalctl -u epaper-home-display -f'
 ```
 
 ### Hardware Tests (Pi)
 
 ```bash
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/python -m scripts.test_epaper'
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/python -m scripts.test_dht22'
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/python -m scripts.test_light'
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/python -m scripts.test_button'
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/python -m scripts.test_speaker'
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/python -m scripts.test_mqtt'
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/python -m scripts.test_weather'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_epaper'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_dht22'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_light'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_button'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_speaker'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_mqtt'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_weather'
 ```
 
 ---
@@ -176,10 +176,10 @@ Reference file: `config.example.yaml`
 
 ```bash
 pytest && git status && git diff          # verify locally first
-ssh pi@agent2.local 'cd ~/agent2-display && git pull'
-ssh pi@agent2.local 'cd ~/agent2-display && .venv/bin/pip install -r requirements.txt'
-ssh pi@agent2.local 'sudo systemctl restart agent2'
-ssh pi@agent2.local 'journalctl -u agent2 -n 100 --no-pager'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && git pull'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/pip install -r requirements.txt'
+ssh pi@epaper-display.local 'sudo systemctl restart epaper-home-display'
+ssh pi@epaper-display.local 'journalctl -u epaper-home-display -n 100 --no-pager'
 ```
 
 Do not add features until the service starts cleanly after each deploy.
@@ -199,4 +199,4 @@ Do not add features until the service starts cleanly after each deploy.
 9. e-Paper dashboard renders all data
 10. WebUI shows current state
 11. SQLite logs all event types
-12. systemd starts agent2 on boot
+12. systemd starts epaper-home-display on boot

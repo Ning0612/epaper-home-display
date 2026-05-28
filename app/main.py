@@ -151,10 +151,10 @@ async def main() -> None:
     )
 
     settings = load_settings()
-    logger.info("Agent 2 starting (tz=%s mock=%s)", settings.timezone, settings.sensors.dht22.use_mock)
+    logger.info("ePaper Home Display starting (tz=%s mock=%s)", settings.timezone, settings.sensors.dht22.use_mock)
 
     await init_db(settings.storage.db_path)
-    await log_system_event("INFO", "main", "Agent 2 starting")
+    await log_system_event("INFO", "main", "ePaper Home Display starting")
 
     executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="hw")
     display_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
@@ -201,7 +201,7 @@ async def main() -> None:
     finally:
         mqtt_service.stop()
         executor.shutdown(wait=False)
-        await log_system_event("INFO", "main", "Agent 2 stopped")
+        await log_system_event("INFO", "main", "ePaper Home Display stopped")
 
 
 if __name__ == "__main__":
