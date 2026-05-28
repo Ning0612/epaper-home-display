@@ -5,7 +5,8 @@ mqtt:
 
 weather:
   api_key: "your_openweathermap_api_key"
-  city_id: 1668341        # Taipei
+  city_name: "Taipei"     # city name for q={city_name},TW query
+  # city_id: 1668341      # deprecated; use city_name instead
   units: "metric"
   fetch_interval_seconds: 600
 

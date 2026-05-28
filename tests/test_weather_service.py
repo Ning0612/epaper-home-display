@@ -1,8 +1,10 @@
+from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.config import WeatherConfig
+from app.display.renderer import _pick_daily_forecast
 from app.services.weather import WeatherService
 
 
@@ -69,3 +71,62 @@ async def test_forecast_returns_all_slots(config):
         _, forecast = await service.fetch()
 
     assert len(forecast) == 40
+
+    calls = mock_session.get.call_args_list
+    assert len(calls) == 2
+    _url, kwargs_current = calls[0][0][0], calls[0][1]
+    _url2, kwargs_forecast = calls[1][0][0], calls[1][1]
+    assert kwargs_current["params"]["q"] == "Taipei,TW"
+    assert kwargs_forecast["params"]["q"] == "Taipei,TW"
+    assert kwargs_forecast["params"]["cnt"] == 40
+
+
+def _make_slots(day_offset: int, conditions: list[str], temps: list[float], pops: list[float]) -> list[dict]:
+    d = (date.today() + timedelta(days=day_offset)).strftime("%Y-%m-%d")
+    return [
+        {"dt_txt": f"{d} {i*3:02d}:00:00", "weather": [{"main": c}], "main": {"temp": t}, "pop": p}
+        for i, (c, t, p) in enumerate(zip(conditions, temps, pops))
+    ]
+
+
+def test_pick_daily_forecast_aggregation():
+    # Rain×4, Clear×3, Thunderstorm×1 → mode is Rain; avg temp = 21°; max pop = 0.8
+    slots = (
+        _make_slots(1, ["Rain", "Rain", "Clear", "Rain", "Thunderstorm", "Rain", "Clear", "Clear"], [20, 22, 21, 19, 18, 20, 23, 25], [0.3, 0.5, 0.0, 0.5, 0.8, 0.6, 0.1, 0.0]) +
+        _make_slots(2, ["Clouds"] * 8, [15.0] * 8, [0.1] * 8)
+    )
+    result = _pick_daily_forecast(slots, count=4)
+
+    assert len(result) == 2
+
+    day1 = result[0]
+    assert day1["weather"][0]["main"] == "Rain"
+    assert abs(day1["main"]["temp"] - sum([20, 22, 21, 19, 18, 20, 23, 25]) / 8) < 0.01
+    assert day1["pop"] == 0.8
+
+    day2 = result[1]
+    assert day2["weather"][0]["main"] == "Clouds"
+    assert day2["main"]["temp"] == pytest.approx(15.0)
+
+
+def test_pick_daily_forecast_skips_today():
+    today_slots = _make_slots(0, ["Clear"] * 8, [30.0] * 8, [0.0] * 8)
+    tomorrow_slots = _make_slots(1, ["Rain"] * 8, [25.0] * 8, [0.5] * 8)
+    result = _pick_daily_forecast(today_slots + tomorrow_slots, count=4)
+    assert len(result) == 1
+    assert result[0]["weather"][0]["main"] == "Rain"
+
+
+def test_pick_daily_forecast_handles_none_dt_txt():
+    bad_slots = [{"dt_txt": None, "weather": [{"main": "Clear"}], "main": {"temp": 20.0}, "pop": 0.0}]
+    good_slots = _make_slots(1, ["Clouds"] * 2, [18.0, 19.0], [0.2, 0.3])
+    result = _pick_daily_forecast(bad_slots + good_slots, count=4)
+    assert len(result) == 1
+    assert result[0]["weather"][0]["main"] == "Clouds"
+
+
+def test_pick_daily_forecast_severe_weather_wins_tie():
+    # Thunderstorm×3 = Clear×3, Rain×2 → tie → Thunderstorm wins by severity
+    slots = _make_slots(1, ["Clear", "Clear", "Rain", "Rain", "Thunderstorm", "Thunderstorm", "Thunderstorm", "Clear"], [20.0] * 8, [0.5] * 8)
+    result = _pick_daily_forecast(slots, count=1)
+    assert result[0]["weather"][0]["main"] == "Thunderstorm"

@@ -58,6 +58,13 @@ USAGE_H = ROW2_H
 _WX_TOP_H = 215
 
 _WEEKDAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+_WEATHER_SEVERITY: dict[str, int] = {
+    "Thunderstorm": 6, "Tornado": 6,
+    "Snow": 5, "Sleet": 5,
+    "Rain": 4, "Drizzle": 3,
+    "Atmosphere": 2, "Mist": 2, "Fog": 2, "Haze": 2,
+    "Clouds": 1, "Clear": 0,
+}
 _FONT_CACHE: dict[tuple[int, bool], ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
 _FONT_PATH = "assets/fonts/DejaVuSans.ttf"
 _FONT_BOLD_PATH = "assets/fonts/DejaVuSans-Bold.ttf"
@@ -128,7 +135,9 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
     today = date.today()
     by_day: dict[date, list[dict]] = {}
     for entry in forecast_list:
-        dt_txt = entry.get("dt_txt", "")
+        dt_txt = entry.get("dt_txt")
+        if not isinstance(dt_txt, str):
+            continue
         try:
             d = datetime.strptime(dt_txt[:10], "%Y-%m-%d").date()
         except ValueError:
@@ -147,7 +156,11 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
 
         mains = [_weather_item(s).get("main", "") for s in slots]
         mains = [m for m in mains if m]
-        mode_main = Counter(mains).most_common(1)[0][0] if mains else ""
+        if mains:
+            counts = Counter(mains)
+            mode_main = max(counts, key=lambda m: (counts[m], _WEATHER_SEVERITY.get(m, 0)))
+        else:
+            mode_main = ""
 
         pops = [s.get("pop") or 0 for s in slots]
         try:
@@ -155,7 +168,10 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
         except (TypeError, ValueError):
             max_pop = 0.0
 
-        noon = next((s for s in slots if "12:00:00" in s.get("dt_txt", "")), slots[0])
+        noon = next(
+            (s for s in slots if isinstance(s.get("dt_txt"), str) and "12:00:00" in s["dt_txt"]),
+            slots[0],
+        )
         result.append({
             "dt_txt": noon["dt_txt"],
             "weather": [{"main": mode_main}],

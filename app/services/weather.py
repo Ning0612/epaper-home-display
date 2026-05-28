@@ -18,6 +18,11 @@ class WeatherService:
         self._cached_current: dict | None = None
         self._cached_forecast: list[dict] = []
         self._last_fetch: datetime | None = None
+        if self._config.city_id != 1668341:
+            logger.warning(
+                "city_id=%d is set but ignored; set city_name in config instead",
+                self._config.city_id,
+            )
 
     async def fetch(self) -> tuple[dict, list[dict]]:
         q = f"{self._config.city_name},TW"
