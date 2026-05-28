@@ -22,6 +22,10 @@ lib/waveshare_epd/epdconfig.py
 assets/sounds/*.wav
 assets/sounds/*.mp3
 
+# Fonts — install on each machine separately (apt/manual)
+assets/fonts/*.ttf
+assets/fonts/*.otf
+
 # IDE
 .vscode/
 .idea/

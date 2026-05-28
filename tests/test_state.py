@@ -29,6 +29,15 @@ def test_fields_are_mutable():
     assert s.presence == "OCCUPIED"
 
 
+def test_stub_usage_fields_default_to_none():
+    s = AgentState()
+    assert s.custom_image_path is None
+    assert s.claude_usage_5h is None
+    assert s.claude_usage_week is None
+    assert s.codex_usage_5h is None
+    assert s.codex_usage_week is None
+
+
 def test_independent_instances_do_not_share_forecast():
     a = AgentState()
     b = AgentState()

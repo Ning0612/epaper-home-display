@@ -26,6 +26,13 @@ class AgentState:
 
     display_busy: bool = False
     active_reminder: str | None = None
+
+    custom_image_path: str | None = None
+    claude_usage_5h: float | None = None
+    claude_usage_week: float | None = None
+    codex_usage_5h: float | None = None
+    codex_usage_week: float | None = None
+
     started_at: datetime = field(default_factory=datetime.now)
 
 
