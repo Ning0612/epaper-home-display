@@ -20,22 +20,29 @@ class WeatherService:
         self._last_fetch: datetime | None = None
 
     async def fetch(self) -> tuple[dict, list[dict]]:
-        params = {
-            "id": self._config.city_id,
+        q = f"{self._config.city_name},TW"
+        current_params = {
+            "q": q,
             "appid": self._config.api_key,
             "units": self._config.units,
         }
+        forecast_params = {
+            "q": q,
+            "appid": self._config.api_key,
+            "units": self._config.units,
+            "cnt": 40,
+        }
         timeout = aiohttp.ClientTimeout(total=10)
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"{_BASE}/weather", params=params, timeout=timeout) as resp:
+            async with session.get(f"{_BASE}/weather", params=current_params, timeout=timeout) as resp:
                 resp.raise_for_status()
                 current: dict = await resp.json()
-            async with session.get(f"{_BASE}/forecast", params=params, timeout=timeout) as resp:
+            async with session.get(f"{_BASE}/forecast", params=forecast_params, timeout=timeout) as resp:
                 resp.raise_for_status()
                 forecast_body: dict = await resp.json()
 
         self._cached_current = current
-        self._cached_forecast = forecast_body.get("list", [])[:8]
+        self._cached_forecast = forecast_body.get("list", [])
         self._last_fetch = datetime.now()
         logger.info(
             "Weather: %s %.1f°C",

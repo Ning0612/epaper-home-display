@@ -23,6 +23,11 @@ Do not assume Claude Code is installed on the Pi. Use SSH for Pi-side execution.
 
 Pi hostname: `pi@epaper-display.local`
 
+### Pi Execution Policy
+
+- **Non-sudo commands** (git pull, pip install, journalctl, python scripts): Claude executes directly via SSH.
+- **sudo commands** (systemctl restart/enable/daemon-reload, cp to /etc/systemd/): Claude cannot run these — provide the exact command and ask the user to run it manually (e.g. `! ssh pi@epaper-display.local 'sudo systemctl restart epaper-home-display'`).
+
 ---
 
 ## Common Commands
@@ -115,10 +120,10 @@ score >= 2 → OCCUPIED | score < 2 → UNOCCUPIED
 
 The display is slow — never block MQTT callbacks or WebUI handlers for it:
 
-- Normal dashboard: every 1 minute or on important state change
+- Normal dashboard: wall-clock aligned — triggered at `:dashboard_trigger_second` each minute (default :57) so the panel shows the correct minute at :00
 - Weather/environment: every 10 minutes
-- Security alert: immediately
-- Full refresh: ~once per hour
+- Security alert: immediately via display_queue
+- Refresh cadence: every 10th successful write is a full refresh (init, clears ghosting); the other 9 use init_fast (partial)
 
 ### MQTT Topics
 

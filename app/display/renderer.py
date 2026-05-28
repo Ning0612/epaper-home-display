@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from datetime import datetime, date
 from typing import TYPE_CHECKING, TypeAlias
 
@@ -125,7 +126,7 @@ def _draw_progress_bar(
 
 def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict]:
     today = date.today()
-    seen: dict[date, dict] = {}
+    by_day: dict[date, list[dict]] = {}
     for entry in forecast_list:
         dt_txt = entry.get("dt_txt", "")
         try:
@@ -134,26 +135,35 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
             continue
         if d == today:
             continue
-        if d not in seen:
-            seen[d] = entry
-        if len(seen) >= count:
-            break
-    result = list(seen.values())
-    if len(result) < count:
-        for entry in forecast_list:
-            if entry in result:
-                continue
-            dt_txt = entry.get("dt_txt", "")
-            try:
-                d = datetime.strptime(dt_txt[:10], "%Y-%m-%d").date()
-            except ValueError:
-                continue
-            if d == today:
-                continue
-            result.append(entry)
-            if len(result) >= count:
-                break
-    return result[:count]
+        by_day.setdefault(d, []).append(entry)
+
+    result: list[dict] = []
+    for d in sorted(by_day.keys())[:count]:
+        slots = by_day[d]
+
+        temps = [s.get("main", {}).get("temp") for s in slots]
+        temps = [t for t in temps if isinstance(t, (int, float))]
+        avg_temp: float | None = sum(temps) / len(temps) if temps else None
+
+        mains = [_weather_item(s).get("main", "") for s in slots]
+        mains = [m for m in mains if m]
+        mode_main = Counter(mains).most_common(1)[0][0] if mains else ""
+
+        pops = [s.get("pop") or 0 for s in slots]
+        try:
+            max_pop: float = max(float(p) for p in pops)
+        except (TypeError, ValueError):
+            max_pop = 0.0
+
+        noon = next((s for s in slots if "12:00:00" in s.get("dt_txt", "")), slots[0])
+        result.append({
+            "dt_txt": noon["dt_txt"],
+            "weather": [{"main": mode_main}],
+            "main": {"temp": avg_temp},
+            "pop": max_pop,
+        })
+
+    return result
 
 
 def _weather_item(payload: dict) -> dict:

@@ -5,6 +5,7 @@ import logging
 import sys
 import functools
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime as _DateTime
 
 from app.config import load_settings
 from app.display.epaper import create_epaper
@@ -101,10 +102,15 @@ async def _display_loop(
     loop = asyncio.get_event_loop()
 
     while True:
+        # Align to wall-clock: trigger at :dashboard_trigger_second each minute.
+        # Any display_queue event (button, MQTT alert) fires immediately instead.
+        now = _DateTime.now()
+        target = settings.display.dashboard_trigger_second
+        delay = (target - now.second) % 60 or 60  # `or 60` avoids re-triggering immediately
         try:
-            await asyncio.wait_for(display_queue.get(), timeout=settings.display.dashboard_update_interval)
+            await asyncio.wait_for(display_queue.get(), timeout=delay)
         except asyncio.TimeoutError:
-            pass  # periodic refresh
+            pass  # wall-clock trigger
 
         if state.display_busy:
             continue

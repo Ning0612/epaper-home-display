@@ -8,7 +8,7 @@ from app.services.weather import WeatherService
 
 @pytest.fixture
 def config():
-    return WeatherConfig(api_key="test_key", city_id=1668341)
+    return WeatherConfig(api_key="test_key", city_name="Taipei")
 
 
 def _make_mock_response(json_data: dict):
@@ -51,8 +51,8 @@ async def test_fetch_returns_current_and_forecast(config):
 
 
 @pytest.mark.asyncio
-async def test_forecast_capped_at_eight(config):
-    many_entries = [{"weather": [{"id": 800}], "main": {"temp": float(i)}} for i in range(20)]
+async def test_forecast_returns_all_slots(config):
+    many_entries = [{"weather": [{"id": 800}], "main": {"temp": float(i)}, "dt_txt": f"2026-06-0{(i//8)+1} {(i%8)*3:02d}:00:00"} for i in range(40)]
     mock_current = {"weather": [{"id": 800}], "main": {"temp": 22.0}}
     mock_forecast = {"list": many_entries}
 
@@ -68,4 +68,4 @@ async def test_forecast_capped_at_eight(config):
         service = WeatherService(config)
         _, forecast = await service.fetch()
 
-    assert len(forecast) == 8
+    assert len(forecast) == 40

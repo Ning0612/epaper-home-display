@@ -19,6 +19,7 @@ class MQTTConfig:
 class WeatherConfig:
     api_key: str = ""
     city_id: int = 1668341
+    city_name: str = "Taipei"
     units: str = "metric"
     fetch_interval_seconds: int = 600
 
@@ -55,7 +56,7 @@ class SensorsConfig:
 class DisplayConfig:
     model: str = "epd7in5_V2"
     use_mock: bool = False
-    dashboard_update_interval: int = 60
+    dashboard_trigger_second: int = 57   # render at :SS of each minute
     weather_update_interval: int = 600
 
 
