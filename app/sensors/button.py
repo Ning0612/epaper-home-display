@@ -15,27 +15,16 @@ class ButtonSensor(Protocol):
 
 class RealButton:
     def __init__(self, config: ButtonConfig) -> None:
-        import RPi.GPIO as GPIO  # type: ignore[import]
-        self._pin = config.gpio_pin
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self._pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        self._gpio = GPIO
+        # gpiozero uses lgpio backend on Bookworm/Trixie and avoids the
+        # RPi.GPIO add_event_detect incompatibility on newer Pi OS versions.
+        from gpiozero import Button as _GZButton  # type: ignore[import]
+        self._btn = _GZButton(config.gpio_pin, pull_up=True, bounce_time=0.2)
 
     def is_pressed(self) -> bool:
-        return not self._gpio.input(self._pin)
+        return bool(self._btn.is_pressed)
 
     def register_callback(self, fn: Callable[[], None]) -> None:
-        # Remove any stale edge detection left by a previous process
-        try:
-            self._gpio.remove_event_detect(self._pin)
-        except Exception:
-            pass
-        self._gpio.add_event_detect(
-            self._pin,
-            self._gpio.FALLING,
-            callback=lambda _: fn(),
-            bouncetime=200,
-        )
+        self._btn.when_pressed = fn
 
 
 class MockButton:
