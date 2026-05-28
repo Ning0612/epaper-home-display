@@ -12,7 +12,7 @@ def main() -> None:
         print(f"ERROR: {e}\nInstall: pip install RPi.GPIO")
         sys.exit(1)
 
-    PIN = 17
+    PIN = 27  # GPIO 17 conflicts with e-Paper RST
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 

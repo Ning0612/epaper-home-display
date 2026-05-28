@@ -13,20 +13,22 @@ def main() -> None:
         sys.exit(1)
 
     spi = spidev.SpiDev()
-    spi.open(0, 0)          # bus 0, CE0
+    spi.open(0, 1)          # bus 0, CE1 (CE0 reserved for e-Paper)
     spi.max_speed_hz = 1_350_000
     channel = 0
 
-    print("Testing MCP3008 light sensor (SPI0, CE0, ch0) ...")
-    for i in range(5):
-        r = spi.xfer2([1, (8 + channel) << 4, 0])
-        raw = ((r[1] & 3) << 8) + r[2]
-        lux = round(raw * 0.098, 1)
-        bright = raw >= 500
-        print(f"  [{i+1}/5] raw={raw}  ~{lux} lux  bright={bright}")
-        time.sleep(1)
+    print("Testing MCP3008 light sensor (SPI0, CE1, ch0) ...")
+    try:
+        for i in range(5):
+            r = spi.xfer2([1, (8 + channel) << 4, 0])
+            raw = ((r[1] & 3) << 8) + r[2]
+            lux = round(raw * 0.098, 1)
+            bright = raw >= 500
+            print(f"  [{i+1}/5] raw={raw}  ~{lux} lux  bright={bright}")
+            time.sleep(1)
+    finally:
+        spi.close()
 
-    spi.close()
     print("PASS")
 
 

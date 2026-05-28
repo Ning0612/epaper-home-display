@@ -32,7 +32,7 @@ class DHT22Config:
 @dataclass
 class LightConfig:
     spi_bus: int = 0
-    spi_device: int = 0
+    spi_device: int = 1          # CE1; CE0 is reserved for e-Paper display
     adc_channel: int = 0
     bright_threshold: int = 500
     use_mock: bool = False
@@ -40,7 +40,7 @@ class LightConfig:
 
 @dataclass
 class ButtonConfig:
-    gpio_pin: int = 17
+    gpio_pin: int = 27           # GPIO 17 conflicts with e-Paper RST
     use_mock: bool = False
 
 

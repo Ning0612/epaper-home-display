@@ -15,12 +15,12 @@ sensors:
     use_mock: false
   light:
     spi_bus: 0
-    spi_device: 0          # CE0
+    spi_device: 1          # CE1 (CE0 is occupied by e-Paper display)
     adc_channel: 0
     bright_threshold: 500  # MCP3008 10-bit (0–1023)
     use_mock: false
   button:
-    gpio_pin: 17
+    gpio_pin: 27           # GPIO 17 conflicts with e-Paper RST; use GPIO 27
     use_mock: false
 
 display:
