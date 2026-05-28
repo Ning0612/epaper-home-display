@@ -38,8 +38,9 @@ class RealEpaper:
         self._epd.init()
 
     def display(self, image: Image.Image, full_refresh: bool = False) -> None:
-        if full_refresh:
-            self._epd.init()
+        # sleep() calls module_exit() which closes the SPI fd, so init() must be
+        # called on every update to reopen it — not only on full refreshes.
+        self._epd.init()
         buf = self._epd.getbuffer(image)
         self._epd.display(buf)
         self._epd.sleep()
