@@ -5,7 +5,7 @@ import logging
 import sys
 import functools
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime as _DateTime
+from datetime import datetime as _DateTime, timedelta as _timedelta
 
 from app.config import load_settings
 from app.display.epaper import create_epaper
@@ -118,7 +118,10 @@ async def _display_loop(
         full_refresh = (refresh_count % 10 == 0)
         state.display_busy = True
         try:
-            image = render_dashboard(state, settings)
+            # Advance clock by display lag so the rendered HH:MM matches the
+            # minute that will be visible when the panel finishes updating.
+            render_time = _DateTime.now() + _timedelta(seconds=settings.display.display_lag_seconds)
+            image = render_dashboard(state, settings, render_time)
             await loop.run_in_executor(
                 executor, functools.partial(epaper.display, image, full_refresh)
             )

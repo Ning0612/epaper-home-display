@@ -200,10 +200,13 @@ def _cx_text(
     draw.text((col_x + (col_w - tw) // 2, y), text, font=font, fill=FG)
 
 
-def render_dashboard(state: "AgentState", settings: "Settings") -> Image.Image:
+def render_dashboard(
+    state: "AgentState", settings: "Settings", now: datetime | None = None
+) -> Image.Image:
     img = Image.new("L", (DISPLAY_W, DISPLAY_H), BG)
     draw = ImageDraw.Draw(img)
-    now = datetime.now()
+    if now is None:
+        now = datetime.now()
 
     _draw_card_weather(img, draw, state, now)
     _draw_card_image(img, draw, state)

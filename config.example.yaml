@@ -28,6 +28,7 @@ display:
   model: "epd7in5_V2"
   use_mock: false
   dashboard_trigger_second: 57   # render at :57 each minute so panel shows correct minute at :00
+  display_lag_seconds: 3         # estimated panel update time added to render clock
   weather_update_interval: 600
 
 voice:
