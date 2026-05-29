@@ -8,12 +8,24 @@ export interface ClaudeUsage {
   raw_ok: boolean;
 }
 
-export function parseClaudeUsage(text: string): ClaudeUsage {
-  // Match "0% used" or "25% used" (anywhere in the output)
-  const usedMatch = text.match(/(\d+)%\s+used/i);
+function to24h(raw: string): string {
+  // Strip trailing timezone parenthetical: "6:40pm (Asia/Taipei)" → "6:40pm"
+  const stripped = raw.replace(/\s*\([^)]+\)\s*$/, "").trim();
+  const m = stripped.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (!m) return stripped;
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const period = m[3].toLowerCase();
+  if (period === "am") {
+    if (h === 12) h = 0;
+  } else {
+    if (h !== 12) h += 12;
+  }
+  return `${h.toString().padStart(2, "0")}:${min}`;
+}
 
-  // Match "Resets 6:40pm (Asia/Taipei)" or "Resets 6:40pm"
-  // Capture everything on that line up to a newline or end of string
+export function parseClaudeUsage(text: string): ClaudeUsage {
+  const usedMatch = text.match(/(\d+)%\s+used/i);
   const resetsMatch = text.match(/Resets\s+([^\n\r]+)/i);
 
   if (!usedMatch) {
@@ -21,8 +33,7 @@ export function parseClaudeUsage(text: string): ClaudeUsage {
   }
 
   const used_pct = Math.max(0, Math.min(100, Number(usedMatch[1])));
-  // Strip trailing whitespace and parenthetical timezone if desired — keep raw for now
-  const reset_text = resetsMatch ? resetsMatch[1].trim() : "";
+  const reset_text = resetsMatch ? to24h(resetsMatch[1].trim()) : "";
 
   return {
     five_hour: { used_pct, reset_text },

@@ -21,19 +21,25 @@ export function parseCodexStatus(text: string): CodexStatus {
   );
 
   const parseLimitInfo = (
-    match: RegExpMatchArray | null
+    match: RegExpMatchArray | null,
+    dateOnly = false
   ): CodexLimitInfo | null => {
     if (!match) return null;
     const leftPct = Number(match[1]);
     if (Number.isNaN(leftPct)) return null;
+    let reset_text = match[2].trim();
+    if (dateOnly) {
+      // "17:38 on 1 Jun" → "1 Jun"  |  "17:38 on 31 May" → "31 May"
+      reset_text = reset_text.replace(/^\d{1,2}:\d{2}\s+on\s+/i, "").trim();
+    }
     return {
       used_pct: Math.max(0, Math.min(100, 100 - leftPct)),
-      reset_text: match[2].trim(),
+      reset_text,
     };
   };
 
   const five_hour = parseLimitInfo(fiveHourMatch);
-  const weekly = parseLimitInfo(weeklyMatch);
+  const weekly = parseLimitInfo(weeklyMatch, true);
 
   return {
     five_hour,

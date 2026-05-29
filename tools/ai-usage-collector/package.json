@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "collect": "ts-node src/index.ts",
+    "debug-raw": "ts-node src/debug-raw.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },

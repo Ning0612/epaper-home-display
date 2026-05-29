@@ -7,55 +7,72 @@ export async function runTuiCommand(
   cliCommand: string,
   slashCommand: string,
   startupMs = 1500,
-  waitMs = 9000
+  waitMs = 12000
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     let output = "";
+    let commandSent = false;
 
-    // On Windows, spawn via cmd.exe to resolve PATH correctly;
-    // on macOS/Linux, spawn directly so the shell profile is not re-sourced.
-    const spawnArgs = IS_WINDOWS
-      ? { name: "xterm-color", cols: 120, rows: 40, env: process.env as Record<string, string>, useConpty: false }
-      : { name: "xterm-color", cols: 120, rows: 40, env: process.env as Record<string, string> };
+    const baseArgs = {
+      name: "xterm-color",
+      cols: 120,
+      rows: 40,
+      env: process.env as Record<string, string>,
+    };
 
     let shell: pty.IPty;
     try {
-      shell = pty.spawn(cliCommand, [], spawnArgs as pty.IWindowsPtyForkOptions);
+      shell = IS_WINDOWS
+        ? pty.spawn("cmd.exe", [], { ...baseArgs, useConpty: false } as pty.IWindowsPtyForkOptions)
+        : pty.spawn(cliCommand, [], baseArgs);
     } catch (err) {
-      reject(new Error(`Failed to spawn '${cliCommand}': ${err}`));
+      reject(new Error(`Failed to spawn PTY for '${cliCommand}': ${err}`));
       return;
     }
+
+    const sendSlashCommand = () => {
+      if (commandSent) return;
+      commandSent = true;
+      try { shell.write(`${slashCommand}\r`); } catch { /* shell may have exited */ }
+    };
 
     const killAndResolve = () => {
       try { shell.kill(); } catch { /* already dead */ }
       resolve(stripAnsi(output));
     };
 
-    const timeout = setTimeout(killAndResolve, waitMs);
+    const hardTimeout = setTimeout(killAndResolve, waitMs);
 
     shell.onData((data: string) => {
       output += data;
+      // Send slash command as soon as the TUI reports "Ready" — more reliable
+      // than a fixed startup delay because MCP server load time varies.
+      if (!commandSent && stripAnsi(output).includes(" · Ready · ")) {
+        setTimeout(sendSlashCommand, 300);
+      }
     });
 
     shell.onExit(() => {
-      clearTimeout(timeout);
+      clearTimeout(hardTimeout);
       resolve(stripAnsi(output));
     });
 
-    // Wait for TUI to finish loading before sending the slash command
-    setTimeout(() => {
-      try {
-        shell.write(`${slashCommand}\r`);
-      } catch {
-        // shell may have already exited
-      }
-    }, startupMs);
+    if (IS_WINDOWS) {
+      // On Windows: type the CLI command into cmd.exe after the shell prompt appears
+      setTimeout(() => {
+        try { shell.write(`${cliCommand}\r`); } catch { /* ignore */ }
+      }, 500);
+    }
 
-    // Send Ctrl+C shortly before the timeout to trigger graceful exit
+    // Fallback: if "Ready" never appears, send the command at startupMs anyway
+    const fallbackDelay = IS_WINDOWS ? 500 + startupMs : startupMs;
     setTimeout(() => {
-      try {
-        shell.write("\x03");
-      } catch { /* ignore */ }
+      if (!commandSent) sendSlashCommand();
+    }, fallbackDelay);
+
+    // Ctrl+C for graceful exit before hard timeout
+    setTimeout(() => {
+      try { shell.write("\x03"); } catch { /* ignore */ }
     }, waitMs - 1000);
   });
 }

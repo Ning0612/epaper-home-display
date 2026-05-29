@@ -70,6 +70,8 @@ async function main(): Promise<void> {
   } catch (err) {
     console.error("[ai-usage-collector] Push failed (cached locally):", err);
   }
+
+  process.exit(0);
 }
 
 main();
