@@ -399,9 +399,17 @@ def _draw_usage_row(
     label: str,
     pct: float | None,
     reset_text: str | None,
+    row_w: int = 190,
 ) -> None:
-    _LW, _G, _PW, _BW, _BH = 52, 4, 36, 94, 11
+    # _LW: label column width (measured at runtime)
+    # _G: gap between elements
+    # _PW: percentage text column width
+    # _BH: bar height
+    _G, _PW, _BH = 4, 36, 11
     fnt = _font(13, bold=True)
+    # measure actual label width so the bar gets all leftover space
+    _bb = draw.textbbox((0, 0), label, font=fnt)
+    _LW = _bb[2] - _bb[0]
     draw.text((x, y), label, font=fnt, fill=FG)
     pct_x = x + _LW + _G
     if pct is None:
@@ -410,6 +418,14 @@ def _draw_usage_row(
     draw.text((pct_x, y), f"{min(100, max(0, int(pct * 100)))}%", font=fnt, fill=FG)
     bar_x = pct_x + _PW + _G
     bar_y = y + (16 - _BH) // 2
+    # measure reset_text width so bar doesn't crowd it out
+    if reset_text:
+        _rb = draw.textbbox((0, 0), reset_text, font=fnt)
+        _RW = _rb[2] - _rb[0] + _G   # reserve: text width + one gap
+    else:
+        _RW = 0
+    # bar gets all space between pct% and reset_text
+    _BW = max(10, row_w - (_LW + _G + _PW + _G) - _RW)
     _draw_progress_bar(draw, bar_x, bar_y, _BW, _BH, pct)
     if reset_text:
         draw.text((bar_x + _BW + _G, y), reset_text, font=fnt, fill=FG)
@@ -428,8 +444,8 @@ def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     sy = iy + max(0, (ih - content_h) // 2)
 
     _cx_text(draw, "Codex Usage", ix, iw, sy, _font(14, bold=True))
-    _draw_usage_row(draw, ix, sy + 20, "5h",     state.codex_usage_5h,   state.codex_5h_reset)
-    _draw_usage_row(draw, ix, sy + 40, "Weekly",  state.codex_usage_week, state.codex_weekly_reset)
+    _draw_usage_row(draw, ix, sy + 20, "5h",     state.codex_usage_5h,   state.codex_5h_reset,   iw)
+    _draw_usage_row(draw, ix, sy + 40, "W",       state.codex_usage_week, state.codex_weekly_reset, iw)
     draw.line([(ix, sy + 60), (ix + iw - 1, sy + 60)], fill=FG, width=1)
     _cx_text(draw, "Claude Usage", ix, iw, sy + 68, _font(14, bold=True))
-    _draw_usage_row(draw, ix, sy + 88, "5h", state.claude_usage_5h, state.claude_5h_reset)
+    _draw_usage_row(draw, ix, sy + 88, "5h", state.claude_usage_5h, state.claude_5h_reset, iw)
