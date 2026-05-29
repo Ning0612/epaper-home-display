@@ -400,14 +400,14 @@ def _draw_usage_row(
     pct: float | None,
     reset_text: str | None,
 ) -> None:
-    _LW, _G, _PW, _BW, _BH = 52, 4, 52, 78, 11
+    _LW, _G, _PW, _BW, _BH = 52, 4, 36, 94, 11
     fnt = _font(13, bold=True)
     draw.text((x, y), label, font=fnt, fill=FG)
     pct_x = x + _LW + _G
     if pct is None:
         draw.text((pct_x, y), "N/A", font=fnt, fill=FG)
         return
-    draw.text((pct_x, y), f"{min(100, max(0, int(pct * 100)))}% used", font=fnt, fill=FG)
+    draw.text((pct_x, y), f"{min(100, max(0, int(pct * 100)))}%", font=fnt, fill=FG)
     bar_x = pct_x + _PW + _G
     bar_y = y + (16 - _BH) // 2
     _draw_progress_bar(draw, bar_x, bar_y, _BW, _BH, pct)
