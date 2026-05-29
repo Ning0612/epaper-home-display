@@ -75,6 +75,15 @@ class _LocationBody(BaseModel):
     lon: float
 
 
+class _AIUsageBody(BaseModel):
+    codex_5h_pct: float | None = None
+    codex_5h_reset: str | None = None
+    codex_weekly_pct: float | None = None
+    codex_weekly_reset: str | None = None
+    claude_5h_pct: float | None = None
+    claude_5h_reset: str | None = None
+
+
 def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI:
     app = FastAPI(title="ePaper Home Display", version="0.1.0")
 
@@ -101,6 +110,13 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
             "active_reminder": state.active_reminder,
             "display_busy": state.display_busy,
             "started_at": state.started_at.isoformat(),
+            "codex_usage_5h": state.codex_usage_5h,
+            "codex_usage_week": state.codex_usage_week,
+            "codex_5h_reset": state.codex_5h_reset,
+            "codex_weekly_reset": state.codex_weekly_reset,
+            "claude_usage_5h": state.claude_usage_5h,
+            "claude_usage_week": state.claude_usage_week,
+            "claude_5h_reset": state.claude_5h_reset,
         })
 
     @app.get("/logs/env")
@@ -128,6 +144,25 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
             .replace("__LON__", str(lon))
         )
         return HTMLResponse(html)
+
+    @app.post("/ai_usage")
+    async def post_ai_usage(body: _AIUsageBody):
+        from app.storage.logs import log_ai_usage
+        from datetime import datetime as _dt
+        if body.codex_5h_pct is not None:
+            state.codex_usage_5h = max(0.0, min(1.0, body.codex_5h_pct / 100.0))
+        if body.codex_5h_reset is not None:
+            state.codex_5h_reset = body.codex_5h_reset
+        if body.codex_weekly_pct is not None:
+            state.codex_usage_week = max(0.0, min(1.0, body.codex_weekly_pct / 100.0))
+        if body.codex_weekly_reset is not None:
+            state.codex_weekly_reset = body.codex_weekly_reset
+        if body.claude_5h_pct is not None:
+            state.claude_usage_5h = max(0.0, min(1.0, body.claude_5h_pct / 100.0))
+        if body.claude_5h_reset is not None:
+            state.claude_5h_reset = body.claude_5h_reset
+        await log_ai_usage(body.model_dump())
+        return {"ok": True, "updated_at": _dt.now().isoformat()}
 
     @app.put("/settings/location")
     async def set_location(body: _LocationBody):

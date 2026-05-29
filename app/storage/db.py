@@ -70,6 +70,13 @@ CREATE INDEX IF NOT EXISTS idx_door_events_ts   ON door_events(ts);
 CREATE INDEX IF NOT EXISTS idx_face_events_ts   ON face_events(ts);
 CREATE INDEX IF NOT EXISTS idx_presence_logs_ts ON presence_logs(ts);
 CREATE INDEX IF NOT EXISTS idx_indoor_env_ts    ON indoor_env_logs(ts);
+
+CREATE TABLE IF NOT EXISTS ai_usage_logs (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts       TEXT NOT NULL,
+    raw_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_ts ON ai_usage_logs(ts);
 """
 
 

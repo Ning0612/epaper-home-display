@@ -133,6 +133,15 @@ async def get_presence_logs(limit: int = 50) -> list[dict]:
     return [{"ts": r[0], "score": r[1], "state": r[2], "reason": r[3]} for r in rows]
 
 
+async def log_ai_usage(data: dict) -> None:
+    async with connect() as db:
+        await db.execute(
+            "INSERT INTO ai_usage_logs (ts, raw_json) VALUES (?,?)",
+            (_now(), json.dumps(data)),
+        )
+        await db.commit()
+
+
 async def get_system_events(limit: int = 50) -> list[dict]:
     limit = max(1, min(limit, 500))
     async with connect() as db:

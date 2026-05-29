@@ -392,43 +392,44 @@ def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     _cx_text(draw, f"M {mode_str}", ix, iw, sy + 20 + 3 * line_h, _font(14, bold=True))
 
 
+def _draw_usage_row(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    label: str,
+    pct: float | None,
+    reset_text: str | None,
+) -> None:
+    _LW, _G, _PW, _BW, _BH = 52, 4, 52, 78, 11
+    fnt = _font(13, bold=True)
+    draw.text((x, y), label, font=fnt, fill=FG)
+    pct_x = x + _LW + _G
+    if pct is None:
+        draw.text((pct_x, y), "N/A", font=fnt, fill=FG)
+        return
+    draw.text((pct_x, y), f"{min(100, max(0, int(pct * 100)))}% used", font=fnt, fill=FG)
+    bar_x = pct_x + _PW + _G
+    bar_y = y + (16 - _BH) // 2
+    _draw_progress_bar(draw, bar_x, bar_y, _BW, _BH, pct)
+    if reset_text:
+        draw.text((bar_x + _BW + _G, y), reset_text, font=fnt, fill=FG)
+
+
 def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     draw.rectangle(
         [(USAGE_X, USAGE_Y), (USAGE_X + USAGE_W - 1, USAGE_Y + USAGE_H - 1)],
         outline=FG, width=1,
     )
     ix, iy = USAGE_X + PAD, USAGE_Y + PAD
-    iw = USAGE_W - 2 * PAD    # 283
+    iw = USAGE_W - 2 * PAD    # 243
     ih = USAGE_H - 2 * PAD    # 168
 
-    label_w = 72
-    gap = 4
-    pct_w = 38
-    bar_w = iw - label_w - 2 * gap - pct_w
-    bar_h = 12
-    bar_spacing = 20
-
-    rows = [
-        ("Claude 5h", state.claude_usage_5h),
-        ("Claude W", state.claude_usage_week),
-        ("Codex 5h", state.codex_usage_5h),
-        ("Codex W", state.codex_usage_week),
-    ]
-
-    # Vertically centre content in available inner height
-    content_h = 16 + 6 + len(rows) * bar_spacing
+    content_h = 104
     sy = iy + max(0, (ih - content_h) // 2)
 
-    _cx_text(draw, "Usage", ix, iw, sy, _font(14, bold=True))
-
-    for i, (label, pct) in enumerate(rows):
-        row_y = sy + 24 + i * bar_spacing
-        draw.text((ix, row_y), label, font=_font(14, bold=True), fill=FG)
-
-        bar_x = ix + label_w + gap
-        if pct is None:
-            draw.text((bar_x, row_y), "N/A", font=_font(14, bold=True), fill=FG)
-        else:
-            bar_y = row_y + (16 - bar_h) // 2
-            _draw_progress_bar(draw, bar_x, bar_y, bar_w, bar_h, pct)
-            draw.text((bar_x + bar_w + gap, row_y), f"{min(100, max(0, int(pct * 100)))}%", font=_font(14, bold=True), fill=FG)
+    _cx_text(draw, "Codex Usage", ix, iw, sy, _font(14, bold=True))
+    _draw_usage_row(draw, ix, sy + 20, "5h",     state.codex_usage_5h,   state.codex_5h_reset)
+    _draw_usage_row(draw, ix, sy + 40, "Weekly",  state.codex_usage_week, state.codex_weekly_reset)
+    draw.line([(ix, sy + 60), (ix + iw - 1, sy + 60)], fill=FG, width=1)
+    _cx_text(draw, "Claude Usage", ix, iw, sy + 68, _font(14, bold=True))
+    _draw_usage_row(draw, ix, sy + 88, "5h", state.claude_usage_5h, state.claude_5h_reset)
