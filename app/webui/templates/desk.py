@@ -1,60 +1,33 @@
-_DESK_HTML = r"""<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>書桌前分析</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap">
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --bg:#080d18;--surface:#0f172a;--surface2:#1a253d;--border:#1e3a5f;
-      --primary:#38bdf8;--primary-h:#0ea5e9;--green:#34d399;--amber:#fbbf24;--red:#f87171;
-      --muted:#64748b;--text:#e2e8f0;
-      --r:10px;--sh:0 2px 12px rgba(0,0,0,.4)
-    }
-    body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-    .topbar{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.5rem;background:rgba(15,23,42,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-    .topbar-title{font-size:1.1rem;font-weight:600}
-    .topbar-link{font-size:.8rem;color:var(--primary);text-decoration:none;padding:.3rem .7rem;border:1px solid var(--primary);border-radius:6px}
-    .container{max-width:900px;margin:0 auto;padding:1.5rem}
-    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.3rem;box-shadow:var(--sh);margin-bottom:1.2rem}
-    .card-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:1rem}
-    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem;margin-bottom:1.2rem}
-    .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh)}
-    .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
-    .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:'DM Mono',monospace}
-    .stat-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}
-    .badge{display:inline-block;padding:.2rem .65rem;border-radius:99px;font-size:.78rem;font-weight:600}
-    .badge-green{background:rgba(52,211,153,.15);color:#34d399}
-    .badge-gray{background:rgba(100,116,139,.15);color:#94a3b8}
-    .sensor-row{display:flex;align-items:center;gap:1rem;font-size:.85rem;flex-wrap:wrap}
-    .sensor-bar-wrap{flex:1;min-width:180px}
-    .sensor-bar{height:8px;background:var(--surface2);border-radius:4px;position:relative;overflow:visible}
-    .sensor-fill{height:100%;border-radius:4px;background:var(--primary);transition:width .4s}
-    .sensor-threshold-line{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--amber);border-radius:1px}
-    .chart-wrap{overflow-x:auto}
-    table{width:100%;border-collapse:collapse;font-size:.82rem}
-    th{text-align:left;padding:.5rem .7rem;font-size:.72rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
-    td{padding:.5rem .7rem;border-bottom:1px solid rgba(30,58,95,.5)}
-    tr:last-child td{border-bottom:none}
-    .badge-occ{background:rgba(56,189,248,.15);color:#7dd3fc}
-    .badge-unocc{background:rgba(100,116,139,.15);color:#94a3b8}
-    .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.3rem}
-    @media(max-width:600px){.container{padding:1rem}.topbar{padding:.7rem 1rem}}
-  </style>
-</head>
-<body>
+from app.webui.templates.base import _make_shell
 
-<div class="topbar">
-  <div class="topbar-title">📖 書桌前分析</div>
-  <a href="/settings" class="topbar-link">⚙️ 設定</a>
-</div>
+_DESK_CONTENT = r"""
+<style>
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem;margin-bottom:1.2rem}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh)}
+  .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
+  .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:'JetBrains Mono',monospace}
+  .stat-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+  .badge{display:inline-block;padding:.2rem .65rem;border-radius:99px;font-size:.78rem;font-weight:600}
+  .badge-green{background:rgba(52,211,153,.15);color:#34d399}
+  .badge-gray{background:rgba(100,116,139,.15);color:#94a3b8}
+  .sensor-row{display:flex;align-items:center;gap:1rem;font-size:.85rem;flex-wrap:wrap}
+  .sensor-bar-wrap{flex:1;min-width:180px}
+  .sensor-bar{height:8px;background:var(--surface2);border-radius:4px;position:relative;overflow:visible}
+  .sensor-fill{height:100%;border-radius:4px;background:var(--primary);transition:width .4s}
+  .sensor-threshold-line{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--amber);border-radius:1px}
+  .chart-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th{text-align:left;padding:.5rem .7rem;font-size:.72rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+  td{padding:.5rem .7rem;border-bottom:1px solid rgba(27,40,66,.5)}
+  tr:last-child td{border-bottom:none}
+  .badge-occ{background:rgba(56,189,248,.15);color:#7dd3fc}
+  .badge-unocc{background:rgba(100,116,139,.15);color:#94a3b8}
+  .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.3rem}
+</style>
 
-<div class="container">
+<div class="page-wrap">
+  <div class="page-title">📊 書桌前分析</div>
 
-  <!-- Status Stats -->
   <div class="stats-grid" id="stats-grid">
     <div class="stat"><div class="stat-label">目前狀態</div><div class="stat-value" id="s-presence">—</div></div>
     <div class="stat"><div class="stat-label">今日累計</div><div class="stat-value" id="s-today">—</div></div>
@@ -62,7 +35,6 @@ _DESK_HTML = r"""<!DOCTYPE html>
     <div class="stat"><div class="stat-label">今日次數</div><div class="stat-value" id="s-count">—</div></div>
   </div>
 
-  <!-- Sensor -->
   <div class="card">
     <div class="card-title">光線感測器</div>
     <div class="sensor-row">
@@ -78,7 +50,6 @@ _DESK_HTML = r"""<!DOCTYPE html>
     <div class="refresh-ts" id="last-refresh"></div>
   </div>
 
-  <!-- 24h Timeline -->
   <div class="card">
     <div class="card-title">近 24 小時狀態軸</div>
     <div class="chart-wrap" id="timeline-wrap">
@@ -86,7 +57,6 @@ _DESK_HTML = r"""<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- 30-day Chart -->
   <div class="card">
     <div class="card-title">近 30 天書桌前時間</div>
     <div class="chart-wrap" id="barchart-wrap">
@@ -98,7 +68,6 @@ _DESK_HTML = r"""<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Daily Stats Table -->
   <div class="card">
     <div class="card-title">每日統計（最近 30 天）</div>
     <div style="overflow-x:auto">
@@ -109,7 +78,6 @@ _DESK_HTML = r"""<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Recent Sessions -->
   <div class="card">
     <div class="card-title">最近時段紀錄</div>
     <div style="overflow-x:auto">
@@ -119,7 +87,6 @@ _DESK_HTML = r"""<!DOCTYPE html>
       </table>
     </div>
   </div>
-
 </div>
 
 <script>
@@ -161,11 +128,11 @@ function renderTimeline(sessions){
     var t=new Date(start24+h*3600000);
     var lbl=String(t.getHours()).padStart(2,'0')+':00';
     var anchor=h===0?'start':h===24?'end':'middle';
-    labels+='<text x="'+x+'" y="'+H+'" text-anchor="'+anchor+'" font-size="10" fill="#64748b">'+lbl+'</text>';
-    labels+='<line x1="'+x+'" y1="44" x2="'+x+'" y2="47" stroke="#475569" stroke-width="1"/>';
+    labels+='<text x="'+x+'" y="'+H+'" text-anchor="'+anchor+'" font-size="10" fill="#4E647A">'+lbl+'</text>';
+    labels+='<line x1="'+x+'" y1="44" x2="'+x+'" y2="47" stroke="#1B2842" stroke-width="1"/>';
   }
   return '<svg viewBox="0 0 '+W+' '+(H+2)+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px">'
-    +'<rect width="'+W+'" height="48" rx="4" fill="#0f172a"/>'
+    +'<rect width="'+W+'" height="48" rx="4" fill="#0C1225"/>'
     +bars+labels+'</svg>';
 }
 
@@ -183,11 +150,11 @@ function renderBarChart(daily30d){
     bars+='<rect x="'+(x+1)+'" y="'+y+'" width="'+bW+'" height="'+h+'" rx="2" fill="#38bdf8" opacity="'+opacity+'"/>';
     if(i%7===0||i===29){
       var lbl=d.date.slice(5);
-      labels+='<text x="'+(x+bW/2)+'" y="'+(svgH-2)+'" text-anchor="middle" font-size="9" fill="#64748b">'+lbl+'</text>';
+      labels+='<text x="'+(x+bW/2)+'" y="'+(svgH-2)+'" text-anchor="middle" font-size="9" fill="#4E647A">'+lbl+'</text>';
     }
   });
   return '<svg viewBox="0 0 '+W+' '+svgH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px">'
-    +'<rect width="'+W+'" height="'+svgH+'" rx="4" fill="#0f172a"/>'
+    +'<rect width="'+W+'" height="'+svgH+'" rx="4" fill="#0C1225"/>'
     +bars+labels+'</svg>';
 }
 
@@ -218,16 +185,13 @@ async function loadHistory(){
     var r=await fetch('/api/desk/history');
     var d=await r.json();
     document.getElementById('timeline-wrap').innerHTML=renderTimeline(d.timeline_24h||[]);
-
     document.getElementById('barchart-wrap').innerHTML=renderBarChart(d.daily_30d||[]);
-
     var totals=(d.daily_30d||[]).map(function(x){return x.total_seconds;});
     var nonZero=totals.filter(function(x){return x>0;});
     var avg=nonZero.length?Math.round(nonZero.reduce(function(a,b){return a+b;},0)/nonZero.length):0;
     var max=nonZero.length?Math.max.apply(null,nonZero):0;
     document.getElementById('avg30').textContent=fmtDuration(avg);
     document.getElementById('max30').textContent=fmtDuration(max);
-
     var tbody=document.getElementById('daily-tbody');
     var rows=(d.daily_30d||[]).slice().reverse().map(function(x){
       var pct=Math.round(x.total_seconds/864);
@@ -256,5 +220,6 @@ loadStats(); loadHistory(); loadSessions();
 setInterval(loadStats, 30000);
 setInterval(function(){loadHistory();loadSessions();}, 300000);
 </script>
-</body>
-</html>"""
+"""
+
+_DESK_HTML = _make_shell("desk", "書桌前分析", _DESK_CONTENT)
