@@ -209,7 +209,8 @@ function renderTimeline(sessions){
     var x=h/24*W;
     var t=new Date(start24+h*3600000);
     var lbl=String(t.getHours()).padStart(2,'0')+':00';
-    labels+='<text x="'+x+'" y="'+H+'" text-anchor="middle" font-size="10" fill="#64748b">'+lbl+'</text>';
+    var anchor=h===0?'start':h===24?'end':'middle';
+    labels+='<text x="'+x+'" y="'+H+'" text-anchor="'+anchor+'" font-size="10" fill="#64748b">'+lbl+'</text>';
     labels+='<line x1="'+x+'" y1="44" x2="'+x+'" y2="47" stroke="#475569" stroke-width="1"/>';
   }
   return '<svg viewBox="0 0 '+W+' '+(H+2)+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px">'
@@ -327,7 +328,10 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
       --r:8px;--sh:0 2px 12px rgba(0,0,0,.4)
     }
     body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
-    .sb{width:210px;background:var(--surface);border-right:1px solid var(--border);padding:1.25rem 0;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0}
+    .sb{width:210px;background:var(--surface);border-right:1px solid var(--border);padding:1.25rem 0;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
+    .sb-foot{margin-top:auto;padding:.75rem 1rem;border-top:1px solid var(--border)}
+    .sb-foot a{display:flex;align-items:center;gap:.5rem;font-size:.83rem;color:var(--primary);text-decoration:none;padding:.4rem .5rem;border-radius:6px;transition:background .15s}
+    .sb-foot a:hover{background:rgba(56,189,248,.08)}
     .sb-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:0 1rem .6rem}
     .nav{display:flex;align-items:center;gap:.5rem;padding:.5rem 1rem;cursor:pointer;font-size:.85rem;color:var(--muted);border-left:3px solid transparent;transition:all .15s;user-select:none}
     .nav:hover{background:var(--surface2);color:var(--text)}
@@ -383,6 +387,8 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
       .sb-title{display:none}
       .nav{border-left:none;border-radius:6px;padding:.35rem .65rem}
       .nav.active{background:rgba(56,189,248,.15);color:var(--primary);border-left:none}
+      .sb-foot{margin-top:0;padding:0;border-top:none}
+      .sb-foot a{padding:.35rem .65rem;font-size:.83rem}
       .main{padding:1rem}
     }
   </style>
@@ -400,6 +406,9 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
   <div class="nav" onclick="go('general',this)"><span class="ni">⚙️</span>一般</div>
   <div class="nav" onclick="go('wifi',this)"><span class="ni">📶</span>WiFi</div>
   <div class="nav" onclick="go('auth',this)"><span class="ni">🔒</span>安全</div>
+  <div class="sb-foot">
+    <a href="/desk"><span class="ni">📖</span>書桌前分析</a>
+  </div>
 </nav>
 
 <main class="main">
