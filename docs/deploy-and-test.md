@@ -114,36 +114,41 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m pyt
 - Pi 已完成首次部署（見第三節）
 - Pi 上已有 `~/epaper-home-display` 目錄與 `.venv`
 
-### 日常部署流程
+### 日常部署流程（自動更新已啟用）
+
+自動更新 timer 每 5 分鐘檢查一次，有新 commit 就自動 pull 並重啟服務。**只需要 push，Pi 會自行更新**：
 
 ```bash
 # 1. 本機確認測試全過
 pytest
 
-# 2. push 到遠端
+# 2. push 到遠端 → Pi 最多 5 分鐘內自動更新
 git push
 
-# 3. Pi 拉取最新程式碼
+# 3. 確認自動更新日誌（約 5 分鐘後）
+ssh pi@epaper-display.local 'journalctl -t epaper-auto-update -n 20 --no-pager'
+```
+
+### 手動部署（緊急或自動更新未設定時）
+
+```bash
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && git pull'
-
-# 4. 更新套件（依賴有變動時才需要）
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/pip install -r requirements.txt'
-
-# 5. 重啟服務
 ssh pi@epaper-display.local 'sudo systemctl restart epaper-home-display'
-
-# 6. 確認服務狀態
 ssh pi@epaper-display.local 'systemctl status epaper-home-display --no-pager'
 ```
 
 ### 查看 Log
 
 ```bash
-# 最近 100 行
+# 服務 log（最近 100 行）
 ssh pi@epaper-display.local 'journalctl -u epaper-home-display -n 100 --no-pager'
 
-# 即時追蹤
+# 服務 log（即時追蹤）
 ssh pi@epaper-display.local 'journalctl -u epaper-home-display -f'
+
+# 自動更新 log
+ssh pi@epaper-display.local 'journalctl -t epaper-auto-update -n 50 --no-pager'
 ```
 
 ---
@@ -177,7 +182,50 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scr
 
 ---
 
-## 六、常見問題排查
+## 六、自動更新機制
+
+Pi 上有 systemd timer 每 5 分鐘自動檢查 `origin/main` 是否有新 commit，有則 pull 並重啟服務。
+
+### 首次設定（Pi 首次部署後執行一次）
+
+```bash
+# 1. 腳本加執行權限
+ssh pi@epaper-display.local 'chmod +x ~/epaper-home-display/scripts/auto_update.sh'
+
+# 2. sudoers：允許 pi 免密重啟服務（在 Pi 上執行）
+# echo "pi ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart epaper-home-display.service" | sudo tee /etc/sudoers.d/epaper-restart && sudo chmod 440 /etc/sudoers.d/epaper-restart
+
+# 3. 安裝並啟用 timer（在 Pi 上執行）
+# sudo cp ~/epaper-home-display/systemd/epaper-auto-update.service /etc/systemd/system/
+# sudo cp ~/epaper-home-display/systemd/epaper-auto-update.timer /etc/systemd/system/
+# sudo systemctl daemon-reload && sudo systemctl enable --now epaper-auto-update.timer
+```
+
+> Step 2–3 需要 sudo，請在 Pi 終端機直接執行（無法透過 Claude SSH 代執行）。
+
+### 監控
+
+```bash
+# 確認 timer 狀態與下次執行時間
+ssh pi@epaper-display.local 'systemctl list-timers epaper-auto-update.timer --no-pager'
+
+# 查看更新日誌
+ssh pi@epaper-display.local 'journalctl -t epaper-auto-update -n 50 --no-pager'
+```
+
+### 暫時停用
+
+```bash
+# 停用 timer（Pi 上執行）
+# sudo systemctl stop epaper-auto-update.timer
+
+# 重新啟用
+# sudo systemctl start epaper-auto-update.timer
+```
+
+---
+
+## 七、常見問題排查
 
 | 症狀 | 排查方式 |
 |------|---------|

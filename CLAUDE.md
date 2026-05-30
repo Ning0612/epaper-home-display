@@ -54,7 +54,7 @@ pytest tests/test_presence.py::test_occupied_when_light_bright
 ### Deploy & Operate (Pi via SSH)
 
 ```bash
-# Deploy latest code
+# Deploy latest code (manual / emergency only — Pi auto-updates within 5 min after push)
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && git pull'
 
 # Install/update dependencies
@@ -69,6 +69,12 @@ ssh pi@epaper-display.local 'systemctl status epaper-home-display --no-pager'
 # Tail logs
 ssh pi@epaper-display.local 'journalctl -u epaper-home-display -n 100 --no-pager'
 ssh pi@epaper-display.local 'journalctl -u epaper-home-display -f'
+
+# Auto-update logs
+ssh pi@epaper-display.local 'journalctl -t epaper-auto-update -n 50 --no-pager'
+
+# Auto-update timer status
+ssh pi@epaper-display.local 'systemctl list-timers epaper-auto-update.timer --no-pager'
 ```
 
 ### Hardware Tests (Pi)
@@ -179,12 +185,22 @@ Reference file: `config.example.yaml`
 
 ## Deployment Checklist
 
+Pi has an auto-update timer (`epaper-auto-update.timer`) that polls every 5 minutes. After `git push`, the Pi will pull and restart automatically — no manual SSH needed.
+
 ```bash
 pytest && git status && git diff          # verify locally first
+git push                                  # Pi auto-updates within 5 minutes
+
+# Optional: confirm update applied
+ssh pi@epaper-display.local 'journalctl -t epaper-auto-update -n 10 --no-pager'
+ssh pi@epaper-display.local 'journalctl -u epaper-home-display -n 50 --no-pager'
+```
+
+Manual deploy (if auto-update not set up or for emergency):
+```bash
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && git pull'
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/pip install -r requirements.txt'
 ssh pi@epaper-display.local 'sudo systemctl restart epaper-home-display'
-ssh pi@epaper-display.local 'journalctl -u epaper-home-display -n 100 --no-pager'
 ```
 
 Do not add features until the service starts cleanly after each deploy.
