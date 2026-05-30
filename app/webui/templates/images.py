@@ -215,7 +215,7 @@ let srcImg = null;       // Image element loaded for cropping
 const CROP_RATIO = 280 / 448;  // e-paper card inner width / height
 const HANDLE_R = 10;
 const MIN_CROP_W = 40;
-const EXPAND = 1.5;      // canvas is EXPAND× the image size; provides white padding around image
+const EXPAND = 2.0;      // canvas is EXPAND× the image size; 0.5× padding per side covers 1:1 images (need ≥1.6×)
 
 // ────────────────────────────────────────────────────────
 // View management
