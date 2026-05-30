@@ -28,6 +28,7 @@ display:
   model: "epd7in5_V2"
   use_mock: false
   dashboard_trigger_second: 57   # 在每分鐘第幾秒觸發渲染，用來補償電子紙刷新延遲（延遲補償自動計算 = 60 - 此值）
+  full_refresh_every: 10         # 每 N 次更新做一次全刷新（清除鬼影），其餘為快速部分刷新
 
 voice:
   enabled: true

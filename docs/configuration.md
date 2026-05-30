@@ -91,9 +91,12 @@ display:
   use_mock: false         # true = 不寫入 e-Paper，渲染結果儲存為 debug_frame.png
   dashboard_trigger_second: 57   # 在每分鐘第幾秒觸發渲染，用來補償電子紙刷新延遲
                                   # 延遲補償自動計算 = 60 - 此值（預設 57 → 補償 3 秒）
+  full_refresh_every: 10          # 每 N 次更新做一次全刷新（清除鬼影），其餘為快速部分刷新
 ```
 
 **dashboard_trigger_second 說明**：e-Paper 刷新需要時間，設定在某秒觸發渲染，面板完成刷新時恰好顯示正確分鐘數。延遲補償（秒）= 60 − 觸發秒，由系統自動計算，無需手動設定。
+
+**full_refresh_every 說明**：每 N 次顯示更新執行一次完整刷新（init，清除鬼影），其餘 N-1 次使用快速部分刷新（init_fast）。設定值範圍 1–100，設為 1 代表每次都全刷新。
 
 ---
 
@@ -230,6 +233,7 @@ display:
   model: "epd7in5_V2"
   use_mock: false
   dashboard_trigger_second: 57
+  full_refresh_every: 10
 
 voice:
   enabled: true

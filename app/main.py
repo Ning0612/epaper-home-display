@@ -96,8 +96,8 @@ async def _presence_loop(settings, display_queue: asyncio.Queue) -> None:
 async def _display_loop(
     epaper, executor: ThreadPoolExecutor, display_queue: asyncio.Queue, settings
 ) -> None:
-    # Every 10th update is a full refresh (clears ghosting); the other nine use
-    # init_fast() for a faster partial update.
+    # Every full_refresh_every-th update is a full refresh (clears ghosting); others use
+    # init_fast() for a faster partial update. max(1,...) guards against zero in YAML.
     refresh_count = 0
     loop = asyncio.get_event_loop()
 
@@ -115,7 +115,7 @@ async def _display_loop(
         if state.display_busy:
             continue
 
-        full_refresh = (refresh_count % 10 == 0)
+        full_refresh = (refresh_count % max(1, settings.display.full_refresh_every) == 0)
         state.display_busy = True
         try:
             # Advance clock by display lag so the rendered HH:MM matches the

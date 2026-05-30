@@ -199,15 +199,13 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
         </select>
       </div>
       <hr>
-      <div class="row2">
-        <div class="f">
-          <label>刷新觸發秒 <span class="hint">（0–59，用來補償電子紙刷新延遲）</span></label>
-          <input type="number" id="d-trigger" min="0" max="59" oninput="updateLagDisplay()">
-        </div>
-        <div class="f">
-          <label>延遲補償 <span class="hint">（自動計算）</span></label>
-          <div style="padding:.45rem 0;font-size:.95rem;color:var(--fg)">= 60 − 觸發秒 = <b id="d-lag-display">3</b> 秒</div>
-        </div>
+      <div class="f">
+        <label>刷新觸發秒 <span class="hint">（0–59，用來補償電子紙刷新延遲）</span></label>
+        <input type="number" id="d-trigger" min="0" max="59">
+      </div>
+      <div class="f" style="margin-top:.9rem">
+        <label>全刷新間隔 <span class="hint">（次數，1–100；每 N 次做一次全刷新清除鬼影）</span></label>
+        <input type="number" id="d-fre" min="1" max="100">
       </div>
       <div class="btn-row"><button class="btn-p" onclick="saveDisplay()">儲存</button></div>
     </div>
@@ -386,7 +384,7 @@ async function loadCfg(){
     var d=c.display||{};
     document.getElementById('d-model').value=d.model||'epd7in5_V2';
     document.getElementById('d-trigger').value=d.dashboard_trigger_second??57;
-    updateLagDisplay();
+    document.getElementById('d-fre').value=d.full_refresh_every??10;
     var p=c.presence||{};
     document.getElementById('p-light').value=p.light_weight??1.0;
     document.getElementById('p-door').value=p.door_weight??1.0;
@@ -456,14 +454,11 @@ async function saveDisplay(){
   try{
     await put('/settings/display',{
       model:document.getElementById('d-model').value,
-      dashboard_trigger_second:+document.getElementById('d-trigger').value
+      dashboard_trigger_second:+document.getElementById('d-trigger').value,
+      full_refresh_every:+document.getElementById('d-fre').value
     });
     toast('✓ 顯示器設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
-}
-function updateLagDisplay(){
-  var t=+(document.getElementById('d-trigger').value)||0;
-  document.getElementById('d-lag-display').textContent=60-t;
 }
 async function savePresence(){
   try{
@@ -569,6 +564,7 @@ class _MQTTBody(BaseModel):
 class _DisplayBody(BaseModel):
     model: str | None = None
     dashboard_trigger_second: int | None = None
+    full_refresh_every: int | None = None
 
 
 class _PresenceBody(BaseModel):
@@ -774,6 +770,8 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
         patch = body.model_dump(exclude_none=True)
         if "dashboard_trigger_second" in patch and not (0 <= patch["dashboard_trigger_second"] <= 59):
             raise HTTPException(400, detail="dashboard_trigger_second must be 0–59")
+        if "full_refresh_every" in patch and not (1 <= patch["full_refresh_every"] <= 100):
+            raise HTTPException(400, detail="full_refresh_every must be 1–100")
         if not patch:
             return {"ok": True}
 

@@ -57,6 +57,7 @@ class DisplayConfig:
     model: str = "epd7in5_V2"
     use_mock: bool = False
     dashboard_trigger_second: int = 57   # trigger at :SS each minute; display_lag = 60 - this value
+    full_refresh_every: int = 10          # full refresh every N updates; partial refresh otherwise
 
 
 @dataclass
