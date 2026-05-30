@@ -54,12 +54,48 @@ class TestMakeDisplayImage:
         finally:
             os.unlink(path)
 
-    def test_crop_clamped_when_out_of_bounds(self):
-        path = _make_tmp_image(size=(200, 200))
+    def test_crop_beyond_bounds_uses_white_padding(self):
+        path = _make_tmp_image(size=(200, 200), color=(0, 0, 0))
         try:
-            # Crop exceeds image bounds — should not raise, should clamp
+            # Crop far outside image — should return correct size without raising
             result = make_display_image(path, crop={"x": 100, "y": 100, "w": 500, "h": 500})
             assert result.size == (_TARGET_W, _TARGET_H)
+        finally:
+            os.unlink(path)
+
+    def test_negative_offset_top_left_is_white(self):
+        """Negative x/y crop: out-of-bounds top-left area should be white after dithering."""
+        # Black image; crop starts 50px before image on both axes.
+        # The top-left region of the crop is outside the image → white padding.
+        path = _make_tmp_image(size=(200, 200), color=(0, 0, 0))
+        try:
+            result = make_display_image(path, crop={"x": -50, "y": -50, "w": 250, "h": 250})
+            assert result.size == (_TARGET_W, _TARGET_H)
+            # Top-left output pixel maps to the padding region → should be white (255)
+            assert result.getpixel((0, 0)) == 255
+        finally:
+            os.unlink(path)
+
+    def test_fully_outside_image_is_white(self):
+        """Crop completely outside the image should produce an all-white result."""
+        path = _make_tmp_image(size=(200, 200), color=(0, 0, 0))
+        try:
+            result = make_display_image(path, crop={"x": 300, "y": 300, "w": 280, "h": 448})
+            assert result.size == (_TARGET_W, _TARGET_H)
+            pixels = set(result.get_flattened_data())
+            assert pixels == {255}, f"Expected all-white, got: {pixels}"
+        finally:
+            os.unlink(path)
+
+    def test_crop_right_overflow_white_corner(self):
+        """Crop extending beyond right edge: far-right output pixels should be white."""
+        path = _make_tmp_image(size=(200, 200), color=(0, 0, 0))
+        try:
+            # Crop starts inside image (x=100) but extends 300px right (x+w=400 > img_w=200)
+            result = make_display_image(path, crop={"x": 100, "y": 0, "w": 300, "h": 200})
+            assert result.size == (_TARGET_W, _TARGET_H)
+            # Far-right output column maps to the out-of-bounds padding → white
+            assert result.getpixel((_TARGET_W - 1, _TARGET_H // 2)) == 255
         finally:
             os.unlink(path)
 

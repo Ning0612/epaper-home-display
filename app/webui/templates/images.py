@@ -153,7 +153,7 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
       <div class="card-title">裁切圖片 <span style="color:var(--muted);font-size:.75rem;font-weight:400;letter-spacing:0;text-transform:none">— 拖曳選框定位，拖曳角點調整大小（固定 5:8 比例）</span></div>
       <div class="crop-wrap">
         <canvas id="crop-canvas"></canvas>
-        <div class="crop-hint">選框比例鎖定為電子紙圖片卡尺寸（280×448）</div>
+        <div class="crop-hint">選框比例鎖定為電子紙圖片卡尺寸（280×448）；可拖曳至圖片外側白邊，超出部分顯示為白色</div>
       </div>
       <div class="btn-row">
         <button class="btn-s" onclick="cancelCrop()">取消</button>
@@ -193,12 +193,15 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
 // ────────────────────────────────────────────────────────
 let uploadId = null;
 let canvasScale = 1;     // canvas px / original image px
+let imgOffsetX = 0;      // canvas px where image starts (left edge)
+let imgOffsetY = 0;      // canvas px where image starts (top edge)
 let cropRect = null;     // {x, y, w, h} in canvas coordinates
 let drag = null;         // {type, startX, startY, origCrop}
 let srcImg = null;       // Image element loaded for cropping
 const CROP_RATIO = 280 / 448;  // e-paper card inner width / height
 const HANDLE_R = 10;
 const MIN_CROP_W = 40;
+const EXPAND = 1.5;      // canvas is EXPAND× the image size; provides white padding around image
 
 // ────────────────────────────────────────────────────────
 // View management
@@ -298,14 +301,19 @@ function initCropView(imgUrl, origW, origH) {
   img.onload = () => {
     // Scale to fit the card (max 640 wide, 520 tall)
     const container = canvas.parentElement;
-    const maxW = Math.min(640, container.clientWidth - 32);
-    const maxH = 520;
-    const scaleW = maxW / img.naturalWidth;
-    const scaleH = maxH / img.naturalHeight;
-    canvasScale = Math.min(scaleW, scaleH, 1);  // never upscale
+    const maxW = Math.max(200, Math.min(640, container.clientWidth - 32));
+    const maxH = Math.max(200, 520);
+    // Scale so that the expanded canvas (EXPAND× image) fits the container
+    const scaleW = maxW / (img.naturalWidth * EXPAND);
+    const scaleH = maxH / (img.naturalHeight * EXPAND);
+    canvasScale = Math.min(scaleW, scaleH, 1);  // never upscale image beyond 1:1
 
-    canvas.width = Math.round(img.naturalWidth * canvasScale);
-    canvas.height = Math.round(img.naturalHeight * canvasScale);
+    const imgPxW = Math.round(img.naturalWidth * canvasScale);
+    const imgPxH = Math.round(img.naturalHeight * canvasScale);
+    canvas.width = Math.round(imgPxW * EXPAND);
+    canvas.height = Math.round(imgPxH * EXPAND);
+    imgOffsetX = Math.round((canvas.width - imgPxW) / 2);
+    imgOffsetY = Math.round((canvas.height - imgPxH) / 2);
 
     srcImg = img;
     cropRect = fitCropRect(canvas.width, canvas.height);
@@ -317,9 +325,12 @@ function initCropView(imgUrl, origW, origH) {
 }
 
 function fitCropRect(cw, ch) {
-  let w = ch * CROP_RATIO;
-  let h = ch;
-  if (w > cw) { w = cw; h = w / CROP_RATIO; }
+  // Default: largest crop fitting the image area (inside the whitespace padding)
+  const imgPxW = Math.round(cw / EXPAND);
+  const imgPxH = Math.round(ch / EXPAND);
+  let w = imgPxH * CROP_RATIO;
+  let h = imgPxH;
+  if (w > imgPxW) { w = imgPxW; h = w / CROP_RATIO; }
   return {
     x: Math.round((cw - w) / 2),
     y: Math.round((ch - h) / 2),
@@ -334,7 +345,19 @@ function drawCropUI() {
   const {x, y, w, h} = cropRect;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(srcImg, 0, 0, canvas.width, canvas.height);
+  // White background (matches e-paper; out-of-bounds crop area becomes white)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Draw image centered in the expanded canvas
+  const imgPxW = Math.round(canvas.width / EXPAND);
+  const imgPxH = Math.round(canvas.height / EXPAND);
+  ctx.drawImage(srcImg, imgOffsetX, imgOffsetY, imgPxW, imgPxH);
+  // Subtle dashed border marking the image boundary
+  ctx.strokeStyle = 'rgba(100,116,139,0.45)';
+  ctx.setLineDash([5, 5]);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(imgOffsetX + 0.5, imgOffsetY + 0.5, imgPxW - 1, imgPxH - 1);
+  ctx.setLineDash([]);
 
   // Dark overlay outside crop
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -447,9 +470,10 @@ function updateCrop(pos, cw, ch) {
 }
 
 function getOrigCrop() {
+  // x/y can be negative when crop extends into the white padding beyond image edge
   return {
-    x: Math.round(cropRect.x / canvasScale),
-    y: Math.round(cropRect.y / canvasScale),
+    x: Math.round((cropRect.x - imgOffsetX) / canvasScale),
+    y: Math.round((cropRect.y - imgOffsetY) / canvasScale),
     w: Math.round(cropRect.w / canvasScale),
     h: Math.round(cropRect.h / canvasScale)
   };
@@ -478,13 +502,30 @@ async function requestPreview() {
   const url = URL.createObjectURL(blob);
   document.getElementById('dither-preview').src = url;
 
-  // Draw crop mini preview on canvas
+  // Draw crop mini preview with white background (handles out-of-bounds white padding)
+  const canvas = document.getElementById('crop-canvas');
+  const imgPxWc = Math.round(canvas.width / EXPAND);
+  const imgPxHc = Math.round(canvas.height / EXPAND);
   const mini = document.getElementById('crop-mini');
   mini.width = 140;
   mini.height = Math.round(140 / CROP_RATIO);
   const mctx = mini.getContext('2d');
-  const {x, y, w, h} = cropRect;
-  mctx.drawImage(srcImg, x, y, w, h, 0, 0, mini.width, mini.height);
+  mctx.fillStyle = '#ffffff';
+  mctx.fillRect(0, 0, mini.width, mini.height);
+  const {x: cx, y: cy, w: cw, h: ch} = cropRect;
+  const ix1 = Math.max(cx, imgOffsetX);
+  const iy1 = Math.max(cy, imgOffsetY);
+  const ix2 = Math.min(cx + cw, imgOffsetX + imgPxWc);
+  const iy2 = Math.min(cy + ch, imgOffsetY + imgPxHc);
+  if (ix2 > ix1 && iy2 > iy1) {
+    const scaleM = mini.width / cw;
+    mctx.drawImage(srcImg,
+      (ix1 - imgOffsetX) / canvasScale, (iy1 - imgOffsetY) / canvasScale,
+      (ix2 - ix1) / canvasScale, (iy2 - iy1) / canvasScale,
+      (ix1 - cx) * scaleM, (iy1 - cy) * (mini.height / ch),
+      (ix2 - ix1) * scaleM, (iy2 - iy1) * (mini.height / ch)
+    );
+  }
 
   showView('preview');
 }

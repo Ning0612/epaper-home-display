@@ -38,11 +38,22 @@ def make_display_image(source_path: str, crop: dict | None = None) -> Image.Imag
             if w <= 0 or h <= 0:
                 raise ValueError(f"Invalid crop: w={w}, h={h}")
             img_w, img_h = img.size
-            x = max(0, min(x, img_w - 1))
-            y = max(0, min(y, img_h - 1))
-            w = min(w, img_w - x)
-            h = min(h, img_h - y)
-            img = img.crop((x, y, x + w, y + h))
+            if x >= 0 and y >= 0 and x + w <= img_w and y + h <= img_h:
+                # Fast path: crop is fully within image bounds
+                img = img.crop((x, y, x + w, y + h))
+            else:
+                # Crop extends beyond image bounds; fill out-of-bounds with white
+                if w * h > Image.MAX_IMAGE_PIXELS:
+                    raise ValueError(
+                        f"Crop area too large ({w}×{h}); exceeds pixel limit"
+                    )
+                canvas = Image.new("RGB", (w, h), (255, 255, 255))
+                ix1, iy1 = max(0, x), max(0, y)
+                ix2, iy2 = min(img_w, x + w), min(img_h, y + h)
+                if ix2 > ix1 and iy2 > iy1:
+                    region = img.crop((ix1, iy1, ix2, iy2))
+                    canvas.paste(region.convert("RGB"), (ix1 - x, iy1 - y))
+                img = canvas
 
         img = img.convert("RGB")
         img = img.resize((_TARGET_W, _TARGET_H), Image.Resampling.LANCZOS)
