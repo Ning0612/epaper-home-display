@@ -69,13 +69,21 @@ class _CropBody(BaseModel):
     h: float
 
 
+class _TransformBody(BaseModel):
+    rotate: int = 0
+    flip_x: bool = False
+    flip_y: bool = False
+
+
 class _PreviewBody(BaseModel):
     id: str
     crop: _CropBody
+    transform: _TransformBody = _TransformBody()
 
 
 class _ConfirmBody(BaseModel):
     crop: _CropBody
+    transform: _TransformBody = _TransformBody()
 
 
 class _CarouselBody(BaseModel):

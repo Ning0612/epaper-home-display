@@ -70,6 +70,9 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
     .crop-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
     #crop-canvas{max-width:100%;cursor:crosshair;border-radius:6px;display:block;touch-action:none}
     .crop-hint{font-size:.78rem;color:var(--muted);text-align:center}
+    .transform-bar{display:flex;gap:.45rem;flex-wrap:wrap;justify-content:center;margin:.6rem 0 .2rem}
+    .btn-tf{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.32rem .65rem;font-size:.78rem;cursor:pointer;transition:background .15s;white-space:nowrap}
+    .btn-tf:hover{background:#243554}
     /* Preview view */
     .preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1rem}
     .preview-panel{text-align:center}
@@ -161,6 +164,13 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
         <canvas id="crop-canvas"></canvas>
         <div class="crop-hint">選框比例鎖定為電子紙圖片卡尺寸（280×448）；可拖曳至圖片外側白邊，超出部分顯示為白色</div>
       </div>
+      <div class="transform-bar">
+        <button class="btn-tf" onclick="doRotate(-90)" title="逆時鐘旋轉 90°">↺ 逆時鐘</button>
+        <button class="btn-tf" onclick="doRotate(90)"  title="順時鐘旋轉 90°">↻ 順時鐘</button>
+        <button class="btn-tf" onclick="doFlip('x')"   title="水平鏡像（左右翻轉）">↔ 鏡像 X</button>
+        <button class="btn-tf" onclick="doFlip('y')"   title="垂直鏡像（上下翻轉）">↕ 鏡像 Y</button>
+        <button class="btn-tf" onclick="centerCrop()"  title="將裁切框置中於畫布">⊡ 置中</button>
+      </div>
       <div class="btn-row">
         <button class="btn-s" onclick="cancelCrop()">取消</button>
         <button class="btn-p" onclick="requestPreview()">預覽 Dithering 效果 →</button>
@@ -211,7 +221,8 @@ let imgOffsetX = 0;      // canvas px where image starts (left edge)
 let imgOffsetY = 0;      // canvas px where image starts (top edge)
 let cropRect = null;     // {x, y, w, h} in canvas coordinates
 let drag = null;         // {type, startX, startY, origCrop}
-let srcImg = null;       // Image element loaded for cropping
+let srcImg = null;       // Image element loaded for cropping (original, untransformed)
+let transform = {rotate: 0, flipX: false, flipY: false};  // current image transforms
 const CROP_RATIO = 280 / 448;  // e-paper card inner width / height
 const HANDLE_R = 10;
 const MIN_CROP_W = 40;
@@ -316,29 +327,35 @@ function initCropView(imgUrl, origW, origH) {
   const canvas = document.getElementById('crop-canvas');
   const img = new Image();
   img.onload = () => {
-    // Scale to fit the card (max 640 wide, 520 tall)
-    const container = canvas.parentElement;
-    const maxW = Math.max(200, Math.min(640, container.clientWidth - 32));
-    const maxH = Math.max(200, 520);
-    // Scale so that the expanded canvas (EXPAND× image) fits the container
-    const scaleW = maxW / (img.naturalWidth * EXPAND);
-    const scaleH = maxH / (img.naturalHeight * EXPAND);
-    canvasScale = Math.min(scaleW, scaleH, 1);  // never upscale image beyond 1:1
-
-    const imgPxW = Math.round(img.naturalWidth * canvasScale);
-    const imgPxH = Math.round(img.naturalHeight * canvasScale);
-    canvas.width = Math.round(imgPxW * EXPAND);
-    canvas.height = Math.round(imgPxH * EXPAND);
-    imgOffsetX = Math.round((canvas.width - imgPxW) / 2);
-    imgOffsetY = Math.round((canvas.height - imgPxH) / 2);
-
+    transform = {rotate: 0, flipX: false, flipY: false};
     srcImg = img;
-    cropRect = fitCropRect(canvas.width, canvas.height);
+    reinitCanvas();
     drawCropUI();
     attachCropEvents(canvas);
   };
   img.onerror = () => toast('圖片載入失敗', 'err');
   img.src = imgUrl;
+}
+
+function reinitCanvas() {
+  // Recalculate canvas size based on current transform (90/270° swaps dimensions)
+  const isRotated90 = (transform.rotate % 180 !== 0);
+  const tw = isRotated90 ? srcImg.naturalHeight : srcImg.naturalWidth;
+  const th = isRotated90 ? srcImg.naturalWidth  : srcImg.naturalHeight;
+  const canvas = document.getElementById('crop-canvas');
+  const container = canvas.parentElement;
+  const maxW = Math.max(200, Math.min(640, container.clientWidth - 32));
+  const maxH = Math.max(200, 520);
+  const scaleW = maxW / (tw * EXPAND);
+  const scaleH = maxH / (th * EXPAND);
+  canvasScale = Math.min(scaleW, scaleH, 1);
+  const imgPxW = Math.round(tw * canvasScale);
+  const imgPxH = Math.round(th * canvasScale);
+  canvas.width  = Math.round(imgPxW * EXPAND);
+  canvas.height = Math.round(imgPxH * EXPAND);
+  imgOffsetX = Math.round((canvas.width  - imgPxW) / 2);
+  imgOffsetY = Math.round((canvas.height - imgPxH) / 2);
+  cropRect = fitCropRect(canvas.width, canvas.height);
 }
 
 function fitCropRect(cw, ch) {
@@ -365,10 +382,23 @@ function drawCropUI() {
   // White background (matches e-paper; out-of-bounds crop area becomes white)
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  // Draw image centered in the expanded canvas
+  // Draw transformed image centered in the expanded canvas
+  // Canvas transform order: flipX first, flipY second, rotate last (matches PIL canonical order)
   const imgPxW = Math.round(canvas.width / EXPAND);
   const imgPxH = Math.round(canvas.height / EXPAND);
-  ctx.drawImage(srcImg, imgOffsetX, imgOffsetY, imgPxW, imgPxH);
+  ctx.save();
+  ctx.translate(imgOffsetX + imgPxW / 2, imgOffsetY + imgPxH / 2);
+  // Canvas CTM = A×B×C, so last call is first applied to coords.
+  // To match PIL order (flipX → flipY → rotate), call in reverse: rotate, flipY, flipX.
+  ctx.rotate(transform.rotate * Math.PI / 180);  // applied last  → outermost
+  if (transform.flipY) ctx.scale( 1, -1);          // applied second
+  if (transform.flipX) ctx.scale(-1,  1);           // applied first → innermost
+  ctx.drawImage(srcImg,
+    -srcImg.naturalWidth  * canvasScale / 2,
+    -srcImg.naturalHeight * canvasScale / 2,
+     srcImg.naturalWidth  * canvasScale,
+     srcImg.naturalHeight * canvasScale);
+  ctx.restore();
   // Subtle dashed border marking the image boundary
   ctx.strokeStyle = 'rgba(100,116,139,0.45)';
   ctx.setLineDash([5, 5]);
@@ -405,6 +435,27 @@ function drawCropUI() {
 
 function redrawCrop() {
   if (srcImg && cropRect) drawCropUI();
+}
+
+// ────────────────────────────────────────────────────────
+// Transform controls
+// ────────────────────────────────────────────────────────
+function doRotate(deg) {
+  transform.rotate = ((transform.rotate + deg) % 360 + 360) % 360;
+  reinitCanvas();  // 90/270° swap image dims → need canvas resize
+  drawCropUI();
+}
+
+function doFlip(axis) {
+  if (axis === 'x') transform.flipX = !transform.flipX;
+  else              transform.flipY = !transform.flipY;
+  drawCropUI();  // flip doesn't change dims, no reinit needed
+}
+
+function centerCrop() {
+  const canvas = document.getElementById('crop-canvas');
+  cropRect = fitCropRect(canvas.width, canvas.height);
+  drawCropUI();
 }
 
 function hitTest(pos) {
@@ -509,7 +560,7 @@ async function requestPreview() {
     const r = await fetch('/api/images/preview', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ id: uploadId, crop })
+      body: JSON.stringify({ id: uploadId, crop, transform: {rotate: transform.rotate, flip_x: transform.flipX, flip_y: transform.flipY} })
     });
     if (!r.ok) { const e2 = await r.json().catch(()=>({})); toast(e2.detail || '預覽失敗', 'err'); return; }
     blob = await r.blob();
@@ -519,7 +570,7 @@ async function requestPreview() {
   const url = URL.createObjectURL(blob);
   document.getElementById('dither-preview').src = url;
 
-  // Draw crop mini preview with white background (handles out-of-bounds white padding)
+  // Draw crop mini preview with transforms (same pipeline as main canvas)
   const canvas = document.getElementById('crop-canvas');
   const imgPxWc = Math.round(canvas.width / EXPAND);
   const imgPxHc = Math.round(canvas.height / EXPAND);
@@ -529,20 +580,20 @@ async function requestPreview() {
   const mctx = mini.getContext('2d');
   mctx.fillStyle = '#ffffff';
   mctx.fillRect(0, 0, mini.width, mini.height);
-  const {x: cx, y: cy, w: cw, h: ch} = cropRect;
-  const ix1 = Math.max(cx, imgOffsetX);
-  const iy1 = Math.max(cy, imgOffsetY);
-  const ix2 = Math.min(cx + cw, imgOffsetX + imgPxWc);
-  const iy2 = Math.min(cy + ch, imgOffsetY + imgPxHc);
-  if (ix2 > ix1 && iy2 > iy1) {
-    const scaleM = mini.width / cw;
-    mctx.drawImage(srcImg,
-      (ix1 - imgOffsetX) / canvasScale, (iy1 - imgOffsetY) / canvasScale,
-      (ix2 - ix1) / canvasScale, (iy2 - iy1) / canvasScale,
-      (ix1 - cx) * scaleM, (iy1 - cy) * (mini.height / ch),
-      (ix2 - ix1) * scaleM, (iy2 - iy1) * (mini.height / ch)
-    );
-  }
+  const {x: cx, y: cy, w: cw} = cropRect;
+  const scaleM = mini.width / cw;  // = mini.height/ch since crop has fixed CROP_RATIO
+  // Image center position in mini canvas coords
+  const miniCx = (imgOffsetX + imgPxWc / 2 - cx) * scaleM;
+  const miniCy = (imgOffsetY + imgPxHc / 2 - cy) * scaleM;
+  mctx.save();
+  mctx.translate(miniCx, miniCy);
+  mctx.rotate(transform.rotate * Math.PI / 180);  // same reverse order as main canvas
+  if (transform.flipY) mctx.scale( 1, -1);
+  if (transform.flipX) mctx.scale(-1,  1);
+  const sw = srcImg.naturalWidth  * canvasScale * scaleM;
+  const sh = srcImg.naturalHeight * canvasScale * scaleM;
+  mctx.drawImage(srcImg, -sw / 2, -sh / 2, sw, sh);
+  mctx.restore();
 
   showView('preview');
 }
@@ -559,12 +610,13 @@ async function confirmSave() {
     const r = await fetch('/api/images/' + uploadId + '/confirm', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ crop })
+      body: JSON.stringify({ crop, transform: {rotate: transform.rotate, flip_x: transform.flipX, flip_y: transform.flipY} })
     });
     if (!r.ok) { const e2 = await r.json().catch(()=>({})); toast(e2.detail || '儲存失敗', 'err'); return; }
   } catch (e) { toast('網路錯誤', 'err'); return; }
 
   toast('已儲存，已套用到電子紙', 'ok');
+  transform = {rotate: 0, flipX: false, flipY: false};
   uploadId = null; srcImg = null; cropRect = null;
   showView('gallery');
   loadGallery();
@@ -579,6 +631,7 @@ async function cancelCrop() {
     try { await fetch('/api/images/' + uploadId, { method: 'DELETE' }); } catch (_) {}
     uploadId = null;
   }
+  transform = {rotate: 0, flipX: false, flipY: false};
   srcImg = null; cropRect = null;
   showView('gallery');
 }

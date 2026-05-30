@@ -154,9 +154,10 @@ def create_images_router(
             raise HTTPException(404, "Source file missing")
 
         crop = {"x": body.crop.x, "y": body.crop.y, "w": body.crop.w, "h": body.crop.h}
+        tf = body.transform.model_dump()
         try:
             from app.display.image_processor import make_preview_bytes
-            png_bytes = await asyncio.to_thread(make_preview_bytes, src, crop)
+            png_bytes = await asyncio.to_thread(make_preview_bytes, src, crop, tf)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except Exception as exc:
@@ -182,6 +183,7 @@ def create_images_router(
             raise HTTPException(404, "Source file missing")
 
         crop = {"x": body.crop.x, "y": body.crop.y, "w": body.crop.w, "h": body.crop.h}
+        tf = body.transform.model_dump()
         display_path = os.path.join(_img_dir(), f"{id}_display.png")
         # Use per-request unique tmp to prevent concurrent confirm collisions
         tmp_out = display_path + f".{uuid.uuid4().hex[:8]}.tmp"
@@ -189,7 +191,7 @@ def create_images_router(
         # Generate dithered display PNG in a thread
         try:
             from app.display.image_processor import make_display_image
-            result_img = await asyncio.to_thread(make_display_image, src, crop)
+            result_img = await asyncio.to_thread(make_display_image, src, crop, tf)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except Exception as exc:

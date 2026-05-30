@@ -153,6 +153,109 @@ class TestMakeDisplayImage:
             os.unlink(path)
 
 
+class TestTransform:
+    def test_rotate_90_returns_correct_size(self):
+        path = _make_tmp_image(size=(300, 200))
+        try:
+            result = make_display_image(path, transform={"rotate": 90})
+            assert result.size == (_TARGET_W, _TARGET_H)
+        finally:
+            os.unlink(path)
+
+    def test_rotate_180_returns_correct_size(self):
+        path = _make_tmp_image()
+        try:
+            result = make_display_image(path, transform={"rotate": 180})
+            assert result.size == (_TARGET_W, _TARGET_H)
+        finally:
+            os.unlink(path)
+
+    def test_flip_x_returns_correct_size(self):
+        path = _make_tmp_image()
+        try:
+            result = make_display_image(path, transform={"flip_x": True})
+            assert result.size == (_TARGET_W, _TARGET_H)
+        finally:
+            os.unlink(path)
+
+    def test_flip_y_returns_correct_size(self):
+        path = _make_tmp_image()
+        try:
+            result = make_display_image(path, transform={"flip_y": True})
+            assert result.size == (_TARGET_W, _TARGET_H)
+        finally:
+            os.unlink(path)
+
+    def test_combined_flip_and_rotate(self):
+        path = _make_tmp_image(size=(400, 300))
+        try:
+            result = make_display_image(
+                path, transform={"rotate": 90, "flip_x": True, "flip_y": False}
+            )
+            assert result.size == (_TARGET_W, _TARGET_H)
+        finally:
+            os.unlink(path)
+
+    def test_no_transform_same_as_none(self):
+        """Empty transform dict behaves same as transform=None."""
+        path = _make_tmp_image()
+        try:
+            r1 = make_display_image(path, transform=None)
+            r2 = make_display_image(path, transform={})
+            assert r1.get_flattened_data() == r2.get_flattened_data()
+        finally:
+            os.unlink(path)
+
+    def test_rotate_360_noop(self):
+        path = _make_tmp_image()
+        try:
+            r1 = make_display_image(path, transform=None)
+            r2 = make_display_image(path, transform={"rotate": 360})
+            assert r1.get_flattened_data() == r2.get_flattened_data()
+        finally:
+            os.unlink(path)
+
+    def test_flip_x_swaps_halves(self):
+        """After flipX the original right-white half should appear on the left."""
+        img = Image.new("L", (200, 200), 255)   # all white
+        for y in range(200):
+            for x in range(100):
+                img.putpixel((x, y), 0)           # left half → black
+        fd, path = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
+        img.save(path)
+        try:
+            result = make_display_image(path, transform={"flip_x": True})
+            # After flip: left should be white (was right), right should be black (was left)
+            lx = _TARGET_W // 8          # safely in left quarter
+            rx = _TARGET_W * 7 // 8     # safely in right quarter
+            my = _TARGET_H // 2
+            assert result.getpixel((lx, my)) == 255, "left side should be white after flipX"
+            assert result.getpixel((rx, my)) == 0,   "right side should be black after flipX"
+        finally:
+            os.unlink(path)
+
+    def test_rotate_90cw_top_becomes_right(self):
+        """After 90° CW the original top-white half should appear on the right side."""
+        img = Image.new("L", (200, 200), 0)      # all black
+        for y in range(100):
+            for x in range(200):
+                img.putpixel((x, y), 255)         # top half → white
+        fd, path = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
+        img.save(path)
+        try:
+            result = make_display_image(path, transform={"rotate": 90})
+            # After 90° CW: original top (white) → right side, original bottom (black) → left
+            lx = _TARGET_W // 8
+            rx = _TARGET_W * 7 // 8
+            my = _TARGET_H // 2
+            assert result.getpixel((rx, my)) == 255, "right side should be white after 90° CW"
+            assert result.getpixel((lx, my)) == 0,   "left side should be black after 90° CW"
+        finally:
+            os.unlink(path)
+
+
 class TestMakePreviewBytes:
     def test_returns_valid_png(self):
         path = _make_tmp_image()

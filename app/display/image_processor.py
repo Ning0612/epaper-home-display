@@ -17,8 +17,14 @@ _ALLOWED_FORMATS = frozenset({"JPEG", "PNG", "WEBP", "GIF", "BMP", "TIFF"})
 _UPLOAD_CHUNK = 65_536  # 64 KB
 
 
-def make_display_image(source_path: str, crop: dict | None = None) -> Image.Image:
-    """Load image, apply crop, then Floyd-Steinberg dither to 280×448 L mode.
+def make_display_image(
+    source_path: str,
+    crop: dict | None = None,
+    transform: dict | None = None,
+) -> Image.Image:
+    """Load image, apply transforms + crop, then Floyd-Steinberg dither to 280×448 L mode.
+
+    Transform canonical order: flipX → flipY → rotate CW (must match canvas render order).
 
     Returns:
         280×448 L mode PIL Image with Floyd-Steinberg dithering applied.
@@ -32,6 +38,20 @@ def make_display_image(source_path: str, crop: dict | None = None) -> Image.Imag
 
         if img.format and img.format not in _ALLOWED_FORMATS:
             raise ValueError(f"Unsupported image format: {img.format}")
+
+        # Apply transforms before crop (canonical: flipX → flipY → rotate CW)
+        if transform:
+            if transform.get("flip_x"):
+                img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            if transform.get("flip_y"):
+                img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+            rot = int(transform.get("rotate", 0)) % 360
+            if rot == 90:
+                img = img.transpose(Image.Transpose.ROTATE_270)   # 90 CW = 270 CCW
+            elif rot == 180:
+                img = img.transpose(Image.Transpose.ROTATE_180)
+            elif rot == 270:
+                img = img.transpose(Image.Transpose.ROTATE_90)    # 270 CW = 90 CCW
 
         if crop is not None:
             x, y, w, h = (int(crop[k]) for k in ("x", "y", "w", "h"))
@@ -62,9 +82,13 @@ def make_display_image(source_path: str, crop: dict | None = None) -> Image.Imag
         return dithered.convert("L")
 
 
-def make_preview_bytes(source_path: str, crop: dict | None = None) -> bytes:
+def make_preview_bytes(
+    source_path: str,
+    crop: dict | None = None,
+    transform: dict | None = None,
+) -> bytes:
     """Return dithered display image as PNG bytes for HTTP preview response."""
-    result = make_display_image(source_path, crop)
+    result = make_display_image(source_path, crop, transform)
     buf = io.BytesIO()
     result.save(buf, format="PNG")
     return buf.getvalue()
