@@ -12,11 +12,9 @@
    (DHT22) 4  3 ● ○  4  5V
            -  5 ○ ○  6  GND ← 多元件共地
        DHT22  7 ● ○  8
-         GND  9 ● ●  10
-  (Button) 27 11 ○ ●  11  ← 電子紙 RST（勿用）
-              13 ● ○  12
-  (Button) 27 13 ●  ← 按鈕
-              14 GND
+         GND  9 ○ ○  10
+              11 ○ ○  12  ← Pin 11 = GPIO 17（電子紙 RST，勿用）
+              13 ● ○  14 GND  ← Pin 13 = GPIO 27（按鈕）
               ...
               18     ← 電子紙 BUSY (GPIO 24)
               19     ← SPI MOSI  (GPIO 10)
