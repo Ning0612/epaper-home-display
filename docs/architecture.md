@@ -140,7 +140,7 @@ MQTT 告警事件（立即） ────────────► display_qu
 | 完整更新（`init`）| 每 10 次快速後 | ~3 秒 | 完整刷新，清除鬼影 |
 | 告警立即更新 | MQTT 告警事件 | ~1 秒 | 透過 display_queue |
 
-**牆鐘對齊原理**：在每分鐘第 57 秒觸發渲染（考慮 `display_lag_seconds = 3`），確保面板在整點 :00 顯示正確的分鐘數。
+**牆鐘對齊原理**：在每分鐘第 57 秒觸發渲染，延遲補償自動計算為 `60 - dashboard_trigger_second`（預設 57 → 補償 3 秒），確保面板在整點 :00 顯示正確的分鐘數。
 
 ---
 
@@ -283,7 +283,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/settings/location` | `lat`, `lon` | 更新天氣位置 |
 | `/settings/weather` | `api_key`, `units`, `fetch_interval_seconds` | 更新天氣設定 |
 | `/settings/mqtt` | `broker_host`, `broker_port`, `client_id` | 更新 MQTT 連線 |
-| `/settings/display` | `model`, `dashboard_trigger_second`, `display_lag_seconds`, `weather_update_interval` | 更新 e-Paper 參數 |
+| `/settings/display` | `model`, `dashboard_trigger_second` | 更新 e-Paper 參數 |
 | `/settings/presence` | `light_weight`, `door_weight`, `face_weight`, `threshold`, `door_window_seconds`, `face_window_seconds` | 更新占用度計分參數 |
 | `/settings/voice` | `enabled`, `player` | 更新語音設定 |
 | `/settings/notifications` | `discord_webhook_url` | 更新 Discord Webhook |

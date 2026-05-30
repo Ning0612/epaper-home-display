@@ -199,7 +199,7 @@ GET /settings/config
 {
   "mqtt": {"broker_host": "192.168.1.100", "broker_port": 1883, "client_id": "epaper-home-display"},
   "weather": {"api_key_set": true, "lat": 25.05, "lon": 121.53, "units": "metric", "fetch_interval_seconds": 600},
-  "display": {"model": "epd7in5_V2", "dashboard_trigger_second": 57, "display_lag_seconds": 3},
+  "display": {"model": "epd7in5_V2", "dashboard_trigger_second": 57},
   "presence": {"light_weight": 1.0, "door_weight": 1.0, "face_weight": 2.0, "threshold": 2.0},
   "discord": {"webhook_set": false},
   "timezone": "Asia/Taipei"
@@ -288,17 +288,13 @@ Content-Type: application/json
 
 {
   "model": "epd7in5_V2",
-  "dashboard_trigger_second": 57,
-  "display_lag_seconds": 3,
-  "weather_update_interval": 600
+  "dashboard_trigger_second": 57
 }
 ```
 
 | 欄位 | 類型 | 範圍 | 說明 |
 |------|------|------|------|
-| `dashboard_trigger_second` | int | 0–59 | 每分鐘觸發渲染的秒數 |
-| `display_lag_seconds` | int | 0–10 | e-Paper 更新延遲補償 |
-| `weather_update_interval` | int | 60–3600 | 天氣更新間隔（秒）|
+| `dashboard_trigger_second` | int | 0–59 | 每分鐘觸發渲染的秒數；延遲補償自動計算 = 60 − 此值 |
 
 ---
 

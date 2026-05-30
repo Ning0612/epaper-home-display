@@ -27,9 +27,7 @@ sensors:
 display:
   model: "epd7in5_V2"
   use_mock: false
-  dashboard_trigger_second: 57   # render at :57 each minute so panel shows correct minute at :00
-  display_lag_seconds: 3         # estimated panel update time added to render clock
-  weather_update_interval: 600
+  dashboard_trigger_second: 57   # 在每分鐘第幾秒觸發渲染，用來補償電子紙刷新延遲（延遲補償自動計算 = 60 - 此值）
 
 voice:
   enabled: true

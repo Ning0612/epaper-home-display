@@ -89,12 +89,11 @@ sensors:
 display:
   model: "epd7in5_V2"   # Waveshare 型號，對應 lib/waveshare_epd/ 的驅動檔名
   use_mock: false         # true = 不寫入 e-Paper，渲染結果儲存為 debug_frame.png
-  dashboard_trigger_second: 57   # 每分鐘第幾秒觸發渲染（考慮 display_lag 使面板在 :00 顯示正確時間）
-  display_lag_seconds: 3         # 估計 e-Paper 更新耗時（秒），用於時鐘補償
-  weather_update_interval: 600   # 天氣顯示更新間隔（秒）
+  dashboard_trigger_second: 57   # 在每分鐘第幾秒觸發渲染，用來補償電子紙刷新延遲
+                                  # 延遲補償自動計算 = 60 - 此值（預設 57 → 補償 3 秒）
 ```
 
-**display_lag_seconds 說明**：e-Paper 完整刷新約 3 秒，渲染時的時鐘會加上此值，使面板完成刷新後顯示正確時間。
+**dashboard_trigger_second 說明**：e-Paper 刷新需要時間，設定在某秒觸發渲染，面板完成刷新時恰好顯示正確分鐘數。延遲補償（秒）= 60 − 觸發秒，由系統自動計算，無需手動設定。
 
 ---
 
@@ -231,8 +230,6 @@ display:
   model: "epd7in5_V2"
   use_mock: false
   dashboard_trigger_second: 57
-  display_lag_seconds: 3
-  weather_update_interval: 600
 
 voice:
   enabled: true
