@@ -57,7 +57,7 @@ async def _sensor_loop(dht22, light, executor: ThreadPoolExecutor, settings) -> 
         await asyncio.sleep(30)
 
 
-async def _presence_loop(display_queue: asyncio.Queue) -> None:
+async def _presence_loop(display_queue: asyncio.Queue, mqtt_service) -> None:
     while True:
         try:
             score, presence = compute_presence(state.light_is_bright)
@@ -72,6 +72,14 @@ async def _presence_loop(display_queue: asyncio.Queue) -> None:
             state.presence = presence
             state.presence_score = score
             await log_presence(score, presence, "periodic")
+
+            try:
+                mqtt_service.publish("home/home_state/presence", {
+                    "state": presence,
+                    "score": score,
+                })
+            except Exception as exc:
+                logger.warning("Failed to publish presence via MQTT: %s", exc)
 
             state.active_reminder = generate_reminder(
                 state.weather_current,
@@ -204,7 +212,7 @@ async def main() -> None:
     try:
         await asyncio.gather(
             _sensor_loop(dht22, light, executor, settings),
-            _presence_loop(display_queue),
+            _presence_loop(display_queue, mqtt_service),
             _display_loop(epaper, executor, display_queue, settings),
             _weather_loop(weather_service, settings),
             server.serve(),
