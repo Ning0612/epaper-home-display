@@ -23,19 +23,17 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
     .container{max-width:960px;margin:0 auto;padding:1.5rem}
     .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.3rem;box-shadow:var(--sh);margin-bottom:1.2rem}
     .card-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:1rem}
-    /* Image list */
-    .img-list{display:flex;flex-direction:column;margin-bottom:.8rem}
-    .img-row{display:flex;align-items:center;gap:.75rem;padding:.55rem 0;border-bottom:1px solid var(--border)}
-    .img-row:last-child{border-bottom:none}
-    .img-thumb-sm{width:44px;height:70px;flex-shrink:0;background:#000;border-radius:4px;overflow:hidden}
-    .img-thumb-sm img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block}
-    .img-meta{flex:1;min-width:0}
-    .img-meta-name{font-size:.85rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
-    .img-meta-sub{font-size:.73rem;color:var(--muted);margin-top:.25rem;display:flex;align-items:center;gap:.5rem}
-    .cur-badge{background:var(--primary);color:#080d18;font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:3px;white-space:nowrap}
-    .btn-del{flex-shrink:0;background:transparent;border:1px solid rgba(248,113,113,.35);color:var(--red);border-radius:6px;padding:.35rem .75rem;font-size:.78rem;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s}
-    .btn-del:hover{background:rgba(248,113,113,.18);border-color:rgba(248,113,113,.65)}
-    .empty-state{text-align:center;padding:2.5rem;color:var(--muted);font-size:.88rem}
+    /* Image icon grid (Windows-style large icons) */
+    .img-grid2{display:grid;grid-template-columns:repeat(auto-fill,96px);gap:.8rem;justify-content:start;margin-top:.9rem}
+    .img-card2{width:96px;display:flex;flex-direction:column;align-items:center}
+    .img-thumb2{width:88px;height:141px;background:#000;border-radius:6px;overflow:hidden;position:relative;flex-shrink:0}
+    .img-thumb2 img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block}
+    .cur-ribbon{position:absolute;bottom:0;left:0;right:0;background:rgba(56,189,248,.88);color:#080d18;font-size:.62rem;font-weight:700;text-align:center;padding:.18rem 0}
+    .img-del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(8,13,24,.78);border:1px solid rgba(248,113,113,.5);color:var(--red);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;padding:0;line-height:1}
+    .img-del-btn:hover{background:rgba(248,113,113,.28);border-color:var(--red)}
+    .img-card2-name{font-size:.72rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:.35rem;width:96px;text-align:center;color:var(--text)}
+    .img-card2-date{font-size:.67rem;color:var(--muted);text-align:center;margin-top:.08rem}
+    .empty-state{text-align:center;padding:2rem;color:var(--muted);font-size:.88rem}
     /* Upload drop zone */
     .drop-zone{border:2px dashed var(--border);border-radius:8px;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:var(--muted)}
     .drop-zone:hover,.drop-zone.drag-over{border-color:var(--primary);background:rgba(56,189,248,.05);color:var(--text)}
@@ -138,12 +136,12 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
     <!-- Image Gallery -->
     <div class="card">
       <div class="card-title">已上傳圖片</div>
-      <div id="img-grid"></div>
       <div id="drop-zone" class="drop-zone" onclick="startUpload()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
         <div class="drop-zone-icon">📁</div>
         <div class="drop-zone-text">點擊上傳，或將圖片拖曳至此<br><span style="font-size:.73rem;color:var(--muted)">支援 JPEG、PNG、WebP（最大 15 MB）</span></div>
       </div>
       <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" style="display:none" onchange="onFileSelect(event)">
+      <div id="img-grid"></div>
     </div>
   </div>
 
@@ -227,22 +225,18 @@ async function loadGallery() {
 function renderGrid(images) {
   const grid = document.getElementById('img-grid');
   if (!images || images.length === 0) {
-    grid.innerHTML = '<div class="empty-state">尚未上傳任何圖片<br>上傳後可在此選擇輪播</div>';
+    grid.innerHTML = '<div class="empty-state">尚未上傳任何圖片</div>';
     return;
   }
-  grid.innerHTML = '<div class="img-list">' + images.map(img => `
-    <div class="img-row">
-      <div class="img-thumb-sm">
+  grid.innerHTML = '<div class="img-grid2">' + images.map(img => `
+    <div class="img-card2">
+      <div class="img-thumb2">
         <img src="/api/images/file/${esc(img.id)}" alt="${esc(img.filename)}" loading="lazy">
+        ${img.is_current ? '<div class="cur-ribbon">顯示中</div>' : ''}
+        <button class="img-del-btn" onclick="deleteImage('${esc(img.id)}')" title="刪除">×</button>
       </div>
-      <div class="img-meta">
-        <div class="img-meta-name" title="${esc(img.filename)}">${esc(img.filename)}</div>
-        <div class="img-meta-sub">
-          <span>${fmtDate(img.created_ts)}</span>
-          ${img.is_current ? '<span class="cur-badge">顯示中</span>' : ''}
-        </div>
-      </div>
-      <button class="btn-del" onclick="deleteImage('${esc(img.id)}')">刪除</button>
+      <div class="img-card2-name" title="${esc(img.filename)}">${esc(img.filename)}</div>
+      <div class="img-card2-date">${fmtDate(img.created_ts)}</div>
     </div>
   `).join('') + '</div>';
 }
