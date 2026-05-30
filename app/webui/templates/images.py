@@ -26,8 +26,9 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
     /* Image icon grid (Windows-style large icons) */
     .img-grid2{display:grid;grid-template-columns:repeat(auto-fill,96px);gap:.8rem;justify-content:start;margin-top:.9rem}
     .img-card2{width:96px;display:flex;flex-direction:column;align-items:center}
-    .img-thumb2{width:88px;height:141px;background:#000;border-radius:6px;overflow:hidden;position:relative;flex-shrink:0}
-    .img-thumb2 img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block}
+    .img-thumb2{width:88px;height:141px;background:#000;border-radius:6px;overflow:hidden;position:relative;flex-shrink:0;cursor:pointer}
+    .img-thumb2 img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block;transition:filter .15s}
+    .img-thumb2:hover>img{filter:brightness(.78)}
     .cur-ribbon{position:absolute;bottom:0;left:0;right:0;background:rgba(56,189,248,.88);color:#080d18;font-size:.62rem;font-weight:700;text-align:center;padding:.18rem 0}
     .img-del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(8,13,24,.78);border:1px solid rgba(248,113,113,.5);color:var(--red);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;padding:0;line-height:1}
     .img-del-btn:hover{background:rgba(248,113,113,.28);border-color:var(--red)}
@@ -80,6 +81,13 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
     #toast.ok{background:#0a2e1a;color:#34d399;border:1px solid rgba(52,211,153,.3)}
     #toast.err{background:#2e0a0a;color:#f87171;border:1px solid rgba(248,113,113,.3)}
     #toast.info{background:#0a1e2e;color:#7dd3fc;border:1px solid rgba(56,189,248,.3)}
+    /* Image preview modal */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+    .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.3rem 1.1rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem;position:relative;max-width:90vw}
+    .modal-close{position:absolute;top:.5rem;right:.7rem;background:transparent;border:none;color:var(--muted);font-size:1.5rem;cursor:pointer;line-height:1;padding:.1rem .35rem;transition:color .15s}
+    .modal-close:hover{color:var(--text)}
+    #modal-img{max-height:70vh;max-width:min(560px,85vw);width:auto;height:auto;image-rendering:pixelated;border-radius:4px;display:block}
+    .modal-fname{font-size:.78rem;color:var(--muted);text-align:center;max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     @media(max-width:600px){
       .container{padding:1rem}
       .topbar{padding:.7rem 1rem}
@@ -185,6 +193,14 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
 
 <div id="toast"></div>
 
+<div id="img-modal" class="modal-overlay" style="display:none" onclick="closeModal(event)">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closePreview()">×</button>
+    <img id="modal-img" alt="">
+    <div id="modal-fname" class="modal-fname"></div>
+  </div>
+</div>
+
 <script>
 // ────────────────────────────────────────────────────────
 // State
@@ -230,10 +246,15 @@ function renderGrid(images) {
   }
   grid.innerHTML = '<div class="img-grid2">' + images.map(img => `
     <div class="img-card2">
-      <div class="img-thumb2">
+      <div class="img-thumb2"
+           data-id="${esc(img.id)}"
+           data-name="${esc(img.filename)}"
+           onclick="openPreview(this.dataset.id, this.dataset.name)">
         <img src="/api/images/file/${esc(img.id)}" alt="${esc(img.filename)}" loading="lazy">
         ${img.is_current ? '<div class="cur-ribbon">顯示中</div>' : ''}
-        <button class="img-del-btn" onclick="deleteImage('${esc(img.id)}')" title="刪除">×</button>
+        <button class="img-del-btn"
+                onclick="event.stopPropagation();deleteImage('${esc(img.id)}')"
+                title="刪除">×</button>
       </div>
       <div class="img-card2-name" title="${esc(img.filename)}">${esc(img.filename)}</div>
       <div class="img-card2-date">${fmtDate(img.created_ts)}</div>
@@ -645,6 +666,29 @@ function toast(msg, type='ok') {
 
 // ────────────────────────────────────────────────────────
 // Init
+// ────────────────────────────────────────────────────────
+// Image preview modal
+// ────────────────────────────────────────────────────────
+function openPreview(id, name) {
+  document.getElementById('modal-img').src = '/api/images/file/' + id;
+  document.getElementById('modal-fname').textContent = name;
+  document.getElementById('img-modal').style.display = 'flex';
+}
+
+function closePreview() {
+  const modal = document.getElementById('img-modal');
+  modal.style.display = 'none';
+  document.getElementById('modal-img').removeAttribute('src');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('img-modal')) closePreview();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('img-modal').style.display !== 'none') closePreview();
+});
+
 // ────────────────────────────────────────────────────────
 loadGallery();
 loadCarousel();
