@@ -454,7 +454,13 @@ function doFlip(axis) {
 
 function centerCrop() {
   const canvas = document.getElementById('crop-canvas');
-  cropRect = fitCropRect(canvas.width, canvas.height);
+  if (!cropRect) return;
+  cropRect = {
+    x: Math.round((canvas.width  - cropRect.w) / 2),
+    y: Math.round((canvas.height - cropRect.h) / 2),
+    w: cropRect.w,
+    h: cropRect.h
+  };
   drawCropUI();
 }
 
