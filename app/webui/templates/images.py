@@ -23,17 +23,18 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
     .container{max-width:960px;margin:0 auto;padding:1.5rem}
     .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.3rem;box-shadow:var(--sh);margin-bottom:1.2rem}
     .card-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:1rem}
-    /* Gallery grid */
-    .img-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.8rem;margin-bottom:1rem}
-    .img-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative;cursor:default}
-    .img-thumb{aspect-ratio:280/448;overflow:hidden;background:#000;position:relative}
-    .img-thumb img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block}
-    .cur-badge{position:absolute;top:6px;left:6px;background:var(--primary);color:#080d18;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:4px}
-    .img-info{padding:.5rem .6rem;font-size:.75rem}
-    .img-name{color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .img-date{color:var(--muted);margin-top:.15rem}
-    .btn-del{position:absolute;top:6px;right:6px;background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.3);color:var(--red);border-radius:6px;padding:.2rem .4rem;font-size:.75rem;cursor:pointer;transition:background .15s;line-height:1}
-    .btn-del:hover{background:rgba(248,113,113,.3)}
+    /* Image list */
+    .img-list{display:flex;flex-direction:column;margin-bottom:.8rem}
+    .img-row{display:flex;align-items:center;gap:.75rem;padding:.55rem 0;border-bottom:1px solid var(--border)}
+    .img-row:last-child{border-bottom:none}
+    .img-thumb-sm{width:44px;height:70px;flex-shrink:0;background:#000;border-radius:4px;overflow:hidden}
+    .img-thumb-sm img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block}
+    .img-meta{flex:1;min-width:0}
+    .img-meta-name{font-size:.85rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+    .img-meta-sub{font-size:.73rem;color:var(--muted);margin-top:.25rem;display:flex;align-items:center;gap:.5rem}
+    .cur-badge{background:var(--primary);color:#080d18;font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:3px;white-space:nowrap}
+    .btn-del{flex-shrink:0;background:transparent;border:1px solid rgba(248,113,113,.35);color:var(--red);border-radius:6px;padding:.35rem .75rem;font-size:.78rem;font-weight:500;cursor:pointer;transition:background .15s,border-color .15s}
+    .btn-del:hover{background:rgba(248,113,113,.18);border-color:rgba(248,113,113,.65)}
     .empty-state{text-align:center;padding:2.5rem;color:var(--muted);font-size:.88rem}
     /* Upload drop zone */
     .drop-zone{border:2px dashed var(--border);border-radius:8px;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:var(--muted)}
@@ -84,7 +85,6 @@ _IMAGES_HTML = r"""<!DOCTYPE html>
     @media(max-width:600px){
       .container{padding:1rem}
       .topbar{padding:.7rem 1rem}
-      .img-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
       .preview-grid{grid-template-columns:1fr}
     }
   </style>
@@ -230,19 +230,21 @@ function renderGrid(images) {
     grid.innerHTML = '<div class="empty-state">尚未上傳任何圖片<br>上傳後可在此選擇輪播</div>';
     return;
   }
-  grid.innerHTML = images.map(img => `
-    <div class="img-card">
-      <div class="img-thumb">
+  grid.innerHTML = '<div class="img-list">' + images.map(img => `
+    <div class="img-row">
+      <div class="img-thumb-sm">
         <img src="/api/images/file/${esc(img.id)}" alt="${esc(img.filename)}" loading="lazy">
-        ${img.is_current ? '<div class="cur-badge">顯示中</div>' : ''}
       </div>
-      <div class="img-info">
-        <div class="img-name" title="${esc(img.filename)}">${esc(img.filename)}</div>
-        <div class="img-date">${fmtDate(img.created_ts)}</div>
+      <div class="img-meta">
+        <div class="img-meta-name" title="${esc(img.filename)}">${esc(img.filename)}</div>
+        <div class="img-meta-sub">
+          <span>${fmtDate(img.created_ts)}</span>
+          ${img.is_current ? '<span class="cur-badge">顯示中</span>' : ''}
+        </div>
       </div>
-      <button class="btn-del" onclick="deleteImage('${esc(img.id)}')" title="刪除">🗑</button>
+      <button class="btn-del" onclick="deleteImage('${esc(img.id)}')">刪除</button>
     </div>
-  `).join('');
+  `).join('') + '</div>';
 }
 
 // ────────────────────────────────────────────────────────
