@@ -86,6 +86,8 @@ class StorageConfig:
 class WebUIConfig:
     host: str = "0.0.0.0"
     port: int = 8000
+    password_hash: str = ""
+    session_secret: str = ""
 
 
 @dataclass

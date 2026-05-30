@@ -6,6 +6,9 @@ pyyaml>=6.0
 pillow>=10.4
 aiohttp>=3.9
 aiosqlite>=0.20
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.9
+itsdangerous>=2.1
 
 # Pi hardware — comment out for laptop dev, install on Pi only
 # adafruit-circuitpython-dht>=3.7

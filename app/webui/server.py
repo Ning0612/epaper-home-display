@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import html as _html
 import logging
 import os
 import re
+import secrets
 import subprocess
 import threading
 from typing import TYPE_CHECKING
 
 import yaml
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from passlib.context import CryptContext
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.services.weather import WeatherService
 from app.state import state
@@ -24,6 +29,21 @@ logger = logging.getLogger(__name__)
 
 _LOCAL_CFG = "config.local.yaml"
 _config_lock = threading.Lock()
+_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+class _AuthMiddleware(BaseHTTPMiddleware):
+    _PUBLIC = frozenset({"/health", "/login", "/logout", "/ai_usage"})
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path not in self._PUBLIC:
+            if not request.session.get("authenticated"):
+                if "text/html" in request.headers.get("accept", ""):
+                    return RedirectResponse(
+                        url=f"/login?next={request.url.path}", status_code=302
+                    )
+                return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        return await call_next(request)
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
@@ -371,6 +391,7 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
   <div class="nav" onclick="go('notif',this)"><span class="ni">💬</span>通知</div>
   <div class="nav" onclick="go('general',this)"><span class="ni">⚙️</span>一般</div>
   <div class="nav" onclick="go('wifi',this)"><span class="ni">📶</span>WiFi</div>
+  <div class="nav" onclick="go('auth',this)"><span class="ni">🔒</span>安全</div>
 </nav>
 
 <main class="main">
@@ -581,6 +602,35 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Auth -->
+  <div id="sec-auth" class="sec">
+    <div class="sec-head">
+      <div class="sec-title">🔒 帳號安全</div>
+      <div class="sec-desc">更改 WebUI 登入密碼</div>
+    </div>
+    <div class="card">
+      <div class="c-sub">更改密碼</div>
+      <div class="f">
+        <label>目前密碼</label>
+        <input type="password" id="a-cur" placeholder="輸入目前密碼">
+      </div>
+      <div class="f">
+        <label>新密碼 <span class="hint">（至少 4 個字元）</span></label>
+        <input type="password" id="a-new" placeholder="輸入新密碼">
+      </div>
+      <div class="f">
+        <label>確認新密碼</label>
+        <input type="password" id="a-conf" placeholder="再次輸入新密碼">
+      </div>
+      <div class="btn-row"><button class="btn-p" onclick="saveAuth()">更改密碼</button></div>
+    </div>
+    <div class="card">
+      <div class="c-sub">會話管理</div>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:.8rem">Cookie 有效期 7 天，登出後需重新輸入密碼。</p>
+      <a href="/logout" style="display:inline-block;padding:.45rem 1.2rem;background:#dc2626;color:#fff;border-radius:6px;font-size:.83rem;font-weight:500;text-decoration:none">登出</a>
+    </div>
+  </div>
+
 </main>
 
 <div id="toast"></div>
@@ -756,12 +806,95 @@ async function saveGeneral(){
     toast('✓ 一般設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
+async function saveAuth(){
+  var cur=document.getElementById('a-cur').value;
+  var nw=document.getElementById('a-new').value;
+  var conf=document.getElementById('a-conf').value;
+  if(!cur||!nw||!conf){toast('請填寫所有欄位',false);return;}
+  if(nw!==conf){toast('新密碼與確認密碼不一致',false);return;}
+  if(nw.length<8){toast('密碼長度至少 8 個字元',false);return;}
+  try{
+    await put('/settings/auth',{current_password:cur,new_password:nw});
+    document.getElementById('a-cur').value='';
+    document.getElementById('a-new').value='';
+    document.getElementById('a-conf').value='';
+    toast('✓ 密碼已更新',true);
+  }catch(e){toast('更改失敗：'+e.message,false);}
+}
 
 loadCfg();
 initMap();
 </script>
 </body>
 </html>"""
+
+
+_LOGIN_HTML = r"""<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>登入 — ePaper Home Display</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f172a;--surface:#1e293b;--border:#334155;
+      --primary:#3b82f6;--primary-h:#2563eb;--text:#e2e8f0;--muted:#64748b;
+      --err-bg:rgba(153,27,27,.15);--err-border:#991b1b;--r:10px
+    }
+    body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:2rem;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+    .logo{text-align:center;font-size:2rem;margin-bottom:.4rem}
+    .title{text-align:center;font-size:1.05rem;font-weight:600;margin-bottom:.25rem}
+    .sub{text-align:center;font-size:.78rem;color:var(--muted);margin-bottom:1.5rem}
+    .err{background:var(--err-bg);border:1px solid var(--err-border);color:#fca5a5;border-radius:6px;padding:.55rem .9rem;font-size:.82rem;margin-bottom:1rem}
+    label{display:block;font-size:.78rem;font-weight:500;margin-bottom:.3rem}
+    input[type=password]{width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:.9rem;color:var(--text);background:#0f172a;outline:none;transition:border-color .15s,box-shadow .15s}
+    input[type=password]:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+    .f{margin-bottom:.9rem}
+    button{width:100%;padding:.6rem;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:.9rem;font-weight:500;cursor:pointer;margin-top:.5rem;transition:background .15s}
+    button:hover{background:var(--primary-h)}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🖥️</div>
+  <div class="title">ePaper Home Display</div>
+  <div class="sub">__SUBTITLE__</div>
+  __ERROR_HTML__
+  <form method="post" action="/login">
+    <input type="hidden" name="next" value="__NEXT__">
+    <div class="f">
+      <label>密碼</label>
+      <input type="password" name="password" required autofocus placeholder="輸入密碼">
+    </div>
+    __CONFIRM_FIELD__
+    <button type="submit">__BUTTON__</button>
+  </form>
+</div>
+</body>
+</html>"""
+
+
+def _render_login(next_url: str = "/settings", error: str = "", is_setup: bool = False) -> str:
+    raw_next = next_url if next_url.startswith("/") and not next_url.startswith("//") else "/settings"
+    safe_next = _html.escape(raw_next, quote=True)
+    subtitle = "首次設定 — 請設定登入密碼" if is_setup else "請輸入密碼以登入"
+    button = "設定密碼" if is_setup else "登入"
+    error_html = f'<div class="err">{_html.escape(error)}</div>' if error else ""
+    confirm_field = (
+        '<div class="f"><label>確認密碼</label>'
+        '<input type="password" name="password_confirm" required placeholder="再次輸入密碼"></div>'
+        if is_setup else ""
+    )
+    return (
+        _LOGIN_HTML
+        .replace("__SUBTITLE__", subtitle)
+        .replace("__BUTTON__", button)
+        .replace("__ERROR_HTML__", error_html)
+        .replace("__CONFIRM_FIELD__", confirm_field)
+        .replace("__NEXT__", safe_next)
+    )
 
 
 # ── Config persistence ────────────────────────────────────────────────────────
@@ -846,10 +979,75 @@ class _GeneralBody(BaseModel):
     timezone: str | None = None
 
 
+class _AuthBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
 # ── App factory ───────────────────────────────────────────────────────────────
 
 def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI:
+    if not settings.webui.session_secret:
+        settings.webui.session_secret = secrets.token_hex(32)
+        _save_to_config({"webui": {"session_secret": settings.webui.session_secret}})
+
     app = FastAPI(title="ePaper Home Display", version="0.1.0")
+    # SessionMiddleware must be outermost so session is populated before _AuthMiddleware runs
+    app.add_middleware(_AuthMiddleware)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.webui.session_secret,
+        max_age=86400 * 7,
+        https_only=False,
+    )
+
+    # ── Auth ───────────────────────────────────────────────────────────────────
+
+    @app.get("/login", response_class=HTMLResponse)
+    async def login_page(next: str = "/settings"):
+        is_setup = not bool(settings.webui.password_hash)
+        return HTMLResponse(_render_login(next_url=next, is_setup=is_setup))
+
+    @app.post("/login", response_class=HTMLResponse)
+    async def login_post(
+        request: Request,
+        password: str = Form(...),
+        password_confirm: str = Form(""),
+        next: str = Form("/settings"),
+    ):
+        is_setup = not bool(settings.webui.password_hash)
+        safe_next = next if next.startswith("/") and not next.startswith("//") else "/settings"
+
+        if is_setup:
+            if len(password) < 8:
+                return HTMLResponse(
+                    _render_login(safe_next, "密碼長度至少 8 個字元", is_setup=True), status_code=400
+                )
+            if password != password_confirm:
+                return HTMLResponse(
+                    _render_login(safe_next, "兩次密碼不一致", is_setup=True), status_code=400
+                )
+            new_hash = _pwd_ctx.hash(password)
+            # Double-check under lock: another request may have set the password concurrently
+            if settings.webui.password_hash:
+                is_setup = False
+            else:
+                _save_to_config({"webui": {"password_hash": new_hash}})
+                settings.webui.password_hash = new_hash
+                request.session["authenticated"] = True
+                return RedirectResponse(url=safe_next, status_code=302)
+
+        if not _pwd_ctx.verify(password, settings.webui.password_hash):
+            return HTMLResponse(
+                _render_login(safe_next, "密碼錯誤", is_setup=False), status_code=401
+            )
+        request.session["authenticated"] = True
+        return RedirectResponse(url=safe_next, status_code=302)
+
+    @app.get("/logout")
+    async def logout(request: Request):
+        request.session.clear()
+        return RedirectResponse(url="/login", status_code=302)
 
     # ── Read-only ──────────────────────────────────────────────────────────────
 
@@ -1136,6 +1334,19 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
             raise HTTPException(500, detail="Failed to persist settings")
 
         settings.timezone = tz
+        return {"ok": True}
+
+    @app.put("/settings/auth")
+    async def set_auth(body: _AuthBody):
+        if not settings.webui.password_hash:
+            raise HTTPException(400, detail="No password configured. Use the login page for first-time setup.")
+        if not _pwd_ctx.verify(body.current_password, settings.webui.password_hash):
+            raise HTTPException(403, detail="目前密碼錯誤")
+        if len(body.new_password) < 8:
+            raise HTTPException(400, detail="密碼長度至少 8 個字元")
+        new_hash = _pwd_ctx.hash(body.new_password)
+        _save_to_config({"webui": {"password_hash": new_hash}})
+        settings.webui.password_hash = new_hash
         return {"ok": True}
 
     # ── Desk analytics ────────────────────────────────────────────────────────
