@@ -56,9 +56,7 @@ class SensorsConfig:
 class DisplayConfig:
     model: str = "epd7in5_V2"
     use_mock: bool = False
-    dashboard_trigger_second: int = 57   # render at :SS of each minute
-    display_lag_seconds: int = 3          # estimated panel update time; added to render clock
-    weather_update_interval: int = 600
+    dashboard_trigger_second: int = 57   # trigger at :SS each minute; display_lag = 60 - this value
 
 
 @dataclass

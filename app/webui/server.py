@@ -201,17 +201,13 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
       <hr>
       <div class="row2">
         <div class="f">
-          <label>Dashboard 觸發秒 <span class="hint">（0–59）</span></label>
-          <input type="number" id="d-trigger" min="0" max="59">
+          <label>刷新觸發秒 <span class="hint">（0–59，用來補償電子紙刷新延遲）</span></label>
+          <input type="number" id="d-trigger" min="0" max="59" oninput="updateLagDisplay()">
         </div>
         <div class="f">
-          <label>延遲補償 <span class="hint">（秒，≥ 0）</span></label>
-          <input type="number" id="d-lag" min="0" max="30">
+          <label>延遲補償 <span class="hint">（自動計算）</span></label>
+          <div style="padding:.45rem 0;font-size:.95rem;color:var(--fg)">= 60 − 觸發秒 = <b id="d-lag-display">3</b> 秒</div>
         </div>
-      </div>
-      <div class="f" style="margin-top:.9rem">
-        <label>天氣顯示更新間隔 <span class="hint">（秒）</span></label>
-        <input type="number" id="d-wi" min="60" max="3600" step="60">
       </div>
       <div class="btn-row"><button class="btn-p" onclick="saveDisplay()">儲存</button></div>
     </div>
@@ -390,8 +386,7 @@ async function loadCfg(){
     var d=c.display||{};
     document.getElementById('d-model').value=d.model||'epd7in5_V2';
     document.getElementById('d-trigger').value=d.dashboard_trigger_second??57;
-    document.getElementById('d-lag').value=d.display_lag_seconds??3;
-    document.getElementById('d-wi').value=d.weather_update_interval??600;
+    updateLagDisplay();
     var p=c.presence||{};
     document.getElementById('p-light').value=p.light_weight??1.0;
     document.getElementById('p-door').value=p.door_weight??1.0;
@@ -461,12 +456,14 @@ async function saveDisplay(){
   try{
     await put('/settings/display',{
       model:document.getElementById('d-model').value,
-      dashboard_trigger_second:+document.getElementById('d-trigger').value,
-      display_lag_seconds:+document.getElementById('d-lag').value,
-      weather_update_interval:+document.getElementById('d-wi').value
+      dashboard_trigger_second:+document.getElementById('d-trigger').value
     });
     toast('✓ 顯示器設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
+}
+function updateLagDisplay(){
+  var t=+(document.getElementById('d-trigger').value)||0;
+  document.getElementById('d-lag-display').textContent=60-t;
 }
 async function savePresence(){
   try{
@@ -572,8 +569,6 @@ class _MQTTBody(BaseModel):
 class _DisplayBody(BaseModel):
     model: str | None = None
     dashboard_trigger_second: int | None = None
-    display_lag_seconds: int | None = None
-    weather_update_interval: int | None = None
 
 
 class _PresenceBody(BaseModel):
@@ -779,10 +774,6 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
         patch = body.model_dump(exclude_none=True)
         if "dashboard_trigger_second" in patch and not (0 <= patch["dashboard_trigger_second"] <= 59):
             raise HTTPException(400, detail="dashboard_trigger_second must be 0–59")
-        if "display_lag_seconds" in patch and patch["display_lag_seconds"] < 0:
-            raise HTTPException(400, detail="display_lag_seconds must be >= 0")
-        if "weather_update_interval" in patch and not (60 <= patch["weather_update_interval"] <= 3600):
-            raise HTTPException(400, detail="weather_update_interval must be 60–3600")
         if not patch:
             return {"ok": True}
 

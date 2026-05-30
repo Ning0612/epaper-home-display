@@ -120,7 +120,7 @@ async def _display_loop(
         try:
             # Advance clock by display lag so the rendered HH:MM matches the
             # minute that will be visible when the panel finishes updating.
-            render_time = _DateTime.now() + _timedelta(seconds=settings.display.display_lag_seconds)
+            render_time = _DateTime.now() + _timedelta(seconds=60 - settings.display.dashboard_trigger_second)
             image = render_dashboard(state, settings, render_time)
             await loop.run_in_executor(
                 executor, functools.partial(epaper.display, image, full_refresh)
