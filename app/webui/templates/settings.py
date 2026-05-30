@@ -96,6 +96,7 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
   <div class="nav" onclick="go('wifi',this)"><span class="ni">📶</span>WiFi</div>
   <div class="nav" onclick="go('auth',this)"><span class="ni">🔒</span>安全</div>
   <div class="sb-foot">
+    <a href="/images"><span class="ni">🖼️</span>圖片輪播</a>
     <a href="/desk"><span class="ni">📖</span>書桌前分析</a>
   </div>
 </nav>

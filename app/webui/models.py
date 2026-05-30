@@ -60,3 +60,25 @@ class _GeneralBody(BaseModel):
 class _AuthBody(BaseModel):
     current_password: str
     new_password: str
+
+
+class _CropBody(BaseModel):
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+class _PreviewBody(BaseModel):
+    id: str
+    crop: _CropBody
+
+
+class _ConfirmBody(BaseModel):
+    crop: _CropBody
+
+
+class _CarouselBody(BaseModel):
+    enabled: bool | None = None
+    interval_minutes: int | None = None
+    mode: str | None = None  # "sequential" | "random"

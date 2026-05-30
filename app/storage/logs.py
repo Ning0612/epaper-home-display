@@ -30,6 +30,16 @@ from app.storage._log_notifications import (
     mark_notification_sent,
     update_notification_retry,
 )
+from app.storage._log_images import (
+    add_image,
+    confirm_image,
+    list_images,
+    get_image,
+    delete_image_record,
+    count_confirmed_images,
+    get_oldest_confirmed_image,
+    get_unconfirmed_images,
+)
 
 __all__ = [
     "_now",
@@ -57,4 +67,12 @@ __all__ = [
     "get_pending_notifications",
     "mark_notification_sent",
     "update_notification_retry",
+    "add_image",
+    "confirm_image",
+    "list_images",
+    "get_image",
+    "delete_image_record",
+    "count_confirmed_images",
+    "get_oldest_confirmed_image",
+    "get_unconfirmed_images",
 ]

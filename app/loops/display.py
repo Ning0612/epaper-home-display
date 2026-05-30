@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+import random
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime as _DateTime, timedelta as _timedelta
 
@@ -10,6 +11,41 @@ from app.display.renderer import render_dashboard
 from app.state import state
 
 logger = logging.getLogger(__name__)
+
+
+def _maybe_advance_carousel(settings) -> None:
+    """Advance carousel to next image if interval elapsed; updates state.custom_image_path."""
+    if not settings.images.carousel_enabled:
+        return
+    if len(state.image_playlist) < 2:
+        return
+
+    now = _DateTime.now()
+    interval = _timedelta(minutes=max(1, settings.images.carousel_interval_minutes))
+
+    if state.carousel_last_advance is not None and (now - state.carousel_last_advance) < interval:
+        return
+
+    playlist = state.image_playlist
+    if settings.images.carousel_mode == "random":
+        candidates = [i for i in range(len(playlist)) if i != state.carousel_index]
+        idx = random.choice(candidates) if candidates else state.carousel_index
+    else:
+        idx = (state.carousel_index + 1) % len(playlist)
+
+    import os
+    if not os.path.exists(playlist[idx]):
+        logger.warning("Carousel image missing, removing from playlist: %s", playlist[idx])
+        state.image_playlist = [p for p in state.image_playlist if p != playlist[idx]]
+        # Recurse once to try the next candidate (avoids infinite loop: list is now shorter)
+        if len(state.image_playlist) >= 2:
+            _maybe_advance_carousel(settings)
+        return
+
+    state.carousel_index = idx
+    state.custom_image_path = playlist[idx]
+    state.carousel_last_advance = now
+    logger.debug("Carousel advanced to index %d: %s", idx, playlist[idx])
 
 
 async def _display_loop(
@@ -30,6 +66,8 @@ async def _display_loop(
             await asyncio.wait_for(display_queue.get(), timeout=delay)
         except asyncio.TimeoutError:
             pass  # wall-clock trigger
+
+        _maybe_advance_carousel(settings)
 
         if state.presence != "OCCUPIED":
             continue  # pause updates while nobody home

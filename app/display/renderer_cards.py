@@ -129,11 +129,16 @@ def _draw_card_image(img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentS
 
     try:
         with Image.open(state.custom_image_path) as custom:
-            custom = custom.convert("L")
-            custom.thumbnail((iw, ih), Image.LANCZOS)
-            px = ix + (iw - custom.width) // 2
-            py = iy + (ih - custom.height) // 2
-            img.paste(custom, (px, py))
+            if custom.size == (iw, ih):
+                # Pre-processed display PNG (dithered 280×448) — paste directly
+                img.paste(custom.convert("L"), (ix, iy))
+            else:
+                # Legacy path: arbitrary image — convert and thumbnail
+                custom = custom.convert("L")
+                custom.thumbnail((iw, ih), Image.Resampling.LANCZOS)
+                px = ix + (iw - custom.width) // 2
+                py = iy + (ih - custom.height) // 2
+                img.paste(custom, (px, py))
     except (OSError, IOError) as e:
         logger.warning("custom image load failed: %s", e)
         draw.text((ix + 4, iy + 4), "Image Error", font=_font(16, bold=True), fill=FG)

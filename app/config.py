@@ -91,6 +91,20 @@ class WebUIConfig:
 
 
 @dataclass
+class ImagesConfig:
+    storage_dir: str = "data/images"
+    max_count: int = 50
+    max_upload_bytes: int = 15_728_640   # 15 MB
+    max_pixels: int = 100_000_000        # 100 MP, matches image_processor limit
+    allowed_formats: list[str] = field(
+        default_factory=lambda: ["JPEG", "PNG", "WEBP", "GIF", "BMP"]
+    )
+    carousel_enabled: bool = False
+    carousel_interval_minutes: int = 30
+    carousel_mode: str = "sequential"    # "sequential" | "random"
+
+
+@dataclass
 class Settings:
     mqtt: MQTTConfig = field(default_factory=MQTTConfig)
     weather: WeatherConfig = field(default_factory=WeatherConfig)
@@ -100,6 +114,7 @@ class Settings:
     discord: DiscordConfig = field(default_factory=DiscordConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     webui: WebUIConfig = field(default_factory=WebUIConfig)
+    images: ImagesConfig = field(default_factory=ImagesConfig)
     timezone: str = "Asia/Taipei"
 
 

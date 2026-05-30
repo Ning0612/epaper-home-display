@@ -24,6 +24,7 @@ from app.services.voice import VoiceService
 from app.services.weather import WeatherService
 from app.storage.db import init_db
 from app.storage.logs import end_desk_session, get_ongoing_desk_session, log_system_event
+from app.storage._log_images import get_unconfirmed_images, delete_image_record
 from app.webui.server import create_app
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ async def main() -> None:
 
     await init_db(settings.storage.db_path)
     await log_system_event("INFO", "main", "ePaper Home Display starting")
+    await _init_image_state(settings)
 
     # Recover any session that was still open when the process last stopped
     orphaned = await get_ongoing_desk_session()
@@ -51,7 +53,7 @@ async def main() -> None:
         logger.info("Recovered orphaned desk session %s (duration=%ds)", orphaned["id"], duration)
 
     executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="hw")
-    display_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+    display_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=100)
 
     dht22 = create_dht22(settings.sensors.dht22)
     light = create_light_sensor(settings.sensors.light)
@@ -74,7 +76,7 @@ async def main() -> None:
 
     import uvicorn
     uvicorn_config = uvicorn.Config(
-        create_app(settings, weather_service),
+        create_app(settings, weather_service, display_queue),
         host=settings.webui.host,
         port=settings.webui.port,
         log_level="warning",
@@ -109,6 +111,33 @@ async def main() -> None:
         mqtt_service.stop()
         executor.shutdown(wait=False)
         await log_system_event("INFO", "main", "ePaper Home Display stopped")
+
+
+async def _init_image_state(settings) -> None:
+    """Clean orphan uploads, load confirmed images into state.image_playlist."""
+    import os
+    from app.state import state
+    from app.storage.logs import list_images
+
+    # Remove orphan uploads (interrupted before confirm)
+    orphans = await get_unconfirmed_images()
+    for orphan in orphans:
+        try:
+            if orphan["tmp_path"] and os.path.exists(orphan["tmp_path"]):
+                os.unlink(orphan["tmp_path"])
+        except OSError:
+            pass
+        await delete_image_record(orphan["id"])
+    if orphans:
+        logger.info("Cleaned up %d orphan image uploads", len(orphans))
+
+    # Load confirmed images; skip any with missing files
+    images = await list_images()
+    valid_paths = [img["display_path"] for img in images if os.path.exists(img["display_path"])]
+    state.image_playlist = valid_paths
+    if valid_paths:
+        state.custom_image_path = valid_paths[0]
+    logger.info("Image playlist loaded: %d image(s)", len(valid_paths))
 
 
 if __name__ == "__main__":

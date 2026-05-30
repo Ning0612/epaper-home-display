@@ -30,6 +30,9 @@ class AgentState:
     active_reminder: str | None = None
 
     custom_image_path: str | None = None
+    image_playlist: list[str] = field(default_factory=list)
+    carousel_index: int = 0
+    carousel_last_advance: datetime | None = None
     claude_usage_5h: float | None = None
     claude_usage_week: float | None = None
     codex_usage_5h: float | None = None

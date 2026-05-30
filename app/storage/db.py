@@ -96,6 +96,16 @@ CREATE TABLE IF NOT EXISTS notification_queue (
     sent          INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_notif_queue_pending ON notification_queue(sent, next_retry_ts);
+
+CREATE TABLE IF NOT EXISTS images (
+    id            TEXT PRIMARY KEY,
+    filename      TEXT NOT NULL,
+    display_path  TEXT NOT NULL,
+    tmp_path      TEXT,
+    file_size     INTEGER,
+    created_ts    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_images_created ON images(created_ts);
 """
 
 

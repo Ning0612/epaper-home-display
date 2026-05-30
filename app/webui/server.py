@@ -3,6 +3,8 @@ from __future__ import annotations
 import secrets
 from typing import TYPE_CHECKING
 
+import asyncio
+
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -12,6 +14,7 @@ from app.webui.middleware import _AuthMiddleware
 from app.webui.routes.ai_usage import create_ai_usage_router
 from app.webui.routes.auth import create_auth_router
 from app.webui.routes.desk import create_desk_router
+from app.webui.routes.images import create_images_router
 from app.webui.routes.read_only import create_read_only_router
 from app.webui.routes.settings import create_settings_router
 
@@ -19,7 +22,11 @@ if TYPE_CHECKING:
     from app.config import Settings
 
 
-def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI:
+def create_app(
+    settings: "Settings",
+    weather_service: WeatherService,
+    display_queue: "asyncio.Queue | None" = None,
+) -> FastAPI:
     if not settings.webui.session_secret:
         settings.webui.session_secret = secrets.token_hex(32)
         _save_to_config({"webui": {"session_secret": settings.webui.session_secret}})
@@ -39,5 +46,6 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
     app.include_router(create_settings_router(settings, weather_service))
     app.include_router(create_desk_router(settings))
     app.include_router(create_ai_usage_router())
+    app.include_router(create_images_router(settings, display_queue))
 
     return app
