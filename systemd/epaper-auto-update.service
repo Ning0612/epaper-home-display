@@ -1,0 +1,12 @@
+[Unit]
+Description=ePaper Home Display Auto Update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/epaper-home-display
+ExecStart=/home/pi/epaper-home-display/scripts/auto_update.sh
+StandardOutput=journal
+StandardError=journal

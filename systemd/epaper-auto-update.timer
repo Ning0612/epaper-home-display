@@ -1,0 +1,10 @@
+[Unit]
+Description=ePaper Home Display Auto Update Timer
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
