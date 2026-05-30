@@ -27,6 +27,264 @@ _config_lock = threading.Lock()
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
+_DESK_HTML = r"""<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>書桌前分析</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+      --primary:#3b82f6;--green:#22c55e;--muted:#64748b;--text:#e2e8f0;
+      --r:10px;--sh:0 2px 8px rgba(0,0,0,.3)
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+    .topbar-title{font-size:1.1rem;font-weight:600}
+    .topbar-link{font-size:.8rem;color:var(--primary);text-decoration:none;padding:.3rem .7rem;border:1px solid var(--primary);border-radius:6px}
+    .container{max-width:900px;margin:0 auto;padding:1.5rem}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.3rem;box-shadow:var(--sh);margin-bottom:1.2rem}
+    .card-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:1rem}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem;margin-bottom:1.2rem}
+    .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh)}
+    .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
+    .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2}
+    .stat-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+    .badge{display:inline-block;padding:.2rem .65rem;border-radius:99px;font-size:.78rem;font-weight:600}
+    .badge-green{background:rgba(34,197,94,.15);color:#4ade80}
+    .badge-gray{background:rgba(100,116,139,.15);color:#94a3b8}
+    .sensor-row{display:flex;align-items:center;gap:1rem;font-size:.85rem;flex-wrap:wrap}
+    .sensor-bar-wrap{flex:1;min-width:180px}
+    .sensor-bar{height:8px;background:var(--surface2);border-radius:4px;position:relative;overflow:visible}
+    .sensor-fill{height:100%;border-radius:4px;background:var(--primary);transition:width .4s}
+    .sensor-threshold-line{position:absolute;top:-3px;bottom:-3px;width:2px;background:#f59e0b;border-radius:1px}
+    .chart-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:.82rem}
+    th{text-align:left;padding:.5rem .7rem;font-size:.72rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+    td{padding:.5rem .7rem;border-bottom:1px solid rgba(51,65,85,.5)}
+    tr:last-child td{border-bottom:none}
+    .badge-occ{background:rgba(59,130,246,.15);color:#93c5fd}
+    .badge-unocc{background:rgba(100,116,139,.15);color:#94a3b8}
+    .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.3rem}
+    @media(max-width:600px){.container{padding:1rem}.topbar{padding:.7rem 1rem}}
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">📖 書桌前分析</div>
+  <a href="/settings" class="topbar-link">⚙️ 設定</a>
+</div>
+
+<div class="container">
+
+  <!-- Status Stats -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat"><div class="stat-label">目前狀態</div><div class="stat-value" id="s-presence">—</div></div>
+    <div class="stat"><div class="stat-label">今日累計</div><div class="stat-value" id="s-today">—</div></div>
+    <div class="stat"><div class="stat-label">本次時段</div><div class="stat-value" id="s-segment">—</div><div class="stat-sub" id="s-since"></div></div>
+    <div class="stat"><div class="stat-label">今日次數</div><div class="stat-value" id="s-count">—</div></div>
+  </div>
+
+  <!-- Sensor -->
+  <div class="card">
+    <div class="card-title">光線感測器</div>
+    <div class="sensor-row">
+      <span>目前值：<b id="s-light">—</b></span>
+      <span>閾值：<b id="s-thresh">—</b></span>
+      <div class="sensor-bar-wrap">
+        <div class="sensor-bar">
+          <div class="sensor-fill" id="s-fill" style="width:0%"></div>
+          <div class="sensor-threshold-line" id="s-tline" style="left:0%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="refresh-ts" id="last-refresh"></div>
+  </div>
+
+  <!-- 24h Timeline -->
+  <div class="card">
+    <div class="card-title">近 24 小時狀態軸</div>
+    <div class="chart-wrap" id="timeline-wrap">
+      <div style="color:var(--muted);font-size:.85rem">載入中…</div>
+    </div>
+  </div>
+
+  <!-- 30-day Chart -->
+  <div class="card">
+    <div class="card-title">近 30 天書桌前時間</div>
+    <div class="chart-wrap" id="barchart-wrap">
+      <div style="color:var(--muted);font-size:.85rem">載入中…</div>
+    </div>
+    <div style="display:flex;gap:2rem;margin-top:.9rem;font-size:.82rem;flex-wrap:wrap">
+      <span>30 天平均：<b id="avg30">—</b></span>
+      <span>最高一天：<b id="max30">—</b></span>
+    </div>
+  </div>
+
+  <!-- Daily Stats Table -->
+  <div class="card">
+    <div class="card-title">每日統計（最近 30 天）</div>
+    <div style="overflow-x:auto">
+      <table id="daily-table">
+        <thead><tr><th>日期</th><th>書桌前時間</th><th>書桌前比例</th></tr></thead>
+        <tbody id="daily-tbody"><tr><td colspan="3" style="color:var(--muted)">載入中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent Sessions -->
+  <div class="card">
+    <div class="card-title">最近時段紀錄</div>
+    <div style="overflow-x:auto">
+      <table id="sessions-table">
+        <thead><tr><th>開始</th><th>結束</th><th>持續時間</th></tr></thead>
+        <tbody id="sessions-tbody"><tr><td colspan="3" style="color:var(--muted)">載入中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function fmtDuration(sec){
+  if(!sec||sec<=0) return '0m';
+  var h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60);
+  if(h===0) return m+'m';
+  if(m===0) return h+'h';
+  return h+'h '+m+'m';
+}
+
+function fmtTime(iso){
+  if(!iso) return '進行中';
+  var d=new Date(iso);
+  return d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+
+function fmtDate(iso){
+  if(!iso) return '';
+  return iso.slice(0,10);
+}
+
+function renderTimeline(sessions){
+  var now=Date.now();
+  var start24=now-86400000;
+  var W=800, H=48;
+  var bars='';
+  sessions.forEach(function(s){
+    var x1=Math.max(0,(new Date(s.start_ts).getTime()-start24)/86400000*W);
+    var endMs=s.end_ts?new Date(s.end_ts).getTime():now;
+    var x2=Math.min(W,(endMs-start24)/86400000*W);
+    var w=Math.max(2,x2-x1);
+    var opacity=s.end_ts?'0.75':'0.95';
+    bars+='<rect x="'+x1+'" y="6" width="'+w+'" height="36" rx="3" fill="#3b82f6" opacity="'+opacity+'"/>';
+  });
+  var labels='';
+  for(var h=0;h<=24;h+=6){
+    var x=h/24*W;
+    var t=new Date(start24+h*3600000);
+    var lbl=String(t.getHours()).padStart(2,'0')+':00';
+    labels+='<text x="'+x+'" y="'+H+'" text-anchor="middle" font-size="10" fill="#64748b">'+lbl+'</text>';
+    labels+='<line x1="'+x+'" y1="44" x2="'+x+'" y2="47" stroke="#475569" stroke-width="1"/>';
+  }
+  return '<svg viewBox="0 0 '+W+' '+(H+2)+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px">'
+    +'<rect width="'+W+'" height="48" rx="4" fill="#1e293b"/>'
+    +bars+labels+'</svg>';
+}
+
+function renderBarChart(daily30d){
+  var W=800, bH=140, svgH=170;
+  var maxSec=Math.max.apply(null,daily30d.map(function(d){return d.total_seconds;}));
+  if(maxSec===0) maxSec=3600;
+  var bW=W/30-2;
+  var bars='',labels='';
+  daily30d.forEach(function(d,i){
+    var x=i*(W/30);
+    var h=Math.max(2,d.total_seconds/maxSec*bH);
+    var y=bH-h;
+    var opacity=d.total_seconds>0?'0.75':'0.2';
+    bars+='<rect x="'+(x+1)+'" y="'+y+'" width="'+bW+'" height="'+h+'" rx="2" fill="#3b82f6" opacity="'+opacity+'"/>';
+    if(i%7===0||i===29){
+      var lbl=d.date.slice(5);
+      labels+='<text x="'+(x+bW/2)+'" y="'+(svgH-2)+'" text-anchor="middle" font-size="9" fill="#64748b">'+lbl+'</text>';
+    }
+  });
+  return '<svg viewBox="0 0 '+W+' '+svgH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px">'
+    +'<rect width="'+W+'" height="'+svgH+'" rx="4" fill="#1e293b"/>'
+    +bars+labels+'</svg>';
+}
+
+async function loadStats(){
+  try{
+    var r=await fetch('/api/desk/stats');
+    var d=await r.json();
+    var occ=d.presence==='OCCUPIED';
+    document.getElementById('s-presence').innerHTML=
+      '<span class="badge '+(occ?'badge-green':'badge-gray')+'">'+(occ?'在桌前':'不在')+'</span>';
+    document.getElementById('s-today').textContent=fmtDuration(d.today_total_seconds);
+    document.getElementById('s-segment').textContent=fmtDuration(d.current_segment_seconds);
+    document.getElementById('s-since').textContent=d.last_change_ts?('自 '+fmtTime(d.last_change_ts)):'';
+    document.getElementById('s-count').textContent=d.today_session_count+'次';
+    document.getElementById('s-light').textContent=d.light_raw??'—';
+    document.getElementById('s-thresh').textContent=d.threshold??'—';
+    var raw=d.light_raw??0, thresh=d.threshold??500;
+    var fillPct=Math.min(100,raw/1023*100).toFixed(1);
+    var threshPct=Math.min(100,thresh/1023*100).toFixed(1);
+    document.getElementById('s-fill').style.width=fillPct+'%';
+    document.getElementById('s-tline').style.left=threshPct+'%';
+    document.getElementById('last-refresh').textContent='最後更新：'+new Date().toLocaleTimeString('zh-TW',{hour12:false});
+  }catch(e){console.error('stats',e);}
+}
+
+async function loadHistory(){
+  try{
+    var r=await fetch('/api/desk/history');
+    var d=await r.json();
+    document.getElementById('timeline-wrap').innerHTML=renderTimeline(d.timeline_24h||[]);
+
+    document.getElementById('barchart-wrap').innerHTML=renderBarChart(d.daily_30d||[]);
+
+    var totals=(d.daily_30d||[]).map(function(x){return x.total_seconds;});
+    var nonZero=totals.filter(function(x){return x>0;});
+    var avg=nonZero.length?Math.round(nonZero.reduce(function(a,b){return a+b;},0)/nonZero.length):0;
+    var max=nonZero.length?Math.max.apply(null,nonZero):0;
+    document.getElementById('avg30').textContent=fmtDuration(avg);
+    document.getElementById('max30').textContent=fmtDuration(max);
+
+    var tbody=document.getElementById('daily-tbody');
+    var rows=(d.daily_30d||[]).slice().reverse().map(function(x){
+      var pct=Math.round(x.total_seconds/864);
+      return '<tr><td>'+x.date+'</td><td>'+fmtDuration(x.total_seconds)+'</td><td>'+pct+'%</td></tr>';
+    }).join('');
+    tbody.innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無資料</td></tr>';
+  }catch(e){console.error('history',e);}
+}
+
+async function loadSessions(){
+  try{
+    var r=await fetch('/api/desk/sessions?limit=20');
+    var d=await r.json();
+    var tbody=document.getElementById('sessions-tbody');
+    var rows=(d.sessions||[]).map(function(s){
+      var badge=s.end_ts?'':'<span class="badge badge-green" style="font-size:.65rem">進行中</span>';
+      return '<tr><td>'+fmtTime(s.start_ts)+'<br><span style="font-size:.72rem;color:var(--muted)">'+fmtDate(s.start_ts)+'</span></td>'
+        +'<td>'+(s.end_ts?fmtTime(s.end_ts):badge)+'</td>'
+        +'<td>'+(s.duration_seconds!=null?fmtDuration(s.duration_seconds):'—')+'</td></tr>';
+    }).join('');
+    tbody.innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無紀錄</td></tr>';
+  }catch(e){console.error('sessions',e);}
+}
+
+loadStats(); loadHistory(); loadSessions();
+setInterval(loadStats, 30000);
+setInterval(function(){loadHistory();loadSessions();}, 300000);
+</script>
+</body>
+</html>"""
+
+
 _SETTINGS_HTML = r"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -253,14 +511,41 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
   <div id="sec-notif" class="sec">
     <div class="sec-head">
       <div class="sec-title">💬 通知設定</div>
-      <div class="sec-desc">Discord Webhook 告警</div>
+      <div class="sec-desc">Discord Webhook 推播設定</div>
     </div>
     <div class="card">
       <div class="f">
         <label>Discord Webhook URL</label>
         <input type="password" id="n-discord" placeholder="https://discord.com/api/webhooks/...">
       </div>
+      <hr>
+      <div class="tog-row">
+        <div><div class="tog-lbl">裝置上線通知</div><div class="tog-desc">服務啟動時通知 WebUI 連結</div></div>
+        <label class="sw"><input type="checkbox" id="n-online"><span class="sl"></span></label>
+      </div>
+      <div class="tog-row">
+        <div><div class="tog-lbl">時段結束通知</div><div class="tog-desc">離開書桌時推送該時段摘要</div></div>
+        <label class="sw"><input type="checkbox" id="n-session"><span class="sl"></span></label>
+      </div>
+      <div class="f" style="margin-top:.5rem">
+        <label>最短通知時段 <span class="hint">（分鐘，1–60）</span></label>
+        <input type="number" id="n-min" min="1" max="60">
+      </div>
+      <hr>
+      <div class="tog-row">
+        <div><div class="tog-lbl">每日摘要通知</div><div class="tog-desc">每天固定時間推送昨日統計</div></div>
+        <label class="sw"><input type="checkbox" id="n-daily"><span class="sl"></span></label>
+      </div>
+      <div class="f">
+        <label>每日摘要時間 <span class="hint">（HH:MM）</span></label>
+        <input type="text" id="n-time" placeholder="23:00" style="max-width:120px">
+      </div>
       <div class="btn-row"><button class="btn-p" onclick="saveNotif()">儲存</button></div>
+    </div>
+    <div class="card">
+      <div class="c-sub">書桌前分析</div>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:.6rem">查看即時狀態、今日統計與歷史紀錄</p>
+      <a href="/desk" style="display:inline-block;padding:.45rem 1.2rem;background:var(--primary);color:#fff;border-radius:6px;font-size:.83rem;font-weight:500;text-decoration:none">開啟 Dashboard →</a>
     </div>
   </div>
 
@@ -363,6 +648,11 @@ async function loadCfg(){
     document.getElementById('v-player').value=v.player||'aplay';
     var dc=c.discord||{};
     document.getElementById('n-discord').placeholder=dc.webhook_set?'（已設定，重新輸入以更新）':'https://discord.com/api/webhooks/...';
+    document.getElementById('n-online').checked=dc.notify_device_online!==false;
+    document.getElementById('n-session').checked=dc.notify_session_end!==false;
+    document.getElementById('n-min').value=dc.session_end_min_minutes??5;
+    document.getElementById('n-daily').checked=dc.notify_daily_summary!==false;
+    document.getElementById('n-time').value=dc.daily_summary_time||'23:00';
     document.getElementById('g-tz').value=c.timezone||'Asia/Taipei';
   }catch(e){console.error('loadCfg',e)}
 }
@@ -443,12 +733,20 @@ async function saveVoice(){
 }
 async function saveNotif(){
   try{
+    var body={
+      notify_device_online:document.getElementById('n-online').checked,
+      notify_session_end:document.getElementById('n-session').checked,
+      session_end_min_minutes:+document.getElementById('n-min').value,
+      notify_daily_summary:document.getElementById('n-daily').checked,
+      daily_summary_time:document.getElementById('n-time').value.trim()
+    };
     var url=document.getElementById('n-discord').value.trim();
-    // only update if user typed something new
-    if(!url){toast('請輸入 Webhook URL，或留空以清除',false);return;}
-    await put('/settings/notifications',{discord_webhook_url:url==='clear'?'':url});
-    document.getElementById('n-discord').value='';
-    document.getElementById('n-discord').placeholder='（已設定，重新輸入以更新）';
+    if(url) body.discord_webhook_url=(url==='clear'?'':url);
+    await put('/settings/notifications',body);
+    if(url){
+      document.getElementById('n-discord').value='';
+      document.getElementById('n-discord').placeholder='（已設定，重新輸入以更新）';
+    }
     toast('✓ 通知設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
@@ -537,6 +835,11 @@ class _VoiceBody(BaseModel):
 
 class _NotificationsBody(BaseModel):
     discord_webhook_url: str | None = None
+    notify_device_online: bool | None = None
+    notify_session_end: bool | None = None
+    session_end_min_minutes: int | None = None
+    notify_daily_summary: bool | None = None
+    daily_summary_time: str | None = None
 
 
 class _GeneralBody(BaseModel):
@@ -781,14 +1084,41 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
         url = patch.get("discord_webhook_url", "")
         if url and not url.startswith("https://"):
             raise HTTPException(400, detail="discord_webhook_url must start with https://")
+        if "session_end_min_minutes" in patch and not (1 <= patch["session_end_min_minutes"] <= 60):
+            raise HTTPException(400, detail="session_end_min_minutes must be 1–60")
+        if "daily_summary_time" in patch:
+            t = patch["daily_summary_time"]
+            m = re.match(r"^(\d{2}):(\d{2})$", t)
+            if not m or not (0 <= int(m.group(1)) <= 23) or not (0 <= int(m.group(2)) <= 59):
+                raise HTTPException(400, detail="daily_summary_time must be HH:MM (00:00–23:59)")
+
+        discord_patch: dict = {}
+        if "discord_webhook_url" in patch:
+            discord_patch["webhook_url"] = patch["discord_webhook_url"]
+        for key in (
+            "notify_device_online", "notify_session_end", "session_end_min_minutes",
+            "notify_daily_summary", "daily_summary_time",
+        ):
+            if key in patch:
+                discord_patch[key] = patch[key]
+
+        if not discord_patch:
+            return {"ok": True}
 
         try:
-            _save_to_config({"discord": {"webhook_url": url}})
+            _save_to_config({"discord": discord_patch})
         except Exception as exc:
             logger.error("Failed to persist notification settings: %s", exc)
             raise HTTPException(500, detail="Failed to persist settings")
 
-        settings.discord.webhook_url = url
+        if "webhook_url" in discord_patch:
+            settings.discord.webhook_url = discord_patch["webhook_url"]
+        for key in (
+            "notify_device_online", "notify_session_end", "session_end_min_minutes",
+            "notify_daily_summary", "daily_summary_time",
+        ):
+            if key in discord_patch:
+                setattr(settings.discord, key, discord_patch[key])
         return {"ok": True}
 
     @app.put("/settings/general")
@@ -807,6 +1137,114 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
 
         settings.timezone = tz
         return {"ok": True}
+
+    # ── Desk analytics ────────────────────────────────────────────────────────
+
+    @app.get("/desk", response_class=HTMLResponse)
+    async def desk_page():
+        return HTMLResponse(_DESK_HTML)
+
+    @app.get("/api/desk/stats")
+    async def desk_stats():
+        from datetime import datetime
+        from app.storage.logs import get_sessions_for_date
+        now = datetime.now()
+        today_sessions = await get_sessions_for_date(now.date())
+
+        today_completed_sec = sum(
+            s["duration_seconds"] for s in today_sessions
+            if s["duration_seconds"] is not None
+        )
+        ongoing_sec = 0
+        if state.desk_session_start is not None and state.desk_session_start.date() == now.date():
+            ongoing_sec = int((now - state.desk_session_start).total_seconds())
+
+        today_count = len([s for s in today_sessions if s["duration_seconds"] is not None])
+        if state.desk_session_start is not None and state.desk_session_start.date() == now.date():
+            today_count += 1
+
+        current_segment_sec = 0
+        last_change_ts = None
+        if state.presence == "OCCUPIED" and state.desk_session_start:
+            current_segment_sec = int((now - state.desk_session_start).total_seconds())
+            last_change_ts = state.desk_session_start.isoformat()
+        elif state.presence == "UNOCCUPIED":
+            completed = [s for s in today_sessions if s["end_ts"] is not None]
+            if completed:
+                last_end = max(s["end_ts"] for s in completed)
+                try:
+                    from datetime import datetime as _dt
+                    last_end_dt = _dt.fromisoformat(last_end)
+                    current_segment_sec = int((now - last_end_dt).total_seconds())
+                    last_change_ts = last_end
+                except ValueError:
+                    pass
+
+        return {
+            "presence": state.presence,
+            "light_raw": state.light_raw,
+            "threshold": settings.sensors.light.bright_threshold,
+            "today_total_seconds": today_completed_sec + ongoing_sec,
+            "today_session_count": today_count,
+            "current_segment_seconds": current_segment_sec,
+            "session_start_ts": state.desk_session_start.isoformat() if state.desk_session_start else None,
+            "last_change_ts": last_change_ts,
+        }
+
+    @app.get("/api/desk/history")
+    async def desk_history():
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        from app.storage.logs import get_sessions_last_n_days
+
+        now = datetime.now()
+        all_sessions = await get_sessions_last_n_days(30)
+
+        # 24h timeline: include sessions that OVERLAP the last 24 hours
+        # (started before cutoff but ended/ongoing within the window)
+        cutoff_24h = (now - timedelta(hours=24)).isoformat()
+        timeline_24h = [
+            s for s in all_sessions
+            if (s["end_ts"] is None and s["start_ts"] is not None)
+            or (s["end_ts"] is not None and s["end_ts"] >= cutoff_24h)
+            or s["start_ts"] >= cutoff_24h
+        ]
+        # Add current ongoing session if not already included
+        if state.desk_session_start is not None and state.desk_session_id is not None:
+            existing_ids = {s["id"] for s in timeline_24h}
+            if state.desk_session_id not in existing_ids:
+                timeline_24h.append({
+                    "id": state.desk_session_id,
+                    "start_ts": state.desk_session_start.isoformat(),
+                    "end_ts": None,
+                    "duration_seconds": None,
+                })
+
+        # 30-day totals (completed sessions only, plus today's ongoing for consistency)
+        daily_totals: dict = defaultdict(int)
+        for s in all_sessions:
+            if s["duration_seconds"] is not None:
+                date_key = s["start_ts"][:10]
+                daily_totals[date_key] += s["duration_seconds"]
+
+        # Add today's ongoing session so chart matches /api/desk/stats today total
+        if state.desk_session_start is not None and state.desk_session_start.date() == now.date():
+            ongoing_sec = int((now - state.desk_session_start).total_seconds())
+            daily_totals[now.date().isoformat()] += ongoing_sec
+
+        today = now.date()
+        daily_30d = []
+        for i in range(29, -1, -1):
+            d = today - timedelta(days=i)
+            date_str = d.isoformat()
+            daily_30d.append({"date": date_str, "total_seconds": daily_totals.get(date_str, 0)})
+
+        return {"timeline_24h": timeline_24h, "daily_30d": daily_30d}
+
+    @app.get("/api/desk/sessions")
+    async def desk_sessions(limit: int = 20):
+        from app.storage.logs import get_recent_sessions
+        return {"sessions": await get_recent_sessions(limit)}
 
     # ── AI usage (internal) ────────────────────────────────────────────────────
 

@@ -14,6 +14,8 @@ class AgentState:
 
     presence: Literal["OCCUPIED", "UNOCCUPIED", "UNKNOWN"] = "UNKNOWN"
     presence_score: float = 0.0
+    desk_session_id: int | None = None
+    desk_session_start: datetime | None = None
 
     weather_current: dict | None = None
     weather_forecast: list[dict] = field(default_factory=list)

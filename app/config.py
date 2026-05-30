@@ -70,6 +70,11 @@ class VoiceConfig:
 @dataclass
 class DiscordConfig:
     webhook_url: str = ""
+    notify_device_online: bool = True
+    notify_session_end: bool = True
+    session_end_min_minutes: int = 5
+    notify_daily_summary: bool = True
+    daily_summary_time: str = "23:00"
 
 
 @dataclass

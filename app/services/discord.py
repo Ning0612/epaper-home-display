@@ -11,16 +11,16 @@ logger = logging.getLogger(__name__)
 
 class DiscordService:
     def __init__(self, config: DiscordConfig) -> None:
-        self._webhook_url = config.webhook_url
+        self._config = config
 
     async def send(self, message: str) -> bool:
-        if not self._webhook_url:
+        if not self._config.webhook_url:
             logger.debug("Discord webhook not configured")
             return False
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    self._webhook_url,
+                    self._config.webhook_url,
                     json={"content": message},
                     timeout=aiohttp.ClientTimeout(total=5),
                 ) as resp:

@@ -77,6 +77,25 @@ CREATE TABLE IF NOT EXISTS ai_usage_logs (
     raw_json TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_ai_usage_ts ON ai_usage_logs(ts);
+
+CREATE TABLE IF NOT EXISTS desk_sessions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    start_ts         TEXT NOT NULL,
+    end_ts           TEXT,
+    duration_seconds INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_desk_sessions_start ON desk_sessions(start_ts);
+
+CREATE TABLE IF NOT EXISTS notification_queue (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_ts    TEXT NOT NULL,
+    type          TEXT NOT NULL,
+    message       TEXT NOT NULL,
+    attempts      INTEGER DEFAULT 0,
+    next_retry_ts TEXT NOT NULL,
+    sent          INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_notif_queue_pending ON notification_queue(sent, next_retry_ts);
 """
 
 

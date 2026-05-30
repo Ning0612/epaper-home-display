@@ -18,15 +18,20 @@ from app.sensors.dht22 import create_dht22
 from app.sensors.light_sensor import create_light_sensor
 from app.services.discord import DiscordService
 from app.services.mqtt_client import MQTTService
+from app.services.notification_manager import NotificationManager
 from app.services.voice import VoiceService
 from app.services.weather import WeatherService
 from app.state import state
 from app.storage.db import init_db
 from app.storage.logs import (
+    end_desk_session,
+    get_ongoing_desk_session,
+    get_sessions_for_date,
     log_alarm_decision,
     log_env,
     log_presence,
     log_system_event,
+    start_desk_session,
 )
 from app.webui.server import create_app
 
@@ -57,13 +62,39 @@ async def _sensor_loop(dht22, light, executor: ThreadPoolExecutor, settings) -> 
         await asyncio.sleep(30)
 
 
-async def _presence_loop(display_queue: asyncio.Queue, mqtt_service) -> None:
+async def _presence_loop(
+    display_queue: asyncio.Queue, mqtt_service, notification_manager: NotificationManager, settings
+) -> None:
     while True:
         try:
             score, presence = compute_presence(state.light_is_bright)
+            now = _DateTime.now()
+            prev_presence = state.presence
 
-            # Detect return home: wake display loop immediately
-            if state.presence != "OCCUPIED" and presence == "OCCUPIED":
+            # Transition OCCUPIED → UNOCCUPIED: end active session
+            if prev_presence == "OCCUPIED" and presence != "OCCUPIED":
+                if state.desk_session_id is not None and state.desk_session_start is not None:
+                    duration = int((now - state.desk_session_start).total_seconds())
+                    try:
+                        await end_desk_session(state.desk_session_id, now, duration)
+                        if duration >= settings.discord.session_end_min_minutes * 60:
+                            session_dict = {
+                                "start_ts": state.desk_session_start.isoformat(),
+                                "end_ts": now.isoformat(),
+                                "duration_seconds": duration,
+                            }
+                            await notification_manager.send_session_end(session_dict)
+                    except Exception as exc:
+                        logger.error("Failed to finalize desk session %s: %s", state.desk_session_id, exc)
+                # Always clear session state regardless of DB/notification errors
+                state.desk_session_id = None
+                state.desk_session_start = None
+
+            # Transition UNOCCUPIED/UNKNOWN → OCCUPIED: start new session + wake display
+            if prev_presence != "OCCUPIED" and presence == "OCCUPIED":
+                session_id = await start_desk_session(now)
+                state.desk_session_id = session_id
+                state.desk_session_start = now
                 try:
                     display_queue.put_nowait("presence_return")
                 except asyncio.QueueFull:
@@ -96,6 +127,32 @@ async def _presence_loop(display_queue: asyncio.Queue, mqtt_service) -> None:
         except Exception as exc:
             logger.error("Presence loop error: %s", exc)
         await asyncio.sleep(60)
+
+
+async def _notification_loop(settings, notification_manager: NotificationManager) -> None:
+    last_summary_date = None
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await notification_manager.process_retry_queue()
+
+            if settings.discord.notify_daily_summary and settings.discord.daily_summary_time:
+                now = _DateTime.now()
+                try:
+                    h, m = (int(x) for x in settings.discord.daily_summary_time.split(":"))
+                    if now.hour == h and now.minute == m and last_summary_date != now.date():
+                        yesterday = (now - _timedelta(days=1)).date()
+                        sessions = await get_sessions_for_date(yesterday)
+                        await notification_manager.send_daily_summary(
+                            str(yesterday), sessions
+                        )
+                        last_summary_date = now.date()
+                except ValueError:
+                    logger.warning(
+                        "Invalid daily_summary_time: %s", settings.discord.daily_summary_time
+                    )
+        except Exception as exc:
+            logger.error("Notification loop error: %s", exc)
 
 
 async def _display_loop(
@@ -154,6 +211,14 @@ async def _weather_loop(weather_service: WeatherService, settings) -> None:
 
 
 async def _handle_button(display_queue: asyncio.Queue) -> None:
+    if state.presence != "OCCUPIED" and state.desk_session_id is None:
+        now = _DateTime.now()
+        try:
+            session_id = await start_desk_session(now)
+            state.desk_session_id = session_id
+            state.desk_session_start = now
+        except Exception as exc:
+            logger.error("Button: failed to start desk session: %s", exc)
     state.presence = "OCCUPIED"
     try:
         display_queue.put_nowait("dashboard")
@@ -175,6 +240,15 @@ async def main() -> None:
     await init_db(settings.storage.db_path)
     await log_system_event("INFO", "main", "ePaper Home Display starting")
 
+    # Recover any session that was still open when the process last stopped
+    orphaned = await get_ongoing_desk_session()
+    if orphaned:
+        from datetime import datetime as _dt_startup
+        now_startup = _dt_startup.now()
+        duration = int((now_startup - _dt_startup.fromisoformat(orphaned["start_ts"])).total_seconds())
+        await end_desk_session(orphaned["id"], now_startup, duration)
+        logger.info("Recovered orphaned desk session %s (duration=%ds)", orphaned["id"], duration)
+
     executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="hw")
     display_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
 
@@ -185,6 +259,7 @@ async def main() -> None:
     weather_service = WeatherService(settings.weather)
     voice_service = VoiceService(settings.voice)
     discord_service = DiscordService(settings.discord)
+    notification_manager = NotificationManager(discord_service, settings.discord)
 
     loop = asyncio.get_event_loop()
     mqtt_service = MQTTService(settings.mqtt, display_queue)
@@ -209,12 +284,27 @@ async def main() -> None:
 
     logger.info("WebUI → http://%s:%d", settings.webui.host, settings.webui.port)
 
+    # Send device online notification after a short delay (let MQTT connect first)
+    if settings.discord.notify_device_online:
+        import socket
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            local_ip = settings.webui.host
+        webui_url = f"http://{local_ip}:{settings.webui.port}"
+        asyncio.get_event_loop().call_later(
+            5, lambda: asyncio.ensure_future(
+                notification_manager.send_device_online(webui_url)
+            )
+        )
+
     try:
         await asyncio.gather(
             _sensor_loop(dht22, light, executor, settings),
-            _presence_loop(display_queue, mqtt_service),
+            _presence_loop(display_queue, mqtt_service, notification_manager, settings),
             _display_loop(epaper, executor, display_queue, settings),
             _weather_loop(weather_service, settings),
+            _notification_loop(settings, notification_manager),
             server.serve(),
         )
     finally:

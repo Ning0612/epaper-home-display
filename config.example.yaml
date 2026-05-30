@@ -37,6 +37,11 @@ voice:
 
 discord:
   webhook_url: ""
+  notify_device_online: true      # 裝置上線時通知（含 WebUI 連結）
+  notify_session_end: true        # 離開書桌時通知該時段摘要
+  session_end_min_minutes: 5      # 短於此時間（分鐘）的時段不觸發通知
+  notify_daily_summary: true      # 每日固定時間推送昨日統計
+  daily_summary_time: "23:00"     # 每日摘要推送時間（HH:MM，依系統時區）
 
 storage:
   db_path: "data/epaper-home-display.db"
