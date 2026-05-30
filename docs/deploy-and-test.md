@@ -30,7 +30,7 @@ pytest
 pytest tests/test_presence.py
 
 # 單一函式
-pytest tests/test_presence.py::test_occupied_when_light_bright
+pytest tests/test_presence.py::test_light_bright_is_occupied
 ```
 
 ### 語法檢查

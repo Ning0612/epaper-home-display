@@ -23,8 +23,6 @@ from app.services.weather import WeatherService
 from app.state import state
 from app.storage.db import init_db
 from app.storage.logs import (
-    get_recent_door_events,
-    get_recent_face_events,
     log_alarm_decision,
     log_env,
     log_presence,
@@ -59,19 +57,18 @@ async def _sensor_loop(dht22, light, executor: ThreadPoolExecutor, settings) -> 
         await asyncio.sleep(30)
 
 
-async def _presence_loop(settings, display_queue: asyncio.Queue) -> None:
+async def _presence_loop(display_queue: asyncio.Queue) -> None:
     while True:
         try:
-            door_events = await get_recent_door_events(settings.presence.door_window_seconds)
-            face_events = await get_recent_face_events(settings.presence.face_window_seconds)
+            score, presence = compute_presence(state.light_is_bright)
 
-            score, presence = compute_presence(
-                light_is_bright=state.light_is_bright,
-                recent_door_events=door_events,
-                recent_face_events=face_events,
-                button_override=False,
-                config=settings.presence,
-            )
+            # Detect return home: wake display loop immediately
+            if state.presence != "OCCUPIED" and presence == "OCCUPIED":
+                try:
+                    display_queue.put_nowait("presence_return")
+                except asyncio.QueueFull:
+                    logger.debug("Display queue full on presence return, will render on next cycle")
+
             state.presence = presence
             state.presence_score = score
             await log_presence(score, presence, "periodic")
@@ -103,7 +100,7 @@ async def _display_loop(
 
     while True:
         # Align to wall-clock: trigger at :dashboard_trigger_second each minute.
-        # Any display_queue event (button, MQTT alert) fires immediately instead.
+        # Any display_queue event (button, MQTT alert, presence_return) fires immediately.
         now = _DateTime.now()
         target = settings.display.dashboard_trigger_second
         delay = (target - now.second) % 60 or 60  # `or 60` avoids re-triggering immediately
@@ -111,6 +108,9 @@ async def _display_loop(
             await asyncio.wait_for(display_queue.get(), timeout=delay)
         except asyncio.TimeoutError:
             pass  # wall-clock trigger
+
+        if state.presence != "OCCUPIED":
+            continue  # pause updates while nobody home
 
         if state.display_busy:
             continue
@@ -204,7 +204,7 @@ async def main() -> None:
     try:
         await asyncio.gather(
             _sensor_loop(dht22, light, executor, settings),
-            _presence_loop(settings, display_queue),
+            _presence_loop(display_queue),
             _display_loop(epaper, executor, display_queue, settings),
             _weather_loop(weather_service, settings),
             server.serve(),

@@ -108,7 +108,7 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
   <div class="nav active" onclick="go('weather',this)"><span class="ni">☁️</span>天氣</div>
   <div class="nav" onclick="go('mqtt',this)"><span class="ni">🔗</span>MQTT</div>
   <div class="nav" onclick="go('display',this)"><span class="ni">🖥️</span>顯示器</div>
-  <div class="nav" onclick="go('presence',this)"><span class="ni">👁️</span>在場偵測</div>
+  <div class="nav" onclick="go('presence',this)"><span class="ni">💡</span>在場偵測</div>
   <div class="nav" onclick="go('voice',this)"><span class="ni">🔊</span>語音</div>
   <div class="nav" onclick="go('notif',this)"><span class="ni">💬</span>通知</div>
   <div class="nav" onclick="go('general',this)"><span class="ni">⚙️</span>一般</div>
@@ -214,42 +214,13 @@ _SETTINGS_HTML = r"""<!DOCTYPE html>
   <!-- Presence -->
   <div id="sec-presence" class="sec">
     <div class="sec-head">
-      <div class="sec-title">👁️ 在場偵測</div>
-      <div class="sec-desc">調整各感測器評分權重與判斷閾值</div>
+      <div class="sec-title">💡 在場偵測</div>
+      <div class="sec-desc">燈亮即判定為在場；人不在時暫停顯示更新</div>
     </div>
     <div class="card">
-      <div class="c-sub">評分權重</div>
-      <div class="row2">
-        <div class="f">
-          <label>光線</label>
-          <input type="number" id="p-light" min="0" max="10" step="0.5">
-        </div>
-        <div class="f">
-          <label>門感測</label>
-          <input type="number" id="p-door" min="0" max="10" step="0.5">
-        </div>
-        <div class="f">
-          <label>人臉辨識</label>
-          <input type="number" id="p-face" min="0" max="10" step="0.5">
-        </div>
-      </div>
-      <hr>
-      <div class="c-sub">判斷閾值</div>
       <div class="f">
-        <label>在場閾值 <span class="hint">（≥ 此值視為在家，≥ 0）</span></label>
-        <input type="number" id="p-thr" min="0" max="20" step="0.5">
-      </div>
-      <hr>
-      <div class="c-sub">時間窗口</div>
-      <div class="row2">
-        <div class="f">
-          <label>門感測窗口 <span class="hint">（秒）</span></label>
-          <input type="number" id="p-dwin" min="30" max="3600" step="30">
-        </div>
-        <div class="f">
-          <label>人臉辨識窗口 <span class="hint">（秒）</span></label>
-          <input type="number" id="p-fwin" min="30" max="3600" step="30">
-        </div>
+        <label>光線閾值 <span class="hint">（0–1023，ADC 原始值，高於此值判定為在場）</span></label>
+        <input type="number" id="p-bright" min="0" max="1023">
       </div>
       <div class="btn-row"><button class="btn-p" onclick="savePresence()">儲存</button></div>
     </div>
@@ -385,13 +356,8 @@ async function loadCfg(){
     document.getElementById('d-model').value=d.model||'epd7in5_V2';
     document.getElementById('d-trigger').value=d.dashboard_trigger_second??57;
     document.getElementById('d-fre').value=d.full_refresh_every??10;
-    var p=c.presence||{};
-    document.getElementById('p-light').value=p.light_weight??1.0;
-    document.getElementById('p-door').value=p.door_weight??1.0;
-    document.getElementById('p-face').value=p.face_weight??2.0;
-    document.getElementById('p-thr').value=p.threshold??2.0;
-    document.getElementById('p-dwin').value=p.door_window_seconds??300;
-    document.getElementById('p-fwin').value=p.face_window_seconds??600;
+    var sl=(c.sensors||{}).light||{};
+    document.getElementById('p-bright').value=sl.bright_threshold??500;
     var v=c.voice||{};
     document.getElementById('v-en').checked=v.enabled!==false;
     document.getElementById('v-player').value=v.player||'aplay';
@@ -462,14 +428,7 @@ async function saveDisplay(){
 }
 async function savePresence(){
   try{
-    await put('/settings/presence',{
-      light_weight:+document.getElementById('p-light').value,
-      door_weight:+document.getElementById('p-door').value,
-      face_weight:+document.getElementById('p-face').value,
-      threshold:+document.getElementById('p-thr').value,
-      door_window_seconds:+document.getElementById('p-dwin').value,
-      face_window_seconds:+document.getElementById('p-fwin').value
-    });
+    await put('/settings/presence',{bright_threshold:+document.getElementById('p-bright').value});
     toast('✓ 在場偵測已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
@@ -568,12 +527,7 @@ class _DisplayBody(BaseModel):
 
 
 class _PresenceBody(BaseModel):
-    light_weight: float | None = None
-    door_weight: float | None = None
-    face_weight: float | None = None
-    threshold: float | None = None
-    door_window_seconds: int | None = None
-    face_window_seconds: int | None = None
+    bright_threshold: int | None = None
 
 
 class _VoiceBody(BaseModel):
@@ -788,23 +742,19 @@ def create_app(settings: "Settings", weather_service: WeatherService) -> FastAPI
     @app.put("/settings/presence")
     async def set_presence(body: _PresenceBody):
         patch = body.model_dump(exclude_none=True)
-        for weight_key in ("light_weight", "door_weight", "face_weight", "threshold"):
-            if weight_key in patch and patch[weight_key] < 0:
-                raise HTTPException(400, detail=f"{weight_key} must be >= 0")
-        for window_key in ("door_window_seconds", "face_window_seconds"):
-            if window_key in patch and not (30 <= patch[window_key] <= 3600):
-                raise HTTPException(400, detail=f"{window_key} must be 30–3600")
+        if "bright_threshold" in patch and not (0 <= patch["bright_threshold"] <= 1023):
+            raise HTTPException(400, detail="bright_threshold must be 0–1023")
         if not patch:
             return {"ok": True}
 
         try:
-            _save_to_config({"presence": patch})
+            _save_to_config({"sensors": {"light": patch}})
         except Exception as exc:
             logger.error("Failed to persist presence settings: %s", exc)
             raise HTTPException(500, detail="Failed to persist settings")
 
         for k, v in patch.items():
-            setattr(settings.presence, k, v)
+            setattr(settings.sensors.light, k, v)
         return {"ok": True}
 
     @app.put("/settings/voice")

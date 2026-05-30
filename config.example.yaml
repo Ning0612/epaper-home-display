@@ -47,10 +47,3 @@ webui:
 
 timezone: "Asia/Taipei"
 
-presence:
-  light_weight: 1.0
-  door_weight: 1.0
-  face_weight: 2.0
-  threshold: 2.0
-  door_window_seconds: 300
-  face_window_seconds: 600

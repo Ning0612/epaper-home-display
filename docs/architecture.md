@@ -119,8 +119,8 @@ MQTT 告警事件（立即） ────────────► display_qu
 | 協程 | 觸發週期 | 職責 |
 |------|---------|------|
 | `_sensor_loop()` | 每 30 秒 | 讀 DHT22 + 光線感測器，更新 state |
-| `_presence_loop()` | 每 60 秒 | 查 DB 最近事件 → `compute_presence()` → 提醒 + 告警決策 |
-| `_display_loop()` | 牆鐘 :57 秒 | 監聽 display_queue，控制 e-Paper 更新節奏 |
+| `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 提醒 + 告警決策；偵測到回家時立即喚醒 display_queue |
+| `_display_loop()` | 牆鐘 :57 秒 | 監聽 display_queue；無人在場時暫停更新 |
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
 | `server.serve()` | 持續 | FastAPI WebUI（埠 8000） |
 
@@ -136,30 +136,33 @@ MQTT 告警事件（立即） ────────────► display_qu
 
 | 更新類型 | 觸發 | 耗時 | 說明 |
 |---------|------|------|------|
-| 快速更新（`init_fast`）| 牆鐘 :57 | ~1 秒 | 部分刷新，每 10 次中有 9 次 |
-| 完整更新（`init`）| 每 10 次快速後 | ~3 秒 | 完整刷新，清除鬼影 |
+| 快速更新（`init_fast`）| 牆鐘 :57（僅 OCCUPIED）| ~1 秒 | 部分刷新，每 N 次中有 N-1 次 |
+| 完整更新（`init`）| 每 N 次快速後 | ~3 秒 | 完整刷新，清除鬼影（N = full_refresh_every）|
 | 告警立即更新 | MQTT 告警事件 | ~1 秒 | 透過 display_queue |
+| 回家立即更新 | 光線亮起（UNOCCUPIED→OCCUPIED）| ~1 秒 | _presence_loop 偵測到後立即觸發 |
+| 人不在時 | — | — | display_loop 暫停，不做任何更新 |
 
 **牆鐘對齊原理**：在每分鐘第 57 秒觸發渲染，延遲補償自動計算為 `60 - dashboard_trigger_second`（預設 57 → 補償 3 秒），確保面板在整點 :00 顯示正確的分鐘數。
 
 ---
 
-## 占用度計分系統
+## 在場偵測邏輯
 
 `app/logic/presence.py` 中的純函數 `compute_presence()`：
 
 ```
-score = 0
+使用場景：電腦桌/辦公桌前，開燈一定有人在
 
-if light_is_bright:                              score += light_weight  (預設 1.0)
-if 最近 5 分鐘有門事件:                           score += door_weight   (預設 1.0)
-if 最近 10 分鐘有已知人臉:                        score += face_weight   (預設 2.0)
+if light_is_bright:  → OCCUPIED  (score = 1.0)
+else:                → UNOCCUPIED (score = 0.0)
 
-result = "OCCUPIED"   if score >= threshold (2.0)
-       = "UNOCCUPIED" otherwise
-       
-button_override = True  →  強制 "OCCUPIED"，不計算分數
+光線閾值由 sensors.light.bright_threshold 控制（預設 500 / ADC 0–1023）
 ```
+
+**顯示行為**：
+- OCCUPIED：正常每分鐘觸發秒更新
+- UNOCCUPIED：display_loop 暫停，不刷新面板
+- UNOCCUPIED → OCCUPIED：_presence_loop 立即送 display_queue，面板馬上更新
 
 ---
 
@@ -284,7 +287,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/settings/weather` | `api_key`, `units`, `fetch_interval_seconds` | 更新天氣設定 |
 | `/settings/mqtt` | `broker_host`, `broker_port`, `client_id` | 更新 MQTT 連線 |
 | `/settings/display` | `model`, `dashboard_trigger_second`, `full_refresh_every` | 更新 e-Paper 參數 |
-| `/settings/presence` | `light_weight`, `door_weight`, `face_weight`, `threshold`, `door_window_seconds`, `face_window_seconds` | 更新占用度計分參數 |
+| `/settings/presence` | `bright_threshold` | 更新在場偵測光線閾值 |
 | `/settings/voice` | `enabled`, `player` | 更新語音設定 |
 | `/settings/notifications` | `discord_webhook_url` | 更新 Discord Webhook |
 | `/settings/general` | `timezone` | 更新時區 |

@@ -48,7 +48,7 @@ pytest tests/test_presence.py
 ### 指定測試函式
 
 ```bash
-pytest tests/test_presence.py::test_occupied_when_light_bright
+pytest tests/test_presence.py::test_light_bright_is_occupied
 ```
 
 ### 語法檢查

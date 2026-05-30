@@ -152,28 +152,24 @@ timezone: "Asia/Taipei"   # 用於顯示時間和日誌時間戳
 
 ---
 
-## 占用度計分
+## 在場偵測
+
+在場偵測邏輯為純光源：燈亮 → OCCUPIED，燈暗 → UNOCCUPIED。
+
+光線閾值設定位於 `sensors.light.bright_threshold`（可透過 WebUI 設定頁或直接修改 YAML）：
 
 ```yaml
-presence:
-  light_weight: 1.0    # 亮燈得分
-  door_weight: 1.0     # 最近門事件得分
-  face_weight: 2.0     # 已知人臉辨識得分
-  threshold: 2.0       # 總分達到此值 → OCCUPIED
-
-  door_window_seconds: 300   # 門事件有效期（秒），超過此時間的事件不計分
-  face_window_seconds: 600   # 人臉事件有效期（秒）
+sensors:
+  light:
+    bright_threshold: 500   # ADC 原始值（0–1023），高於此值視為在場
 ```
 
-**計分邏輯範例**：
+| 情境 | 結果 |
+|------|------|
+| 光線讀值 > bright_threshold | OCCUPIED |
+| 光線讀值 ≤ bright_threshold | UNOCCUPIED |
 
-| 情境 | 分數 | 結果 |
-|------|------|------|
-| 亮燈 + 最近開門 | 1.0 + 1.0 = 2.0 | OCCUPIED |
-| 僅亮燈 | 1.0 | UNOCCUPIED |
-| 辨識到已知人臉 | 2.0 | OCCUPIED |
-| 全部無訊號 | 0 | UNOCCUPIED |
-| 按鈕按下 | — | 強制 OCCUPIED（無視計分）|
+**顯示行為**：人不在時 e-Paper 暫停更新；偵測到剛回家（亮燈）時立即觸發一次更新，後續恢復固定觸發秒節奏。
 
 ---
 

@@ -84,16 +84,6 @@ class WebUIConfig:
 
 
 @dataclass
-class PresenceConfig:
-    light_weight: float = 1.0
-    door_weight: float = 1.0
-    face_weight: float = 2.0
-    threshold: float = 2.0
-    door_window_seconds: int = 300
-    face_window_seconds: int = 600
-
-
-@dataclass
 class Settings:
     mqtt: MQTTConfig = field(default_factory=MQTTConfig)
     weather: WeatherConfig = field(default_factory=WeatherConfig)
@@ -104,7 +94,6 @@ class Settings:
     storage: StorageConfig = field(default_factory=StorageConfig)
     webui: WebUIConfig = field(default_factory=WebUIConfig)
     timezone: str = "Asia/Taipei"
-    presence: PresenceConfig = field(default_factory=PresenceConfig)
 
 
 def _from_dict(cls: type, data: dict):
