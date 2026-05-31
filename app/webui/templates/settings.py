@@ -161,9 +161,32 @@ _SETTINGS_CONTENT = r"""
         <div class="sec-desc">燈亮即判定為在場；人不在時暫停顯示更新</div>
       </div>
       <div class="card">
+        <div class="c-sub" style="display:flex;align-items:center;justify-content:space-between">
+          即時光線讀值
+          <span id="lp-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;transition:background .3s"></span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.7rem">
+          <span id="lp-val" style="font-size:2rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text);min-width:3.5ch">—</span>
+          <span style="font-size:.78rem;color:var(--muted)">/1023</span>
+          <span style="font-size:.78rem;color:var(--muted)">≈ <span id="lp-lux">—</span> lux</span>
+          <span style="margin-left:auto">
+            <span id="lp-badge" style="font-size:.78rem;font-weight:600;padding:.18rem .65rem;border-radius:999px;background:var(--surface2);color:var(--muted)">—</span>
+          </span>
+        </div>
+        <div style="position:relative;height:10px;background:var(--surface2);border-radius:5px;margin-bottom:.35rem">
+          <div id="lp-bar" style="height:100%;border-radius:5px;width:0%;transition:width .4s,background .3s;max-width:100%"></div>
+          <div id="lp-thresh-line" style="position:absolute;top:-5px;bottom:-5px;width:2px;background:#f59e0b;border-radius:2px;left:49%;transform:translateX(-50%)">
+            <span style="position:absolute;top:-17px;left:50%;transform:translateX(-50%);font-size:.6rem;white-space:nowrap;color:#f59e0b;font-weight:700">閾值</span>
+          </div>
+        </div>
+        <div style="font-size:.7rem;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:.2rem">
+          <span>0 暗</span><span>1023 亮</span>
+        </div>
+      </div>
+      <div class="card">
         <div class="f">
           <label>光線閾值 <span class="hint">（0–1023，ADC 原始值，高於此值判定為在場）</span></label>
-          <input type="number" id="p-bright" min="0" max="1023">
+          <input type="number" id="p-bright" min="0" max="1023" oninput="updThresh(this.value)">
         </div>
         <div class="btn-row"><button class="btn-p" onclick="savePresence()">儲存</button></div>
       </div>
@@ -291,14 +314,71 @@ _SETTINGS_CONTENT = r"""
 <script>
 var mapLat=__LAT__, mapLon=__LON__;
 var lmap=null, lmk=null;
+var _presTimer=null;
 
 function go(name,el){
+  if(name!=='presence') stopLightPoll();
   document.querySelectorAll('.sec').forEach(function(s){s.classList.remove('active')});
   document.querySelectorAll('.svc-nav').forEach(function(n){n.classList.remove('active')});
   document.getElementById('sec-'+name).classList.add('active');
   el.classList.add('active');
   if(name==='weather' && !lmap) initMap();
   if(name==='wifi') loadWifi();
+  if(name==='presence') startLightPoll();
+}
+
+function updThresh(v){
+  var pct=(Math.min(Math.max(+v||0,0),1023)/1023*100).toFixed(2);
+  document.getElementById('lp-thresh-line').style.left=pct+'%';
+}
+
+function startLightPoll(){
+  stopLightPoll();
+  _fetchLight();
+  _presTimer=setInterval(_fetchLight,2000);
+}
+
+function stopLightPoll(){
+  if(_presTimer){clearInterval(_presTimer);_presTimer=null;}
+}
+
+async function _fetchLight(){
+  try{
+    var r=await fetch('/state');
+    if(!r.ok){if(r.status===401)stopLightPoll();return;}
+    var d=await r.json();
+    var raw=d.light_raw;
+    var dot=document.getElementById('lp-dot');
+    var badge=document.getElementById('lp-badge');
+    var _nodata='font-size:.78rem;font-weight:600;padding:.18rem .65rem;border-radius:999px;background:var(--surface2);color:var(--muted)';
+    if(raw==null){
+      document.getElementById('lp-val').textContent='—';
+      document.getElementById('lp-lux').textContent='—';
+      document.getElementById('lp-bar').style.width='0%';
+      document.getElementById('lp-bar').style.background='var(--muted)';
+      dot.style.background='var(--muted)';
+      badge.textContent='無資料';badge.style.cssText=_nodata;
+      return;
+    }
+    var dispRaw=Math.min(Math.max(raw,0),1023);
+    var inp=document.getElementById('p-bright');
+    var thresh=inp.value!==''?+inp.value:500;
+    var bright=typeof d.light_is_bright==='boolean'?d.light_is_bright:dispRaw>=thresh;
+    document.getElementById('lp-val').textContent=raw;
+    document.getElementById('lp-lux').textContent=(dispRaw*0.098).toFixed(1);
+    document.getElementById('lp-bar').style.width=(dispRaw/1023*100).toFixed(2)+'%';
+    document.getElementById('lp-bar').style.background=bright?'var(--primary)':'var(--muted)';
+    document.getElementById('lp-thresh-line').style.left=(thresh/1023*100).toFixed(2)+'%';
+    if(bright){
+      dot.style.background='#22c55e';
+      badge.textContent='亮燈（在場）';
+      badge.style.cssText='font-size:.78rem;font-weight:600;padding:.18rem .65rem;border-radius:999px;background:rgba(34,197,94,.15);color:#16a34a';
+    }else{
+      dot.style.background='var(--muted)';
+      badge.textContent='暗燈（離場）';
+      badge.style.cssText=_nodata;
+    }
+  }catch(e){console.error('light poll',e);}
 }
 
 function toast(msg,ok){
