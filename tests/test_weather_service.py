@@ -117,12 +117,13 @@ def test_pick_daily_forecast_aggregation():
     assert day2["main"]["temp"] == pytest.approx(15.0)
 
 
-def test_pick_daily_forecast_skips_today():
+def test_pick_daily_forecast_includes_today():
     today_slots = _make_slots(0, ["Clear"] * 8, [30.0] * 8, [0.0] * 8)
     tomorrow_slots = _make_slots(1, ["Rain"] * 8, [25.0] * 8, [0.5] * 8)
     result = _pick_daily_forecast(today_slots + tomorrow_slots, count=4)
-    assert len(result) == 1
-    assert result[0]["weather"][0]["main"] == "Rain"
+    assert len(result) == 2
+    assert result[0]["weather"][0]["main"] == "Clear"
+    assert result[1]["weather"][0]["main"] == "Rain"
 
 
 def test_pick_daily_forecast_handles_none_dt_txt():
@@ -141,21 +142,25 @@ def test_pick_daily_forecast_severe_weather_wins_tie():
 
 
 def test_pick_daily_forecast_filters_stale_utc_midnight_slots():
-    """Regression: stale UTC slots (yesterday or today) must not appear after local midnight."""
+    """Regression: UTC slots from yesterday must not appear; today's slots must be kept."""
     today = date.today()
     yesterday = today - timedelta(days=1)
 
-    # yesterday noon UTC is always <= today in any timezone → must be filtered
+    # yesterday noon UTC is always < today in any timezone → must be filtered
     yesterday_noon_utc = datetime(yesterday.year, yesterday.month, yesterday.day, 12, 0, 0, tzinfo=timezone.utc)
-    stale = {"dt": int(yesterday_noon_utc.timestamp()), "weather": [{"main": "Clear"}], "main": {"temp": 30.0}, "pop": 0.0}
+    stale = {"dt": int(yesterday_noon_utc.timestamp()), "weather": [{"main": "Stale"}], "main": {"temp": 30.0}, "pop": 0.0}
+
+    today_local = datetime(today.year, today.month, today.day, 12, 0, 0)
+    today_slot = {"dt": int(today_local.timestamp()), "weather": [{"main": "Clear"}], "main": {"temp": 28.0}, "pop": 0.0}
 
     tomorrow = today + timedelta(days=1)
     tomorrow_local = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 12, 0, 0)
     future = {"dt": int(tomorrow_local.timestamp()), "weather": [{"main": "Rain"}], "main": {"temp": 22.0}, "pop": 0.5}
 
-    result = _pick_daily_forecast([stale, future], count=4)
-    assert len(result) == 1
-    assert result[0]["weather"][0]["main"] == "Rain"
+    result = _pick_daily_forecast([stale, today_slot, future], count=4)
+    assert len(result) == 2
+    assert result[0]["weather"][0]["main"] == "Clear"
+    assert result[1]["weather"][0]["main"] == "Rain"
 
 
 def test_pick_daily_forecast_result_dt_txt_uses_local_date():

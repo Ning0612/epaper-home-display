@@ -98,7 +98,7 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
                 d = utc_dt.astimezone().date()
         except (TypeError, ValueError, OSError):
             continue
-        if d <= today:
+        if d < today:
             continue
         by_day.setdefault(d, []).append(entry)
 
