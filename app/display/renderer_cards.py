@@ -155,15 +155,13 @@ def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
 
     temp_str = f"{state.temperature:.1f}°" if state.temperature is not None else "--°"
     hum_str = f"{state.humidity:.0f}%" if state.humidity is not None else "--%"
-    light_str = "bright" if state.light_is_bright else "dim"
 
-    content_h = 14 + 5 + 17 + 5 + 17 + 5 + 12
+    content_h = 14 + 5 + 17 + 5 + 17
     sy = iy + max(0, (ih - content_h) // 2)
 
     _cx_text(draw, "Indoor", ix, iw, sy, _font(14, bold=True))
     _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17, bold=True))
     _cx_text(draw, hum_str, ix, iw, sy + 41, _font(17, bold=True))
-    _cx_text(draw, light_str, ix, iw, sy + 63, _font(12, bold=True))
 
 
 def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
