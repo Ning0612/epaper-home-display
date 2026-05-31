@@ -17,6 +17,12 @@ logger = logging.getLogger(__name__)
 async def _presence_loop(
     display_queue: asyncio.Queue, mqtt_service, notification_manager: NotificationManager, settings
 ) -> None:
+    # Publish alarm_decision only when the alert object changes (new event) or the
+    # decision/reason changes (presence shift for the same alert).
+    # Using object identity avoids relying on timestamp format or uniqueness.
+    _last_processed_alert: dict | None = None
+    _last_published_decision: tuple | None = None  # (decision, reason)
+
     while True:
         try:
             score, presence = compute_presence(state.light_is_bright)
@@ -72,10 +78,22 @@ async def _presence_loop(
             )
 
             if state.last_alert:
+                alert = state.last_alert
                 decision, reason = compute_alarm_decision(
-                    presence, score, state.last_alert, state.last_face_event
+                    presence, score, alert, state.last_face_event
                 )
                 await log_alarm_decision(decision, reason, score)
+                if alert is not _last_processed_alert or (decision, reason) != _last_published_decision:
+                    try:
+                        mqtt_service.publish("home/home_state/alarm_decision", {
+                            "decision": decision,
+                            "reason": reason,
+                            "score": score,
+                        })
+                        _last_processed_alert = alert
+                        _last_published_decision = (decision, reason)
+                    except Exception as exc:
+                        logger.warning("Failed to publish alarm_decision via MQTT: %s", exc)
         except Exception as exc:
             logger.error("Presence loop error: %s", exc)
         await asyncio.sleep(60)

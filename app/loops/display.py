@@ -49,7 +49,7 @@ def _maybe_advance_carousel(settings) -> None:
 
 
 async def _display_loop(
-    epaper, executor: ThreadPoolExecutor, display_queue: asyncio.Queue, settings
+    epaper, executor: ThreadPoolExecutor, display_queue: asyncio.Queue, settings, mqtt_service=None
 ) -> None:
     # Every full_refresh_every-th update is a full refresh (clears ghosting); others use
     # init_fast() for a faster partial update. max(1,...) guards against zero in YAML.
@@ -86,6 +86,14 @@ async def _display_loop(
                 executor, functools.partial(epaper.display, image, full_refresh)
             )
             refresh_count += 1  # only advance cadence on successful panel write
+            if mqtt_service is not None:
+                try:
+                    mqtt_service.publish("home/display/status", {
+                        "status": "updated",
+                        "refresh_type": "full" if full_refresh else "fast",
+                    })
+                except Exception as exc:
+                    logger.debug("Failed to publish display status: %s", exc)
         except Exception as exc:
             logger.error("Display update failed: %s", exc)
         finally:

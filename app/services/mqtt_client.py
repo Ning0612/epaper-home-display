@@ -33,9 +33,11 @@ def make_done_callback(context: str) -> Callable[[asyncio.Future], None]:
 
 
 class MQTTService:
-    def __init__(self, config: MQTTConfig, display_queue: asyncio.Queue) -> None:
+    def __init__(self, config: MQTTConfig, display_queue: asyncio.Queue, voice_service=None) -> None:
         self._config = config
         self._display_queue = display_queue
+        self._voice_service = voice_service
+        self._voice_task: asyncio.Task | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
 
         self._client = mqtt.Client(client_id=config.client_id)
@@ -50,6 +52,8 @@ class MQTTService:
         logger.info("MQTT connecting to %s:%d", self._config.broker_host, self._config.broker_port)
 
     def stop(self) -> None:
+        if self._voice_task is not None and not self._voice_task.done():
+            self._voice_task.cancel()
         self._client.loop_stop()
         self._client.disconnect()
 
@@ -107,6 +111,9 @@ class MQTTService:
                 self._display_queue.put_nowait("alert")
             except asyncio.QueueFull:
                 logger.debug("Display queue full, alert will render on next cycle")
+            if self._voice_service is not None:
+                if self._voice_task is None or self._voice_task.done():
+                    self._voice_task = asyncio.ensure_future(self._voice_service.play("alert.wav"))
             logger.info("Alert: %s", payload)
 
         elif topic == "home/security/status":

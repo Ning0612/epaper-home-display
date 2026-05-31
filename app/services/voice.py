@@ -20,6 +20,7 @@ class VoiceService:
         if not os.path.exists(path):
             logger.warning("Sound file not found: %s", path)
             return
+        proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
                 self._config.player, path,
@@ -28,5 +29,19 @@ class VoiceService:
             )
             await proc.wait()
             logger.info("Played: %s", filename)
+        except asyncio.CancelledError:
+            if proc is not None and proc.returncode is None:
+                proc.terminate()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    try:
+                        await proc.wait()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            raise
         except Exception as exc:
             logger.warning("Voice play failed: %s", exc)

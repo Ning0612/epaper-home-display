@@ -127,7 +127,7 @@ Agent1 發布：
   home/security/door   ──┐
   home/security/face   ──┼──► mqtt_client.py ──► state.py ──► logic/ ──► 發布：
   home/security/alert  ──┤                                              home/home_state/presence      ✅ 已啟用（每 60 秒）
-  home/security/status ──┘                                              home/home_state/alarm_decision ⚠️ 計劃中
+  home/security/status ──┘                                              home/home_state/alarm_decision ✅ 已啟用（有活躍告警時，決策改變才發布）
 ```
 
 ### 顯示更新觸發條件

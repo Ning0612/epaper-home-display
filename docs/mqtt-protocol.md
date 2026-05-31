@@ -90,8 +90,8 @@
 **效果**：
 - 更新 `state.last_alert`
 - 立即觸發 `display_queue.put_nowait("alert")`，e-Paper 立即刷新
-- Discord 通知（⚠️ 服務已建立但尚未連接至告警流程，目前不會送出）
-- 音效提醒（⚠️ 服務已建立但尚未連接至告警流程，目前不會播放）
+- 播放 `alert.wav` 音效（USB 喇叭，需 `voice.enabled: true` 且 `assets/sounds/alert.wav` 存在）
+- Discord 告警通知由 **Agent 1** 負責發送，本服務不發送
 
 ---
 
@@ -115,7 +115,7 @@ Agent 1 的系統狀態心跳。
 
 ## 發布主題（出站）
 
-> **⚠️ 實作狀態**：`home/home_state/presence` 已啟用（`_presence_loop` 每 60 秒發布）。`home/home_state/alarm_decision` 與 `home/display/status` 為計劃中規格，目前尚未發布。
+> **實作狀態**：三個出站主題均已啟用。`home/home_state/presence` 每 60 秒發布；`home/home_state/alarm_decision` 在新告警到達或相同告警下決策改變時發布；`home/display/status` 在每次 e-Paper 成功更新後發布。
 
 本服務發布以下主題，供 **Agent 1** 或其他訂閱者使用：
 
@@ -149,9 +149,9 @@ Agent 1 的系統狀態心跳。
 
 ---
 
-### `home/home_state/alarm_decision` — 告警決策（⚠️ 計劃中，尚未發布）
+### `home/home_state/alarm_decision` — 告警決策
 
-每次收到安全事件後發布（目前僅記錄至 `alarm_decisions` 資料表，不發布 MQTT）。
+收到新告警事件、或相同告警下 presence 變化導致決策改變時發布（同時每次計算都記錄至 `alarm_decisions` 資料表）。
 
 ```json
 {
@@ -179,9 +179,9 @@ Agent 1 的系統狀態心跳。
 
 ---
 
-### `home/display/status` — 顯示器狀態（⚠️ 計劃中，尚未發布）
+### `home/display/status` — 顯示器狀態
 
-e-Paper 更新狀態回報。
+每次 e-Paper 成功寫入後發布。
 
 ```json
 {
@@ -213,9 +213,9 @@ e-Paper 更新狀態回報。
 | 訂閱 | `home/security/face` | 人臉辨識事件 |
 | 訂閱 | `home/security/alert` | 安全告警（立即顯示）|
 | 訂閱 | `home/security/status` | Agent 1 狀態心跳 |
-| 發布 | `home/home_state/presence` | 占用狀態更新（已啟用）|
-| 發布 | `home/home_state/alarm_decision` | 告警決策結果（⚠️ 計劃中）|
-| 發布 | `home/display/status` | 顯示器狀態回報（⚠️ 計劃中）|
+| 發布 | `home/home_state/presence` | 占用狀態更新 |
+| 發布 | `home/home_state/alarm_decision` | 告警決策結果 |
+| 發布 | `home/display/status` | 顯示器狀態回報 |
 
 ---
 

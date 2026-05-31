@@ -60,12 +60,12 @@ async def main() -> None:
     button = create_button(settings.sensors.button)
     epaper = create_epaper(settings.display)
     weather_service = WeatherService(settings.weather)
-    voice_service = VoiceService(settings.voice)  # noqa: F841
+    voice_service = VoiceService(settings.voice)
     discord_service = DiscordService(settings.discord)
     notification_manager = NotificationManager(discord_service, settings.discord)
 
     loop = asyncio.get_event_loop()
-    mqtt_service = MQTTService(settings.mqtt, display_queue)
+    mqtt_service = MQTTService(settings.mqtt, display_queue, voice_service)
     mqtt_service.start(loop)
 
     def _on_button():
@@ -102,7 +102,7 @@ async def main() -> None:
         await asyncio.gather(
             _sensor_loop(dht22, light, executor, settings),
             _presence_loop(display_queue, mqtt_service, notification_manager, settings),
-            _display_loop(epaper, executor, display_queue, settings),
+            _display_loop(epaper, executor, display_queue, settings, mqtt_service),
             _weather_loop(weather_service, settings),
             _notification_loop(settings, notification_manager),
             server.serve(),
