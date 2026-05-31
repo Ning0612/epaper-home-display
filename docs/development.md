@@ -185,19 +185,18 @@ def compute_something():
 
 ### 修改顯示佈局
 
-渲染邏輯在 `app/display/renderer.py`。顯示器解析度為 800×480 像素（黑白）。
+渲染邏輯拆分於 `app/display/` 下的多個模組，顯示器解析度為 800×480 像素（灰階 `"L"` 模式）。
 
 ```python
-class Renderer:
-    WIDTH = 800
-    HEIGHT = 480
-    
-    def render(self, state: AgentState) -> Image.Image:
-        img = Image.new("1", (self.WIDTH, self.HEIGHT), 255)
-        draw = ImageDraw.Draw(img)
-        # 在這裡加入繪製邏輯
-        return img
+# app/display/renderer.py - 主入口
+def render_dashboard(state: AgentState, settings: Settings, now: datetime | None = None) -> Image.Image:
+    img = Image.new("L", (800, 480), 255)  # 白色背景，灰階模式
+    draw = ImageDraw.Draw(img)
+    # 各卡片繪製函數在 renderer_cards.py
+    return img
 ```
+
+各卡片繪製函數在 `app/display/renderer_cards.py`，版面常數在 `renderer_constants.py`，工具函數（天氣圖示、進度條等）在 `renderer_utils.py`。
 
 使用 `MockEpaper` 可將渲染結果儲存為 `debug_frame.png` 進行視覺驗證。
 

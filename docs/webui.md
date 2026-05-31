@@ -18,7 +18,13 @@ ssh pi@epaper-display.local
 # 若 mDNS 可用，也可直接 http://epaper-display.local:8000/settings
 ```
 
-> **安全提醒**：WebUI 沒有認證機制，區域網路內所有裝置均可存取，包含修改 MQTT、API Key、Webhook 等敏感設定。請確認 Pi 只接取可信任的網段，或透過防火牆限制存取。
+> **認證機制**：WebUI 受密碼保護。首次存取時會顯示密碼設定頁面，設定後密碼雜湊值儲存至 `config.local.yaml`。Session cookie 有效期為瀏覽器關閉前。若忘記密碼，可刪除 `config.local.yaml` 中的 `webui.password_hash` 欄位重設。
+
+---
+
+## 認證
+
+首次連線會顯示密碼設定頁面（`/login?setup=1`），輸入並確認密碼後即可登入。之後每次連線須輸入密碼。`/health` 端點不需認證。
 
 ---
 
@@ -48,20 +54,16 @@ ssh pi@epaper-display.local
 | 欄位 | 說明 |
 |------|------|
 | **型號** | Waveshare 驅動型號，對應 `lib/waveshare_epd/` 中的驅動檔 |
-| **觸發秒** | 每分鐘第幾秒觸發渲染（預設 57，配合 display_lag 使面板在 :00 顯示正確時間）|
-| **顯示延遲** | 估計 e-Paper 更新耗時（秒），用於時鐘補償（預設 3）|
-| **天氣刷新間隔** | 天氣面板更新頻率（秒）|
+| **觸發秒** | 每分鐘第幾秒觸發渲染（預設 57；延遲補償自動計算 = 60 − 此值，使面板在整分 :00 顯示正確時間）|
+| **全刷新間隔** | 每 N 次更新做一次完整刷新（清除鬼影，預設 10）|
 
 ### 占用度設定
 
 | 欄位 | 說明 |
 |------|------|
-| **亮燈權重** | 光線亮度計入占用計分的權重（預設 1.0）|
-| **門事件權重** | 近期門事件計入占用計分的權重（預設 1.0）|
-| **人臉辨識權重** | 已知人臉辨識計入占用計分的權重（預設 2.0）|
-| **閾值** | 總分達到此值判定為 OCCUPIED（預設 2.0）|
-| **門事件有效期** | 門事件計分有效時間窗口（秒，預設 300）|
-| **人臉辨識有效期** | 人臉事件計分有效時間窗口（秒，預設 600）|
+| **光線閾值** | ADC 原始值（0–1023），超過此值視為在場（預設 500）|
+
+占用偵測邏輯為純光線感測：光線 > 閾值 → OCCUPIED，否則 → UNOCCUPIED。
 
 ### 語音設定
 
@@ -74,7 +76,12 @@ ssh pi@epaper-display.local
 
 | 欄位 | 說明 |
 |------|------|
-| **Discord Webhook URL** | 安全告警推送目標（留空則停用）⚠️ 服務架構已就緒，告警流程尚未連接，設定後目前不會觸發推送 |
+| **Discord Webhook URL** | 推送通知目標（留空則停用）|
+| **裝置上線通知** | 服務啟動時推送（含 WebUI 連結）|
+| **時段結束通知** | 桌面工作時段結束時推送摘要 |
+| **最短時段時間** | 短於此分鐘數的時段不觸發通知 |
+| **每日摘要通知** | 每日固定時間推送昨日統計 |
+| **每日摘要時間** | 摘要推送時間（HH:MM 格式，依系統時區）|
 
 ### 一般設定
 
@@ -86,7 +93,17 @@ ssh pi@epaper-display.local
 
 ## REST API 參考
 
-以下為完整的 REST API 端點，可供自動化腳本或 Agent 1 呼叫。
+以下為完整的 REST API 端點。以下端點**不需認證**（公開存取）：`/health`、`/login`、`/logout`、`/ai_usage`。其餘端點均需 Session cookie。
+
+### 認證端點
+
+```
+GET  /login          # 顯示登入頁面（初次使用時為密碼設定頁）
+POST /login          # 提交密碼（form: password, password_confirm, next）
+GET  /logout         # 清除 session，redirect 至 /login
+```
+
+---
 
 ### 健康檢查
 
@@ -117,7 +134,7 @@ GET /state
   "light_raw": 680,
   "light_is_bright": true,
   "presence": "OCCUPIED",
-  "presence_score": 2.0,
+  "presence_score": 1.0,
   "weather_current": {"main": "Clear", "temp": 28.0},
   "last_door_event": {"state": "closed", "timestamp": "2026-05-29T10:30:00"},
   "last_face_event": null,
@@ -162,7 +179,7 @@ GET /logs/presence
 ```json
 {
   "logs": [
-    {"ts": "2026-05-29T10:00:00", "score": 2.0, "state": "OCCUPIED", "reason": "..."},
+    {"ts": "2026-05-29T10:00:00", "score": 1.0, "state": "OCCUPIED", "reason": "..."},
     ...
   ]
 }
@@ -338,11 +355,32 @@ PUT /settings/notifications
 Content-Type: application/json
 
 {
-  "discord_webhook_url": "https://discord.com/api/webhooks/{id}/{token}"
+  "discord_webhook_url": "https://discord.com/api/webhooks/{id}/{token}",
+  "notify_device_online": true,
+  "notify_session_end": true,
+  "session_end_min_minutes": 5,
+  "notify_daily_summary": true,
+  "daily_summary_time": "23:00"
 }
 ```
 
-留空字串 `""` 可停用 Discord 通知。
+所有欄位均可選，僅更新提供的欄位。`discord_webhook_url` 設為空字串 `""` 可停用 Discord 通知。
+
+---
+
+### 修改密碼
+
+```
+PUT /settings/auth
+Content-Type: application/json
+
+{
+  "current_password": "old-password",
+  "new_password": "new-password"
+}
+```
+
+需提供目前密碼驗證，新密碼長度至少 8 個字元。首次設定密碼請透過登入頁面（`/login`）。
 
 ---
 
@@ -384,6 +422,156 @@ Content-Type: application/json
 **回應：**
 ```json
 {"ok": true, "updated_at": "2026-05-29T14:30:00.123456"}
+```
+
+---
+
+---
+
+## 圖片管理 API
+
+### 列出圖片
+
+```
+GET /api/images
+```
+
+**回應：**
+```json
+{
+  "images": [
+    {
+      "id": "uuid",
+      "filename": "photo.jpg",
+      "file_size": 102400,
+      "created_ts": "2026-05-29T10:00:00",
+      "is_current": true
+    }
+  ]
+}
+```
+
+### 上傳圖片
+
+```
+POST /api/images/upload
+Content-Type: multipart/form-data
+
+file: <binary>
+```
+
+支援格式由 `images.allowed_formats` 設定決定，預設為 JPEG、PNG、WebP、GIF、BMP（TIFF 需手動加入設定）。大小上限由 `images.max_upload_bytes` 控制（預設 15 MB）。
+
+**回應：**
+```json
+{"id": "uuid", "orig_w": 3000, "orig_h": 2000}
+```
+
+### 預覽裁切效果
+
+```
+POST /api/images/preview
+Content-Type: application/json
+
+{
+  "id": "uuid",
+  "crop": {"x": 0, "y": 0, "w": 800, "h": 480},
+  "transform": {"rotate": 0, "flip_x": false, "flip_y": false}
+}
+```
+
+回傳 Floyd-Steinberg dithering 後的 PNG 預覽圖（不寫入 DB）。
+
+### 確認圖片
+
+```
+POST /api/images/{id}/confirm
+Content-Type: application/json
+
+{
+  "crop": {"x": 0, "y": 0, "w": 800, "h": 480},
+  "transform": {"rotate": 0, "flip_x": false, "flip_y": false}
+}
+```
+
+產生 280×448 display PNG（dashboard 圖片區塊尺寸），寫入 DB，立即更新輪播並觸發 e-Paper 刷新。
+
+**回應：**
+```json
+{"ok": true, "id": "uuid"}
+```
+
+### 刪除圖片
+
+```
+DELETE /api/images/{id}
+```
+
+### 輪播設定
+
+```
+GET  /api/images/carousel                    # 讀取輪播設定
+PUT  /api/images/carousel                    # 更新輪播設定
+PUT  /api/images/carousel/advance            # 手動換圖
+```
+
+PUT carousel 請求體：
+```json
+{
+  "enabled": true,
+  "interval_minutes": 30,
+  "mode": "sequential"
+}
+```
+
+`mode` 可為 `"sequential"`（順序）或 `"random"`（隨機）。
+
+---
+
+## 桌面工作時段 API
+
+### 今日統計
+
+```
+GET /api/desk/stats
+```
+
+**回應：**
+```json
+{
+  "presence": "OCCUPIED",
+  "light_raw": 680,
+  "threshold": 500,
+  "today_total_seconds": 14400,
+  "today_session_count": 3,
+  "current_segment_seconds": 1800,
+  "session_start_ts": "2026-05-29T14:00:00",
+  "last_change_ts": "2026-05-29T14:00:00"
+}
+```
+
+### 歷史記錄
+
+```
+GET /api/desk/history
+```
+
+**回應：**
+```json
+{
+  "timeline_24h": [
+    {"id": 1, "start_ts": "2026-05-29T09:00:00", "end_ts": "2026-05-29T12:00:00", "duration_seconds": 10800}
+  ],
+  "daily_30d": [
+    {"date": "2026-05-29", "total_seconds": 28800}
+  ]
+}
+```
+
+### 時段清單
+
+```
+GET /api/desk/sessions?limit=20
 ```
 
 ---

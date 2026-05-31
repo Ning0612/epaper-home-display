@@ -10,13 +10,15 @@
 
 - **天氣面板**：即時天氣 + 5 天預報（OpenWeatherMap），含天氣圖示與溫度
 - **室內環境**：DHT22 溫濕度 + 光線感測器（MCP3008 ADC）
-- **家庭占用偵測**：依光線、門事件、人臉辨識加權計分，判斷 OCCUPIED / UNOCCUPIED
+- **家庭占用偵測**：純光線感測，燈亮 → OCCUPIED，燈暗 → UNOCCUPIED
 - **安全整合**：接收 Agent 1 的門鈴、人臉、告警 MQTT 事件，輸出 ALARM / INVESTIGATE / IGNORE 決策
 - **AI 使用量顯示**：顯示 Claude 5h、Codex 5h 與 Codex 週配額使用百分比，搭配 ai-usage-collector 工具
-- **WebUI 設定介面**：瀏覽器設定介面，支援互動地圖選點、MQTT 設定、占用度調參
-- **Discord 通知**：安全告警推送（⚠️ 服務架構已就緒，尚未連接至告警流程）
+- **圖片輪播**：上傳自訂圖片，支援裁切、旋轉、翻轉、Floyd-Steinberg dithering，顯示於 e-Paper 面板
+- **桌面工作時段**：自動追蹤在場時段、記錄每日統計、離場時推送 Discord 摘要
+- **WebUI 設定介面**：密碼保護的瀏覽器設定介面，支援互動地圖選點、MQTT 設定、圖片管理
+- **Discord 通知**：裝置上線、桌面時段結束、每日統計推送
 - **音效提醒**：天氣提醒播報（aplay + USB 音箱）
-- **事件日誌**：SQLite 記錄所有環境、門、人臉、告警、AI 使用量事件
+- **事件日誌**：SQLite 記錄所有環境、門、人臉、告警、AI 使用量、圖片、工作時段事件
 
 ---
 
@@ -105,7 +107,7 @@ WebUI 設定介面：`http://<Pi_IP>:8000/settings`
 ```
 筆電（開發）                Raspberry Pi Zero 2W
 ─────────────               ──────────────────────────────────────────────
-編輯程式碼                   app/main.py（asyncio 5 協程）
+編輯程式碼                   app/main.py（asyncio 6 協程）
 跑單元測試（mock）              ├── _sensor_loop()    → DHT22, 光線（每 30 秒）
 git push                        ├── _presence_loop()  → 占用計分, 告警決策（每 60 秒）
                                 ├── _display_loop()   → e-Paper 更新（牆鐘 :57）
@@ -113,13 +115,14 @@ Agent 1（MQTT）                 ├── _weather_loop()   → OpenWeatherMap
 ─────────────                   └── server.serve()    → FastAPI WebUI（:8000）
 home/security/*  →
                                 app/ 層架構：
-← home/home_state/* (計劃中)     sensors/ → display/ → logic/ → services/ → storage/
+← home/home_state/presence ✓     sensors/ → display/ → logic/ → services/ → storage/
+← home/home_state/* (部分計劃中)
                                                 ↕
                                            state.py（全局狀態）
 
 ai-usage-collector              SQLite（data/*.db）
-（筆電 Node.js 工具）            └── 8 張資料表：環境、門、人臉、告警、AI 使用量等
-POST /ai_usage  →
+（筆電 Node.js 工具）            └── 11 張資料表：環境、門、人臉、告警、AI 使用量、
+POST /ai_usage  →                       圖片、桌面時段、通知等
 ```
 
 ---

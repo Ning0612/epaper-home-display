@@ -48,11 +48,16 @@ epaper-home-display/
 │   ├── config.py            # 配置系統（YAML + 環境變數）
 │   ├── state.py             # 全局狀態（AgentState dataclass）
 │   ├── display/
-│   │   ├── epaper.py        # Waveshare 7.5" 驅動包裝
-│   │   └── renderer.py      # Pillow 圖像渲染（800×480）
+│   │   ├── epaper.py        # Waveshare 7.5" 驅動包裝（Real + Mock）
+│   │   ├── renderer.py      # 主渲染入口（800×480 Pillow 圖像）
+│   │   ├── renderer_cards.py   # 各卡片繪製函數
+│   │   ├── renderer_constants.py  # 解析度、顏色、版面常數
+│   │   ├── renderer_utils.py    # 天氣圖示、進度條等工具函數
+│   │   └── image_processor.py  # 圖片裁切、旋轉/翻轉、Floyd-Steinberg dithering
 │   ├── logic/
-│   │   ├── presence.py      # 占用度計分演算法（純函數）
+│   │   ├── presence.py      # 占用偵測（純函數，光線 → OCCUPIED/UNOCCUPIED）
 │   │   ├── alarm_decision.py  # 安全告警決策引擎（純函數）
+│   │   ├── desk_session.py  # 桌面工作時段狀態機（純函數）
 │   │   └── reminder.py      # 天氣提醒生成（純函數）
 │   ├── sensors/
 │   │   ├── dht22.py         # DHT22 溫濕度（Real + Mock）
@@ -62,12 +67,35 @@ epaper-home-display/
 │   │   ├── mqtt_client.py   # Paho MQTT Pub/Sub
 │   │   ├── weather.py       # OpenWeatherMap API（aiohttp）
 │   │   ├── voice.py         # aplay 音效播放
-│   │   └── discord.py       # Discord Webhook 通知
+│   │   ├── discord.py       # Discord Webhook 通知
+│   │   └── notification_manager.py  # 通知協調（裝置上線、時段結束、每日摘要）
+│   ├── loops/               # asyncio 協程（由 main.py 以 gather 並行執行）
+│   │   ├── sensor.py        # 感測器讀取循環（30 秒）
+│   │   ├── presence.py      # 占用計分循環（60 秒）
+│   │   ├── display.py       # 顯示更新循環（牆鐘 :57）
+│   │   ├── weather.py       # 天氣更新循環（600 秒）
+│   │   ├── notification.py  # 通知排程循環
+│   │   └── button.py        # 按鈕事件處理
 │   ├── storage/
 │   │   ├── db.py            # SQLite 初始化（WAL 模式）
-│   │   └── logs.py          # 非同步事件日誌記錄函數
+│   │   ├── logs.py          # 非同步日誌記錄公開 API
+│   │   ├── _log_events.py   # 系統事件日誌
+│   │   ├── _log_helpers.py  # 日誌工具函數
+│   │   ├── _log_images.py   # 圖片元數據日誌與管理
+│   │   ├── _log_notifications.py  # 通知日誌
+│   │   └── _log_sessions.py      # 桌面工作時段日誌
 │   └── webui/
-│       └── server.py        # FastAPI 設定頁面 + JSON API
+│       ├── server.py        # FastAPI 應用工廠（注入所有路由）
+│       ├── models.py        # Pydantic 請求/回應模型
+│       ├── middleware.py    # 認證中介層（Session cookie 驗證）
+│       ├── config_helpers.py  # config.local.yaml 讀寫工具
+│       └── routes/
+│           ├── auth.py      # 登入/登出（Session cookie）
+│           ├── read_only.py # /health, /state, /logs/*
+│           ├── settings.py  # 設定 PUT 端點
+│           ├── desk.py      # 桌面工作時段 REST API
+│           ├── ai_usage.py  # AI 使用量接收端點
+│           └── images.py    # 圖片上傳/裁切/確認/輪播管理
 ├── tests/                   # pytest 單元測試（mock 硬體）
 ├── scripts/                 # Pi 硬體獨立測試腳本
 ├── lib/waveshare_epd/       # Waveshare 驅動（需手動下載）
@@ -76,7 +104,7 @@ epaper-home-display/
 │   └── ai-usage-collector/  # AI 使用量採集工具（Node.js/TypeScript）
 ├── docs/                    # 文件
 ├── assets/                  # 字體、音效、圖片資源
-├── data/                    # SQLite 資料庫（git ignored）
+├── data/                    # SQLite 資料庫與圖片（git ignored）
 ├── config.example.yaml      # 配置範本
 └── requirements.txt
 ```
@@ -98,7 +126,7 @@ DHT22 ────────────────────────�
 Agent1 發布：
   home/security/door   ──┐
   home/security/face   ──┼──► mqtt_client.py ──► state.py ──► logic/ ──► 發布：
-  home/security/alert  ──┤                                              home/home_state/presence      ⚠️ 計劃中
+  home/security/alert  ──┤                                              home/home_state/presence      ✅ 已啟用（每 60 秒）
   home/security/status ──┘                                              home/home_state/alarm_decision ⚠️ 計劃中
 ```
 
@@ -114,14 +142,15 @@ MQTT 告警事件（立即） ────────────► display_qu
 
 ## asyncio 協程架構
 
-`app/main.py` 中以 `asyncio.gather()` 並行執行五個協程：
+`app/main.py` 中以 `asyncio.gather()` 並行執行六個協程：
 
 | 協程 | 觸發週期 | 職責 |
 |------|---------|------|
 | `_sensor_loop()` | 每 30 秒 | 讀 DHT22 + 光線感測器，更新 state |
-| `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 提醒 + 告警決策；偵測到回家時立即喚醒 display_queue |
-| `_display_loop()` | 牆鐘 :57 秒 | 監聽 display_queue；無人在場時暫停更新 |
+| `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 桌面時段管理 + 告警決策；偵測到回家時立即喚醒 display_queue |
+| `_display_loop()` | 牆鐘 :57 秒 | 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖 |
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
+| `_notification_loop()` | 依排程 | Discord 每日統計摘要等定時通知 |
 | `server.serve()` | 持續 | FastAPI WebUI（埠 8000） |
 
 **ThreadPoolExecutor**（3 個工作執行緒）用於阻擋性硬體 I/O（DHT22 感測、SPI 傳輸、e-Paper 驅動）。
@@ -197,27 +226,34 @@ else                                                    →  INVESTIGATE
 
 | 欄位 | 類型 | 說明 |
 |------|------|------|
-| `temperature` | float | DHT22 溫度（°C）|
-| `humidity` | float | DHT22 濕度（%）|
-| `light_raw` | int | 光線感測器原始值（0–1023）|
+| `temperature` | float \| None | DHT22 溫度（°C）|
+| `humidity` | float \| None | DHT22 濕度（%）|
+| `light_raw` | int \| None | 光線感測器原始值（0–1023）|
 | `light_is_bright` | bool | 是否超過亮度閾值 |
 | `presence` | str | "OCCUPIED" / "UNOCCUPIED" / "UNKNOWN" |
-| `presence_score` | float | 占用計分 |
-| `weather_current` | dict | 目前天氣 JSON |
-| `weather_forecast` | list | 5 天預報列表 |
-| `weather_fetched_at` | datetime | 最後 fetch 時間 |
-| `last_door_event` | dict | 最近門事件 |
-| `last_face_event` | dict | 最近人臉事件 |
-| `last_alert` | dict | 最近安全告警 |
+| `presence_score` | float | 占用計分（0.0 或 1.0）|
+| `desk_session_id` | int \| None | 當前桌面工作時段 DB ID |
+| `desk_session_start` | datetime \| None | 當前時段開始時間 |
+| `weather_current` | dict \| None | 目前天氣 JSON |
+| `weather_forecast` | list[dict] | 5 天預報列表 |
+| `weather_fetched_at` | datetime \| None | 最後 fetch 時間 |
+| `last_door_event` | dict \| None | 最近門事件 |
+| `last_face_event` | dict \| None | 最近人臉事件 |
+| `last_alert` | dict \| None | 最近安全告警 |
+| `security_status` | dict \| None | Agent 1 狀態心跳 |
 | `display_busy` | bool | e-Paper 忙碌標誌 |
-| `active_reminder` | str | 當前提醒文本 |
-| `claude_usage_5h` | int | Claude 5h 使用百分比 |
-| `claude_usage_week` | int | Claude 週使用百分比 |
-| `codex_usage_5h` | int | Codex 5h 使用百分比 |
-| `codex_usage_week` | int | Codex 週使用百分比 |
-| `claude_reset_5h` | str | Claude 5h 重置時間 |
-| `codex_reset_5h` | str | Codex 5h 重置時間 |
-| `codex_reset_week` | str | Codex 週重置時間 |
+| `active_reminder` | str \| None | 當前提醒文本 |
+| `custom_image_path` | str \| None | 當前顯示的圖片路徑 |
+| `image_playlist` | list[str] | 已確認圖片的完整路徑清單 |
+| `carousel_index` | int | 輪播當前索引 |
+| `carousel_last_advance` | datetime \| None | 上次輪播換圖時間 |
+| `claude_usage_5h` | float \| None | Claude 5h 使用率（0.0–1.0）|
+| `claude_usage_week` | float \| None | Claude 週使用率（0.0–1.0）|
+| `codex_usage_5h` | float \| None | Codex 5h 使用率（0.0–1.0）|
+| `codex_usage_week` | float \| None | Codex 週使用率（0.0–1.0）|
+| `codex_5h_reset` | str \| None | Codex 5h 重置時間 |
+| `codex_weekly_reset` | str \| None | Codex 週重置時間 |
+| `claude_5h_reset` | str \| None | Claude 5h 重置時間 |
 | `started_at` | datetime | 服務啟動時間戳 |
 
 ---
@@ -259,19 +295,32 @@ SQLite（WAL 模式）位於 `data/epaper-home-display.db`：
 | `system_events` | 系統級事件（info / warning / error）|
 | `weather_logs` | 天氣資料快取 |
 | `ai_usage_logs` | AI 使用量日誌 |
+| `desk_sessions` | 桌面工作時段記錄（start/end/duration）|
+| `images` | 圖片元數據與路徑（tmp_path / display_path）|
+| `notification_queue` | 通知發送佇列（含 attempts、next_retry_ts、sent，支援重試）|
 
 ---
 
 ## WebUI 端點
 
-FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.md)：
+FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.md)。WebUI 受密碼保護（Session cookie 認證）。
+
+**認證**
+
+| 方法 | 路徑 | 說明 |
+|------|------|------|
+| GET | `/login` | 登入頁面（首次使用時顯示密碼設定表單）|
+| POST | `/login` | 提交密碼，成功後 redirect 至目標頁面 |
+| GET | `/logout` | 清除 session，redirect 至 `/login` |
 
 **讀取端點（GET）**
 
 | 路徑 | 說明 |
 |------|------|
 | `/settings` | HTML 設定介面（含 Leaflet 互動地圖）|
-| `/health` | 健康檢查（`{"status": "ok"}`）|
+| `/images` | HTML 圖片管理介面 |
+| `/desk` | HTML 桌面工作時段介面 |
+| `/health` | 健康檢查（`{"status": "ok"}`，不需認證）|
 | `/state` | 目前 AgentState 的 JSON 快照 |
 | `/logs/env` | 環境日誌（溫濕度、光線）最近 50 筆 |
 | `/logs/presence` | 占用度日誌最近 50 筆 |
@@ -281,24 +330,47 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 
 **設定更新端點（PUT）**
 
-| 路徑 | 參數 | 說明 |
-|------|------|------|
-| `/settings/location` | `lat`, `lon` | 更新天氣位置 |
-| `/settings/weather` | `api_key`, `units`, `fetch_interval_seconds` | 更新天氣設定 |
-| `/settings/mqtt` | `broker_host`, `broker_port`, `client_id` | 更新 MQTT 連線 |
-| `/settings/display` | `model`, `dashboard_trigger_second`, `full_refresh_every` | 更新 e-Paper 參數 |
-| `/settings/presence` | `bright_threshold` | 更新在場偵測光線閾值 |
-| `/settings/voice` | `enabled`, `player` | 更新語音設定 |
-| `/settings/notifications` | `discord_webhook_url` | 更新 Discord Webhook |
-| `/settings/general` | `timezone` | 更新時區 |
+| 路徑 | 說明 |
+|------|------|
+| `/settings/location` | 更新天氣位置（`lat`, `lon`）|
+| `/settings/weather` | 更新天氣設定 |
+| `/settings/mqtt` | 更新 MQTT 連線 |
+| `/settings/display` | 更新 e-Paper 參數 |
+| `/settings/presence` | 更新光線閾值（`bright_threshold`）|
+| `/settings/voice` | 更新語音設定 |
+| `/settings/notifications` | 更新 Discord Webhook |
+| `/settings/general` | 更新時區 |
 
-**資料接收端點（POST）**
+**圖片管理（Images）**
+
+| 方法 | 路徑 | 說明 |
+|------|------|------|
+| GET | `/api/images` | 列出所有已確認圖片 |
+| POST | `/api/images/upload` | 上傳圖片（返回 id 與原始尺寸）|
+| POST | `/api/images/preview` | 產生裁切+dithering 預覽（返回 PNG）|
+| POST | `/api/images/{id}/confirm` | 確認裁切設定，生成 display PNG 並更新輪播 |
+| DELETE | `/api/images/{id}` | 刪除圖片 |
+| GET | `/api/images/file/{id}` | 提供 display PNG 檔案 |
+| GET | `/api/images/original/{id}` | 提供原始上傳檔案 |
+| GET | `/api/images/carousel` | 讀取輪播設定 |
+| PUT | `/api/images/carousel` | 更新輪播設定（enabled/interval/mode）|
+| PUT | `/api/images/carousel/advance` | 手動強制換圖 |
+
+**桌面工作時段（Desk）**
+
+| 方法 | 路徑 | 說明 |
+|------|------|------|
+| GET | `/api/desk/stats` | 今日統計（在場狀態、總時長、時段數）|
+| GET | `/api/desk/history` | 近 24 小時時間軸 + 近 30 天每日統計 |
+| GET | `/api/desk/sessions` | 最近 N 筆時段記錄（預設 20 筆）|
+
+**資料接收（POST）**
 
 | 路徑 | 說明 |
 |------|------|
 | `/ai_usage` | 接收 ai-usage-collector 推送的 AI 使用量資料 |
 
-所有 PUT 端點變更會原子化寫入 `config.local.yaml`，重啟服務後生效。
+所有 PUT /settings/* 端點變更會原子化寫入 `config.local.yaml`，重啟服務後生效。
 
 ---
 

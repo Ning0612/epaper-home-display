@@ -117,6 +117,11 @@ voice:
 discord:
   webhook_url: ""   # Discord Webhook URL，留空則停用
                     # 格式：https://discord.com/api/webhooks/{id}/{token}
+  notify_device_online: true      # 裝置上線時推送通知（含 WebUI 連結）
+  notify_session_end: true        # 桌面工作時段結束時推送摘要
+  session_end_min_minutes: 5      # 短於此分鐘數的時段不觸發通知
+  notify_daily_summary: true      # 每日固定時間推送昨日統計
+  daily_summary_time: "23:00"     # 每日摘要時間（HH:MM，依系統時區）
 ```
 
 ---
@@ -170,6 +175,21 @@ sensors:
 | 光線讀值 ≤ bright_threshold | UNOCCUPIED |
 
 **顯示行為**：人不在時 e-Paper 暫停更新；偵測到剛回家（亮燈）時立即觸發一次更新，後續恢復固定觸發秒節奏。
+
+---
+
+## 圖片輪播
+
+```yaml
+images:
+  storage_dir: "data/images"       # 圖片存放目錄（含 display PNG 與 tmp 上傳）
+  max_count: 50                    # 最多保留已確認圖片數，超過自動刪除最舊的
+  max_upload_bytes: 15728640       # 上傳大小上限（bytes，預設 15 MB）
+  max_pixels: 100000000            # 圖片像素數上限（預設 1 億像素）
+  carousel_enabled: false          # 是否啟用輪播
+  carousel_interval_minutes: 30    # 輪播換圖間隔（分鐘）
+  carousel_mode: "sequential"      # 換圖模式：sequential（順序）/ random（隨機）
+```
 
 ---
 
@@ -238,6 +258,11 @@ voice:
 
 discord:
   webhook_url: ""
+  notify_device_online: true
+  notify_session_end: true
+  session_end_min_minutes: 5
+  notify_daily_summary: true
+  daily_summary_time: "23:00"
 
 storage:
   db_path: "data/epaper-home-display.db"
@@ -245,14 +270,16 @@ storage:
 webui:
   host: "0.0.0.0"
   port: 8000
+  # password_hash and session_secret are managed automatically
 
 timezone: "Asia/Taipei"
 
-presence:
-  light_weight: 1.0
-  door_weight: 1.0
-  face_weight: 2.0
-  threshold: 2.0
-  door_window_seconds: 300
-  face_window_seconds: 600
+images:
+  storage_dir: "data/images"
+  max_count: 50
+  max_upload_bytes: 15728640
+  max_pixels: 100000000
+  carousel_enabled: false
+  carousel_interval_minutes: 30
+  carousel_mode: "sequential"
 ```

@@ -36,7 +36,6 @@
 **效果**：
 - 更新 `state.last_door_event`
 - 寫入 `door_events` 資料表
-- 門事件計入占用計分（`door_weight`），有效期 `door_window_seconds`
 
 ---
 
@@ -63,7 +62,7 @@
 **效果**：
 - 更新 `state.last_face_event`
 - 寫入 `face_events` 資料表
-- **已知人臉**（`known: true`）計入占用計分（`face_weight`），有效期 `face_window_seconds`
+- 已知人臉（`known: true`）供告警決策（`compute_alarm_decision()`）使用
 - 觸發告警決策重新計算
 
 ---
@@ -116,9 +115,9 @@ Agent 1 的系統狀態心跳。
 
 ## 發布主題（出站）
 
-> **⚠️ 實作狀態**：以下發布主題為計劃中的 MQTT 介面規格，`MQTTService.publish()` API 已就緒，但目前主服務流程（`app/main.py`）尚未呼叫發布函式。Agent 1 或其他訂閱者**目前不會**收到這些訊息，待後續版本啟用。
+> **⚠️ 實作狀態**：`home/home_state/presence` 已啟用（`_presence_loop` 每 60 秒發布）。`home/home_state/alarm_decision` 與 `home/display/status` 為計劃中規格，目前尚未發布。
 
-本服務計劃發布以下主題，供 **Agent 1** 或其他訂閱者使用：
+本服務發布以下主題，供 **Agent 1** 或其他訂閱者使用：
 
 所有出站訊息自動附加以下欄位：
 ```json
@@ -137,7 +136,7 @@ Agent 1 的系統狀態心跳。
 ```json
 {
   "state": "OCCUPIED",
-  "score": 2.5,
+  "score": 1.0,
   "agent": "epaper-home-display",
   "timestamp": "2026-05-29T10:30:00.123456"
 }
@@ -146,19 +145,19 @@ Agent 1 的系統狀態心跳。
 | 欄位 | 類型 | 說明 |
 |------|------|------|
 | `state` | string | `"OCCUPIED"`, `"UNOCCUPIED"`, 或 `"UNKNOWN"` |
-| `score` | float | 目前占用計分 |
+| `score` | float | 目前占用計分（`1.0` = OCCUPIED，`0.0` = UNOCCUPIED）|
 
 ---
 
-### `home/home_state/alarm_decision` — 告警決策
+### `home/home_state/alarm_decision` — 告警決策（⚠️ 計劃中，尚未發布）
 
-每次收到安全事件後發布。
+每次收到安全事件後發布（目前僅記錄至 `alarm_decisions` 資料表，不發布 MQTT）。
 
 ```json
 {
   "decision": "IGNORE",
   "reason": "Known face detected, occupant present",
-  "score": 3.0,
+  "score": 1.0,
   "agent": "epaper-home-display",
   "timestamp": "2026-05-29T10:30:00.123456"
 }
@@ -180,7 +179,7 @@ Agent 1 的系統狀態心跳。
 
 ---
 
-### `home/display/status` — 顯示器狀態（選用）
+### `home/display/status` — 顯示器狀態（⚠️ 計劃中，尚未發布）
 
 e-Paper 更新狀態回報。
 
@@ -214,9 +213,9 @@ e-Paper 更新狀態回報。
 | 訂閱 | `home/security/face` | 人臉辨識事件 |
 | 訂閱 | `home/security/alert` | 安全告警（立即顯示）|
 | 訂閱 | `home/security/status` | Agent 1 狀態心跳 |
-| 發布 | `home/home_state/presence` | 占用狀態更新 |
-| 發布 | `home/home_state/alarm_decision` | 告警決策結果 |
-| 發布 | `home/display/status` | 顯示器狀態回報 |
+| 發布 | `home/home_state/presence` | 占用狀態更新（已啟用）|
+| 發布 | `home/home_state/alarm_decision` | 告警決策結果（⚠️ 計劃中）|
+| 發布 | `home/display/status` | 顯示器狀態回報（⚠️ 計劃中）|
 
 ---
 
