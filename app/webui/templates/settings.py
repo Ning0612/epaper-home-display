@@ -161,7 +161,7 @@ _SETTINGS_CONTENT = r"""
       </div>
       <div class="card">
         <div class="f">
-          <label>光線閾值 <span class="hint">（0–1023，ADC 原始值，高於此值判定為在場）</span></label>
+          <label>光線閾值 <span class="hint">（0–1023，ADC 原始值，低於此值判定為在場）</span></label>
           <input type="number" id="p-bright" min="0" max="1023" oninput="updThresh(this.value)">
         </div>
         <div class="btn-row"><button class="btn-p" onclick="savePresence()">儲存</button></div>
@@ -358,15 +358,15 @@ async function _fetchLight(){
     document.getElementById('lp-val').textContent=raw;
     document.getElementById('lp-lux').textContent=(dispRaw*0.098).toFixed(1);
     document.getElementById('lp-bar').style.width=(dispRaw/1023*100).toFixed(2)+'%';
-    document.getElementById('lp-bar').style.background=bright?'var(--primary)':'var(--muted)';
+    document.getElementById('lp-bar').style.background=bright?'var(--muted)':'var(--primary)';
     document.getElementById('lp-thresh-line').style.left=(thresh/1023*100).toFixed(2)+'%';
-    if(bright){
+    if(!bright){
       dot.style.background='#22c55e';
-      badge.textContent='亮燈（在場）';
+      badge.textContent='暗燈（在場）';
       badge.style.cssText='font-size:.78rem;font-weight:600;padding:.18rem .65rem;border-radius:999px;background:rgba(34,197,94,.15);color:#16a34a';
     }else{
       dot.style.background='var(--muted)';
-      badge.textContent='暗燈（離場）';
+      badge.textContent='亮燈（離場）';
       badge.style.cssText=_nodata;
     }
   }catch(e){console.error('light poll',e);}

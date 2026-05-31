@@ -168,7 +168,7 @@ MQTT 告警事件（立即） ────────────► display_qu
 | 快速更新（`init_fast`）| 牆鐘 :57（僅 OCCUPIED）| ~1 秒 | 部分刷新，每 N 次中有 N-1 次 |
 | 完整更新（`init`）| 每 N 次快速後 | ~3 秒 | 完整刷新，清除鬼影（N = full_refresh_every）|
 | 告警立即更新 | MQTT 告警事件 | ~1 秒 | 透過 display_queue |
-| 回家立即更新 | 光線亮起（UNOCCUPIED→OCCUPIED）| ~1 秒 | _presence_loop 偵測到後立即觸發 |
+| 回家立即更新 | 光線變暗（UNOCCUPIED→OCCUPIED）| ~1 秒 | _presence_loop 偵測到後立即觸發 |
 | 人不在時 | — | — | display_loop 暫停，不做任何更新 |
 
 **牆鐘對齊原理**：在每分鐘第 57 秒觸發渲染，延遲補償自動計算為 `60 - dashboard_trigger_second`（預設 57 → 補償 3 秒），確保面板在整點 :00 顯示正確的分鐘數。
@@ -180,10 +180,10 @@ MQTT 告警事件（立即） ────────────► display_qu
 `app/logic/presence.py` 中的純函數 `compute_presence()`：
 
 ```
-使用場景：電腦桌/辦公桌前，開燈一定有人在
+使用場景：電腦桌/辦公桌前，室內燈讓環境光讀值偏低；白天自然光高表示無人在家
 
-if light_is_bright:  → OCCUPIED  (score = 1.0)
-else:                → UNOCCUPIED (score = 0.0)
+if not light_is_bright:  → OCCUPIED  (score = 1.0)
+else:                    → UNOCCUPIED (score = 0.0)
 
 光線閾值由 sensors.light.bright_threshold 控制（預設 500 / ADC 0–1023）
 ```

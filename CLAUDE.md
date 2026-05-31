@@ -42,7 +42,7 @@ pytest
 pytest tests/test_presence.py
 
 # Run a single test function
-pytest tests/test_presence.py::test_occupied_when_light_bright
+pytest tests/test_presence.py::test_light_dark_is_occupied
 
 # Syntax-check a modified file
 ./.venv/Scripts/python.exe -m py_compile app/logic/presence.py
@@ -118,8 +118,8 @@ Agent1 publishes home/security/* → app/services/mqtt_client.py → app/logic/ 
 
 **Presence Score (app/logic/presence.py):**
 ```
-presence_score = ambient_light_score + recent_door_activity_score + recent_known_user_entry_score
-score >= 2 → OCCUPIED | score < 2 → UNOCCUPIED
+light_raw < bright_threshold → OCCUPIED  (score = 1.0)
+light_raw ≥ bright_threshold → UNOCCUPIED (score = 0.0)
 ```
 
 ### e-Paper Update Timing

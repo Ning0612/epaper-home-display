@@ -61,9 +61,9 @@ ssh pi@epaper-display.local
 
 | 欄位 | 說明 |
 |------|------|
-| **光線閾值** | ADC 原始值（0–1023），超過此值視為在場（預設 500）|
+| **光線閾值** | ADC 原始值（0–1023），低於此值視為在場（預設 500）|
 
-占用偵測邏輯為純光線感測：光線 > 閾值 → OCCUPIED，否則 → UNOCCUPIED。
+占用偵測邏輯為純光線感測：光線 < 閾值 → OCCUPIED，光線 ≥ 閾值 → UNOCCUPIED。
 
 ### 語音設定
 
@@ -330,7 +330,7 @@ Content-Type: application/json
 
 | 欄位 | 類型 | 範圍 | 說明 |
 |------|------|------|------|
-| `bright_threshold` | int | 0–1023 | 光線 ADC 值高於此值判定為在場 |
+| `bright_threshold` | int | 0–1023 | 光線 ADC 值低於此值判定為在場 |
 
 ---
 

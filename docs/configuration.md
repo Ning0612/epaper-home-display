@@ -159,22 +159,24 @@ timezone: "Asia/Taipei"   # 用於顯示時間和日誌時間戳
 
 ## 在場偵測
 
-在場偵測邏輯為純光源：燈亮 → OCCUPIED，燈暗 → UNOCCUPIED。
+在場偵測邏輯為純光源：環境光低於閾值 → OCCUPIED，高於閾值 → UNOCCUPIED。
+
+適用場景：室內書桌/辦公桌，室內燈光使環境光讀值偏低，無人時白天外部自然光讀值偏高。
 
 光線閾值設定位於 `sensors.light.bright_threshold`（可透過 WebUI 設定頁或直接修改 YAML）：
 
 ```yaml
 sensors:
   light:
-    bright_threshold: 500   # ADC 原始值（0–1023），高於此值視為在場
+    bright_threshold: 500   # ADC 原始值（0–1023），低於此值視為在場
 ```
 
 | 情境 | 結果 |
 |------|------|
-| 光線讀值 > bright_threshold | OCCUPIED |
-| 光線讀值 ≤ bright_threshold | UNOCCUPIED |
+| 光線讀值 < bright_threshold | OCCUPIED |
+| 光線讀值 ≥ bright_threshold | UNOCCUPIED |
 
-**顯示行為**：人不在時 e-Paper 暫停更新；偵測到剛回家（亮燈）時立即觸發一次更新，後續恢復固定觸發秒節奏。
+**顯示行為**：人不在時 e-Paper 暫停更新；偵測到剛回家（光線變暗）時立即觸發一次更新，後續恢復固定觸發秒節奏。
 
 ---
 
