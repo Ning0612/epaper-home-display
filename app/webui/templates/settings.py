@@ -362,11 +362,11 @@ async function _fetchLight(){
     document.getElementById('lp-thresh-line').style.left=(thresh/1023*100).toFixed(2)+'%';
     if(!bright){
       dot.style.background='#22c55e';
-      badge.textContent='暗燈（在場）';
+      badge.textContent='亮燈（在場）';
       badge.style.cssText='font-size:.78rem;font-weight:600;padding:.18rem .65rem;border-radius:999px;background:rgba(34,197,94,.15);color:#16a34a';
     }else{
       dot.style.background='var(--muted)';
-      badge.textContent='亮燈（離場）';
+      badge.textContent='暗燈（離場）';
       badge.style.cssText=_nodata;
     }
   }catch(e){console.error('light poll',e);}
