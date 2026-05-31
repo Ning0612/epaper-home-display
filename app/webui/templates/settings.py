@@ -5,26 +5,19 @@ _SETTINGS_EXTRA_HEAD = r"""<link rel="stylesheet" href="https://unpkg.com/leafle
 
 _SETTINGS_CONTENT = r"""
 <style>
-  .svc-wrap{display:flex;min-height:100vh}
-  .svc-sb{
-    width:196px;background:var(--surface);border-right:1px solid var(--border);
-    padding:.75rem 0;position:sticky;top:0;height:100vh;overflow-y:auto;
-    flex-shrink:0;display:flex;flex-direction:column;
+  .acc{max-width:700px;margin:0 auto;padding:1.5rem 1rem}
+  .acc-item{border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;overflow:hidden}
+  .acc-head{
+    display:flex;align-items:center;gap:.55rem;padding:.72rem 1rem;
+    cursor:pointer;user-select:none;background:var(--surface);
+    font-size:.9rem;font-weight:500;color:var(--text);transition:background .15s;
   }
-  .svc-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:0 1rem .5rem}
-  .svc-nav{
-    display:flex;align-items:center;gap:.5rem;padding:.48rem 1rem;cursor:pointer;
-    font-size:.83rem;color:var(--muted);border-left:2px solid transparent;
-    transition:all .15s;user-select:none;
-  }
-  .svc-nav:hover{background:var(--surface2);color:var(--text)}
-  .svc-nav.active{color:var(--primary);border-left-color:var(--primary);background:var(--pdim);font-weight:500}
-  .svc-ic{width:1.2rem;text-align:center;font-size:.95rem}
-  .svc-main{flex:1;padding:2rem;max-width:680px}
-  .sec{display:none}.sec.active{display:block}
-  .sec-head{margin-bottom:1.4rem}
-  .sec-title{font-size:1.1rem;font-weight:600;display:flex;align-items:center;gap:.4rem}
-  .sec-desc{font-size:.78rem;color:var(--muted);margin-top:.2rem}
+  .acc-head:hover{background:var(--surface2)}
+  .acc-ic{width:1.3rem;text-align:center;font-size:1rem}
+  .acc-chev{margin-left:auto;font-size:.7rem;color:var(--muted);transition:transform .2s;line-height:1}
+  .acc-item.open>.acc-head>.acc-chev{transform:rotate(180deg)}
+  .acc-body{display:none;padding:.75rem 1rem 1rem;border-top:1px solid var(--border)}
+  .acc-item.open>.acc-body{display:block}
   .c-sub{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.9rem}
   #map{height:300px;border-radius:6px;border:1px solid var(--border);margin-top:.4rem}
   #map .leaflet-tile-pane{filter:invert(100%) hue-rotate(180deg) brightness(90%)}
@@ -35,40 +28,17 @@ _SETTINGS_CONTENT = r"""
   .iv{font-family:'JetBrains Mono',monospace;color:var(--text)}
   pre{background:var(--surface2);padding:.7rem;border-radius:6px;font-size:.75rem;overflow-x:auto;color:var(--muted);line-height:1.5;font-family:'JetBrains Mono',monospace}
   hr{border:none;border-top:1px solid var(--border);margin:.9rem 0}
-  @media(max-width:767px){
-    .svc-wrap{flex-direction:column}
-    .svc-sb{width:100%;height:auto;position:static;display:flex;flex-wrap:wrap;gap:.2rem;padding:.5rem .75rem;border-right:none;border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:visible}
-    .svc-title{display:none}
-    .svc-nav{border-left:none;border-radius:6px;padding:.3rem .6rem;flex-shrink:0}
-    .svc-nav.active{background:rgba(56,189,248,.15);border-left:none}
-    .svc-main{padding:1rem}
-  }
-  @media(min-width:768px) and (max-width:1023px){
-    .svc-sb{width:160px}
-  }
+  @media(max-width:600px){.acc{padding:1rem .5rem}}
 </style>
 
-<div class="svc-wrap">
-  <nav class="svc-sb">
-    <div class="svc-title">設定</div>
-    <div class="svc-nav active" onclick="go('weather',this)"><span class="svc-ic">☁️</span>天氣</div>
-    <div class="svc-nav" onclick="go('mqtt',this)"><span class="svc-ic">🔗</span>MQTT</div>
-    <div class="svc-nav" onclick="go('display',this)"><span class="svc-ic">🖥️</span>顯示器</div>
-    <div class="svc-nav" onclick="go('presence',this)"><span class="svc-ic">💡</span>在場偵測</div>
-    <div class="svc-nav" onclick="go('voice',this)"><span class="svc-ic">🔊</span>語音</div>
-    <div class="svc-nav" onclick="go('notif',this)"><span class="svc-ic">💬</span>通知</div>
-    <div class="svc-nav" onclick="go('general',this)"><span class="svc-ic">⚙️</span>一般</div>
-    <div class="svc-nav" onclick="go('wifi',this)"><span class="svc-ic">📶</span>WiFi</div>
-    <div class="svc-nav" onclick="go('auth',this)"><span class="svc-ic">🔒</span>安全</div>
-  </nav>
+<div class="acc">
 
-  <main class="svc-main">
-
-    <div id="sec-weather" class="sec active">
-      <div class="sec-head">
-        <div class="sec-title">☁️ 天氣設定</div>
-        <div class="sec-desc">OpenWeatherMap API 金鑰、單位與更新頻率</div>
-      </div>
+  <div class="acc-item open" id="acc-weather">
+    <div class="acc-head" onclick="toggle('weather')">
+      <span class="acc-ic">☁️</span>天氣設定
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card">
         <div class="c-sub">API 設定</div>
         <div class="f">
@@ -102,12 +72,14 @@ _SETTINGS_CONTENT = r"""
         <div class="btn-row"><button class="btn-p" onclick="saveLocation()">儲存位置</button></div>
       </div>
     </div>
+  </div>
 
-    <div id="sec-mqtt" class="sec">
-      <div class="sec-head">
-        <div class="sec-title">🔗 MQTT 設定</div>
-        <div class="sec-desc">Broker 連線資訊</div>
-      </div>
+  <div class="acc-item" id="acc-mqtt">
+    <div class="acc-head" onclick="toggle('mqtt')">
+      <span class="acc-ic">🔗</span>MQTT 設定
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card">
         <div class="f">
           <label>Broker Host</label>
@@ -126,12 +98,14 @@ _SETTINGS_CONTENT = r"""
         <div class="btn-row"><button class="btn-p" onclick="saveMQTT()">儲存</button></div>
       </div>
     </div>
+  </div>
 
-    <div id="sec-display" class="sec">
-      <div class="sec-head">
-        <div class="sec-title">🖥️ 顯示器設定</div>
-        <div class="sec-desc">e-Paper 更新時機與顯示行為</div>
-      </div>
+  <div class="acc-item" id="acc-display">
+    <div class="acc-head" onclick="toggle('display')">
+      <span class="acc-ic">🖥️</span>顯示器設定
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card">
         <div class="f">
           <label>e-Paper 型號</label>
@@ -154,12 +128,14 @@ _SETTINGS_CONTENT = r"""
         <div class="btn-row"><button class="btn-p" onclick="saveDisplay()">儲存</button></div>
       </div>
     </div>
+  </div>
 
-    <div id="sec-presence" class="sec">
-      <div class="sec-head">
-        <div class="sec-title">💡 在場偵測</div>
-        <div class="sec-desc">燈亮即判定為在場；人不在時暫停顯示更新</div>
-      </div>
+  <div class="acc-item" id="acc-presence">
+    <div class="acc-head" onclick="toggle('presence')">
+      <span class="acc-ic">💡</span>在場偵測
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card">
         <div class="c-sub" style="display:flex;align-items:center;justify-content:space-between">
           即時光線讀值
@@ -191,12 +167,14 @@ _SETTINGS_CONTENT = r"""
         <div class="btn-row"><button class="btn-p" onclick="savePresence()">儲存</button></div>
       </div>
     </div>
+  </div>
 
-    <div id="sec-voice" class="sec">
-      <div class="sec-head">
-        <div class="sec-title">🔊 語音設定</div>
-        <div class="sec-desc">提示音與播放器</div>
-      </div>
+  <div class="acc-item" id="acc-voice">
+    <div class="acc-head" onclick="toggle('voice')">
+      <span class="acc-ic">🔊</span>語音設定
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card">
         <div class="tog-row">
           <div>
@@ -213,12 +191,14 @@ _SETTINGS_CONTENT = r"""
         <div class="btn-row"><button class="btn-p" onclick="saveVoice()">儲存</button></div>
       </div>
     </div>
+  </div>
 
-    <div id="sec-notif" class="sec">
-      <div class="sec-head">
-        <div class="sec-title">💬 通知設定</div>
-        <div class="sec-desc">Discord Webhook 推播設定</div>
-      </div>
+  <div class="acc-item" id="acc-notif">
+    <div class="acc-head" onclick="toggle('notif')">
+      <span class="acc-ic">💬</span>通知設定
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card">
         <div class="f">
           <label>Discord Webhook URL</label>
@@ -249,12 +229,14 @@ _SETTINGS_CONTENT = r"""
         <div class="btn-row"><button class="btn-p" onclick="saveNotif()">儲存</button></div>
       </div>
     </div>
+  </div>
 
-    <div id="sec-general" class="sec">
-      <div class="sec-head">
-        <div class="sec-title">⚙️ 一般設定</div>
-        <div class="sec-desc">系統時區</div>
-      </div>
+  <div class="acc-item" id="acc-general">
+    <div class="acc-head" onclick="toggle('general')">
+      <span class="acc-ic">⚙️</span>一般設定
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card">
         <div class="f">
           <label>時區 <span class="hint">（例：Asia/Taipei）</span></label>
@@ -263,12 +245,14 @@ _SETTINGS_CONTENT = r"""
         <div class="btn-row"><button class="btn-p" onclick="saveGeneral()">儲存</button></div>
       </div>
     </div>
+  </div>
 
-    <div id="sec-wifi" class="sec">
-      <div class="sec-head">
-        <div class="sec-title">📶 WiFi 狀態</div>
-        <div class="sec-desc">目前網路連線資訊</div>
-      </div>
+  <div class="acc-item" id="acc-wifi">
+    <div class="acc-head" onclick="toggle('wifi')">
+      <span class="acc-ic">📶</span>WiFi 狀態
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card" id="wifi-card">
         <div style="font-size:.85rem;color:var(--muted)">載入中…</div>
       </div>
@@ -279,12 +263,14 @@ _SETTINGS_CONTENT = r"""
         <p style="font-size:.72rem;color:var(--muted);margin-top:.5rem">或編輯 /etc/wpa_supplicant/wpa_supplicant.conf 後重啟網路</p>
       </div>
     </div>
+  </div>
 
-    <div id="sec-auth" class="sec">
-      <div class="sec-head">
-        <div class="sec-title">🔒 帳號安全</div>
-        <div class="sec-desc">更改 WebUI 登入密碼</div>
-      </div>
+  <div class="acc-item" id="acc-auth">
+    <div class="acc-head" onclick="toggle('auth')">
+      <span class="acc-ic">🔒</span>帳號安全
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
       <div class="card">
         <div class="c-sub">更改密碼</div>
         <div class="f">
@@ -307,8 +293,8 @@ _SETTINGS_CONTENT = r"""
         <a href="/logout" style="display:inline-block;padding:.45rem 1.2rem;background:#dc2626;color:#fff;border-radius:6px;font-size:.83rem;font-weight:500;text-decoration:none">登出</a>
       </div>
     </div>
+  </div>
 
-  </main>
 </div>
 
 <script>
@@ -316,15 +302,20 @@ var mapLat=__LAT__, mapLon=__LON__;
 var lmap=null, lmk=null;
 var _presTimer=null;
 
-function go(name,el){
-  if(name!=='presence') stopLightPoll();
-  document.querySelectorAll('.sec').forEach(function(s){s.classList.remove('active')});
-  document.querySelectorAll('.svc-nav').forEach(function(n){n.classList.remove('active')});
-  document.getElementById('sec-'+name).classList.add('active');
-  el.classList.add('active');
-  if(name==='weather' && !lmap) initMap();
-  if(name==='wifi') loadWifi();
-  if(name==='presence') startLightPoll();
+function toggle(name){
+  var item=document.getElementById('acc-'+name);
+  var wasOpen=item.classList.contains('open');
+  document.querySelectorAll('.acc-item').forEach(function(i){i.classList.remove('open')});
+  stopLightPoll();
+  if(!wasOpen){
+    item.classList.add('open');
+    if(name==='weather'){
+      if(!lmap) initMap();
+      else setTimeout(function(){lmap.invalidateSize();},50);
+    }
+    if(name==='wifi') loadWifi();
+    if(name==='presence') startLightPoll();
+  }
 }
 
 function updThresh(v){
@@ -417,7 +408,7 @@ async function loadCfg(){
       mapLat=w.lat; mapLon=w.lon;
       document.getElementById('v-lat').textContent=mapLat;
       document.getElementById('v-lon').textContent=mapLon;
-      if(lmap){lmap.setView([mapLat,mapLon]);lmk.setLatLng([mapLat,mapLon]);}
+      if(lmap && lmk){lmap.setView([mapLat,mapLon]);lmk.setLatLng([mapLat,mapLon]);}
     }
     var m=c.mqtt||{};
     document.getElementById('m-host').value=m.broker_host||'';
