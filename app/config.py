@@ -105,6 +105,15 @@ class ImagesConfig:
 
 
 @dataclass
+class OutdoorAgentConfig:
+    snapshot_url: str = ""                   # e.g. "http://faceguard.local/snapshot"
+    snapshot_timeout_sec: float = 2.5
+    alert_page_enabled: bool = True
+    alert_page_timeout_sec: int = 120        # return to dashboard after N seconds with no new alert
+    alert_refresh_interval_sec: float = 3.0
+
+
+@dataclass
 class Settings:
     mqtt: MQTTConfig = field(default_factory=MQTTConfig)
     weather: WeatherConfig = field(default_factory=WeatherConfig)
@@ -115,6 +124,7 @@ class Settings:
     storage: StorageConfig = field(default_factory=StorageConfig)
     webui: WebUIConfig = field(default_factory=WebUIConfig)
     images: ImagesConfig = field(default_factory=ImagesConfig)
+    outdoor_agent: OutdoorAgentConfig = field(default_factory=OutdoorAgentConfig)
     timezone: str = "Asia/Taipei"
 
 

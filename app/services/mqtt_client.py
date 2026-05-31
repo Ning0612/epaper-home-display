@@ -107,6 +107,11 @@ class MQTTService:
 
         elif topic == "home/security/alert":
             state.last_alert = payload
+            now_dt = datetime.now()
+            if state.display_page != "alert":
+                state.alert_page_started_at = now_dt
+            state.alert_last_triggered_at = now_dt
+            state.display_page = "alert"
             try:
                 self._display_queue.put_nowait("alert")
             except asyncio.QueueFull:
@@ -114,7 +119,7 @@ class MQTTService:
             if self._voice_service is not None:
                 if self._voice_task is None or self._voice_task.done():
                     self._voice_task = asyncio.ensure_future(self._voice_service.play("alert.wav"))
-            logger.info("Alert: %s", payload)
+            logger.info("Alert: %s — switching to alert page", payload)
 
         elif topic == "home/security/status":
             # status is a heartbeat/general update — never treated as a security alert

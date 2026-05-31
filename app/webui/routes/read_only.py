@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import io
+from datetime import datetime
+from typing import TYPE_CHECKING
+
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.state import state
 
+if TYPE_CHECKING:
+    from app.config import Settings
 
-def create_read_only_router() -> APIRouter:
+
+def create_read_only_router(settings: "Settings | None" = None) -> APIRouter:
     router = APIRouter()
 
     @router.get("/health")
@@ -31,6 +38,11 @@ def create_read_only_router() -> APIRouter:
             "security_status": state.security_status,
             "active_reminder": state.active_reminder,
             "display_busy": state.display_busy,
+            "display_page": state.display_page,
+            "alert_last_triggered_at": (
+                state.alert_last_triggered_at.isoformat()
+                if state.alert_last_triggered_at else None
+            ),
             "started_at": state.started_at.isoformat(),
             "codex_usage_5h": state.codex_usage_5h,
             "codex_usage_week": state.codex_usage_week,
@@ -39,7 +51,20 @@ def create_read_only_router() -> APIRouter:
             "claude_usage_5h": state.claude_usage_5h,
             "claude_usage_week": state.claude_usage_week,
             "claude_5h_reset": state.claude_5h_reset,
+            # last_snapshot_image is a PIL Image — intentionally excluded from JSON
         })
+
+    @router.get("/api/preview/alert", response_class=Response)
+    async def preview_alert_page():
+        """Return a PNG rendering of the alert page (for WebUI simulation/debug)."""
+        import asyncio
+        from app.display.renderer_alert import render_alert_page
+
+        _settings = settings
+        img = await asyncio.to_thread(render_alert_page, state, _settings, datetime.now())
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return Response(content=buf.getvalue(), media_type="image/png")
 
     @router.get("/logs/env")
     async def get_env_logs_route(limit: int = 50):

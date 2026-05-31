@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass
@@ -40,6 +40,11 @@ class AgentState:
     codex_5h_reset: str | None = None
     codex_weekly_reset: str | None = None
     claude_5h_reset: str | None = None
+
+    display_page: Literal["dashboard", "alert"] = "dashboard"
+    last_snapshot_image: Any = None          # PIL Image | None — set by display loop
+    alert_page_started_at: datetime | None = None
+    alert_last_triggered_at: datetime | None = None
 
     started_at: datetime = field(default_factory=datetime.now)
 

@@ -8,9 +8,49 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime as _DateTime, timedelta as _timedelta
 
 from app.display.renderer import render_dashboard
+from app.display.renderer_alert import render_alert_page
+from app.services.snapshot_client import fetch_snapshot
 from app.state import state
 
 logger = logging.getLogger(__name__)
+
+
+def _is_alert_active(settings) -> bool:
+    """True when alert page should be shown: enabled, URL configured, and page is alert."""
+    return (
+        state.display_page == "alert"
+        and settings.outdoor_agent.alert_page_enabled
+        and bool(settings.outdoor_agent.snapshot_url)
+    )
+
+
+def _check_alert_timeout(settings) -> bool:
+    """Return to dashboard if timed out or alert page is disabled/unconfigured.
+
+    Returns True if a transition from alert→dashboard just occurred (caller can force full refresh).
+    """
+    if state.display_page != "alert":
+        return False
+
+    # Normalise disabled / unconfigured alert state immediately
+    if not settings.outdoor_agent.alert_page_enabled or not settings.outdoor_agent.snapshot_url:
+        state.display_page = "dashboard"
+        state.last_snapshot_image = None
+        return True
+
+    if state.alert_last_triggered_at is None:
+        state.display_page = "dashboard"
+        state.last_snapshot_image = None
+        return True
+
+    elapsed = (_DateTime.now() - state.alert_last_triggered_at).total_seconds()
+    if elapsed > settings.outdoor_agent.alert_page_timeout_sec:
+        logger.info("Alert page timeout (%.0fs), returning to dashboard", elapsed)
+        state.display_page = "dashboard"
+        state.last_snapshot_image = None
+        return True
+
+    return False
 
 
 def _maybe_advance_carousel(settings) -> None:
@@ -57,40 +97,86 @@ async def _display_loop(
     loop = asyncio.get_event_loop()
 
     while True:
-        # Align to wall-clock: trigger at :dashboard_trigger_second each minute.
-        # Any display_queue event (button, MQTT alert, presence_return) fires immediately.
-        now = _DateTime.now()
-        target = settings.display.dashboard_trigger_second
-        delay = (target - now.second) % 60 or 60  # `or 60` avoids re-triggering immediately
-        try:
-            await asyncio.wait_for(display_queue.get(), timeout=delay)
-        except asyncio.TimeoutError:
-            pass  # wall-clock trigger
+        # Wait strategy: alert mode uses a fixed short interval; dashboard mode aligns to wall-clock.
+        if _is_alert_active(settings):
+            interval = settings.outdoor_agent.alert_refresh_interval_sec
+            try:
+                await asyncio.wait_for(display_queue.get(), timeout=interval)
+            except asyncio.TimeoutError:
+                pass
+        else:
+            # Align to wall-clock: trigger at :dashboard_trigger_second each minute.
+            # Any display_queue event (button, MQTT alert, presence_return) fires immediately.
+            now = _DateTime.now()
+            target = settings.display.dashboard_trigger_second
+            delay = (target - now.second) % 60 or 60  # `or 60` avoids re-triggering immediately
+            try:
+                await asyncio.wait_for(display_queue.get(), timeout=delay)
+            except asyncio.TimeoutError:
+                pass  # wall-clock trigger
 
-        _maybe_advance_carousel(settings)
+        # Check if alert page should time out and return to dashboard.
+        # When a transition occurs, drain stale events from the queue and force full refresh.
+        transitioned = _check_alert_timeout(settings)
+        if transitioned:
+            # Drain stale "alert" events that accumulated during the alert session so the
+            # first dashboard frame isn't burst-triggered multiple times.
+            while not display_queue.empty():
+                try:
+                    display_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+            refresh_count = 0   # force full refresh on first dashboard frame after alert
 
-        if state.presence != "OCCUPIED":
-            continue  # pause updates while nobody home
+        if state.display_page == "dashboard":
+            _maybe_advance_carousel(settings)
+            if state.presence != "OCCUPIED":
+                continue  # pause dashboard updates while nobody home
 
         if state.display_busy:
             continue
 
-        full_refresh = (refresh_count % max(1, settings.display.full_refresh_every) == 0)
+        # Capture page before entering executor so publish reflects what was actually rendered,
+        # not a potentially mutated state (MQTT can change display_page mid-executor-wait).
+        rendered_page = state.display_page
+
         state.display_busy = True
         try:
-            # Advance clock by display lag so the rendered HH:MM matches the
-            # minute that will be visible when the panel finishes updating.
-            render_time = _DateTime.now() + _timedelta(seconds=60 - settings.display.dashboard_trigger_second)
-            image = render_dashboard(state, settings, render_time)
-            await loop.run_in_executor(
-                executor, functools.partial(epaper.display, image, full_refresh)
-            )
-            refresh_count += 1  # only advance cadence on successful panel write
+            now = _DateTime.now()
+
+            if _is_alert_active(settings):
+                # Fetch latest snapshot from outdoor agent (non-blocking)
+                snap = await fetch_snapshot(
+                    settings.outdoor_agent.snapshot_url,
+                    settings.outdoor_agent.snapshot_timeout_sec,
+                )
+                if snap is not None:
+                    state.last_snapshot_image = snap
+                image = render_alert_page(state, settings, now)
+                # Alert page always uses fast refresh to meet 3s cadence
+                actual_full_refresh = False
+                await loop.run_in_executor(
+                    executor, functools.partial(epaper.display, image, actual_full_refresh)
+                )
+                # Do not increment refresh_count — alert uses fast refresh exclusively;
+                # dashboard resumes from its previous cadence position when we return.
+            else:
+                actual_full_refresh = (refresh_count % max(1, settings.display.full_refresh_every) == 0)
+                # Advance clock by display lag so the rendered HH:MM matches the
+                # minute that will be visible when the panel finishes updating.
+                render_time = now + _timedelta(seconds=60 - settings.display.dashboard_trigger_second)
+                image = render_dashboard(state, settings, render_time)
+                await loop.run_in_executor(
+                    executor, functools.partial(epaper.display, image, actual_full_refresh)
+                )
+                refresh_count += 1  # only advance cadence on successful panel write
+
             if mqtt_service is not None:
                 try:
                     mqtt_service.publish("home/display/status", {
                         "status": "updated",
-                        "refresh_type": "full" if full_refresh else "fast",
+                        "page": rendered_page,
+                        "refresh_type": "full" if actual_full_refresh else "fast",
                     })
                 except Exception as exc:
                     logger.debug("Failed to publish display status: %s", exc)

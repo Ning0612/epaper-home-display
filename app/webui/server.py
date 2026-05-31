@@ -42,7 +42,7 @@ def create_app(
     )
 
     app.include_router(create_auth_router(settings))
-    app.include_router(create_read_only_router())
+    app.include_router(create_read_only_router(settings))
     app.include_router(create_settings_router(settings, weather_service))
     app.include_router(create_desk_router(settings))
     app.include_router(create_ai_usage_router())
