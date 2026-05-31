@@ -7,4 +7,17 @@ if (-not (Test-Path (Split-Path $logFile))) {
     New-Item -ItemType Directory -Force (Split-Path $logFile) | Out-Null
 }
 
-& $nodeExe $distEntry *>> $logFile
+# Remove legacy UTF-16 LE log (written by old *>> operator) to prevent mixed-encoding corruption.
+if (Test-Path $logFile) {
+    $sig = [System.IO.File]::ReadAllBytes($logFile)
+    if ($sig.Length -ge 2 -and $sig[0] -eq 0xFF -and $sig[1] -eq 0xFE) {
+        Remove-Item $logFile -Force
+    }
+}
+# Trim log to last 2000 lines to prevent unbounded growth.
+if (Test-Path $logFile) {
+    $tail = Get-Content $logFile -Tail 2000
+    $tail | Out-File -FilePath $logFile -Encoding utf8
+}
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+& $nodeExe $distEntry 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8

@@ -23,7 +23,7 @@ export async function runTuiCommand(
     let shell: pty.IPty;
     try {
       shell = IS_WINDOWS
-        ? pty.spawn("cmd.exe", [], { ...baseArgs, useConpty: false } as pty.IWindowsPtyForkOptions)
+        ? pty.spawn("cmd.exe", [], { ...baseArgs, useConpty: true } as pty.IWindowsPtyForkOptions)
         : pty.spawn(cliCommand, [], baseArgs);
     } catch (err) {
       reject(new Error(`Failed to spawn PTY for '${cliCommand}': ${err}`));

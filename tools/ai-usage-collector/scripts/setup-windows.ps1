@@ -92,17 +92,45 @@ if (-not (Test-Path (Split-Path `$logFile))) {
     New-Item -ItemType Directory -Force (Split-Path `$logFile) | Out-Null
 }
 
-& `$nodeExe `$distEntry *>> `$logFile
+# Remove legacy UTF-16 LE log (written by old *>> operator) to prevent mixed-encoding corruption.
+if (Test-Path `$logFile) {
+    `$sig = [System.IO.File]::ReadAllBytes(`$logFile)
+    if (`$sig.Length -ge 2 -and `$sig[0] -eq 0xFF -and `$sig[1] -eq 0xFE) {
+        Remove-Item `$logFile -Force
+    }
+}
+# Trim log to last 2000 lines to prevent unbounded growth.
+if (Test-Path `$logFile) {
+    `$tail = Get-Content `$logFile -Tail 2000
+    `$tail | Out-File -FilePath `$logFile -Encoding utf8
+}
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+& `$nodeExe `$distEntry 2>&1 | Out-File -FilePath `$logFile -Append -Encoding utf8
 "@ | Set-Content $runPs -Encoding utf8
 
-Write-Host "[setup] Created wrappers: $runCmd, $runPs"
+# ── Create run.vbs launcher (fully suppresses PowerShell window) ──────────────
+# WScript.Shell.Run with windowStyle=0 (SW_HIDE) suppresses the console window
+# at CreateProcess level. -WindowStyle Hidden applies only after PowerShell
+# starts, causing a visible flash; this approach avoids that race condition.
+# Third arg True = synchronous, so Task Scheduler's ExecutionTimeLimit applies
+# to the collector process, not just the wscript.exe wrapper.
+$runVbs = Join-Path $projectDir "scripts\run.vbs"
+$psExe  = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+@"
+Set shell = CreateObject("WScript.Shell")
+shell.CurrentDirectory = "$projectDir"
+shell.Run """$psExe"" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""$runPs""", 0, True
+Set shell = Nothing
+"@ | Set-Content $runVbs -Encoding ascii
+
+Write-Host "[setup] Created wrappers: $runCmd, $runPs, $runVbs"
 
 # ── Register Task Scheduler (XML — compatible with PS 5.1) ────────────────────
 $taskName = "ai-usage-collector"
 $startBoundary = (Get-Date).AddSeconds(10).ToString("yyyy-MM-ddTHH:mm:ss")
 
 # Escape XML special chars in paths
-$runPsXml   = [System.Security.SecurityElement]::Escape($runPs)
+$runVbsXml  = [System.Security.SecurityElement]::Escape($runVbs)
 $projectXml = [System.Security.SecurityElement]::Escape($projectDir)
 
 $xml = @"
@@ -120,8 +148,8 @@ $xml = @"
   </Triggers>
   <Actions Context="Author">
     <Exec>
-      <Command>powershell.exe</Command>
-      <Arguments>-WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File "$runPsXml"</Arguments>
+      <Command>wscript.exe</Command>
+      <Arguments>//B //nologo "$runVbsXml"</Arguments>
       <WorkingDirectory>$projectXml</WorkingDirectory>
     </Exec>
   </Actions>

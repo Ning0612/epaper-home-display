@@ -25,8 +25,10 @@ function to24h(raw: string): string {
 }
 
 export function parseClaudeUsage(text: string): ClaudeUsage {
-  const usedMatch = text.match(/(\d+)%\s+used/i);
-  const resetsMatch = text.match(/Resets\s+([^\n\r]+)/i);
+  // TUI strips spaces, so "34% used" and "34%used" both occur
+  const usedMatch = text.match(/(\d+)%\s*used/i);
+  // Capture only the time token after "Resets", not the rest of the collapsed line
+  const resetsMatch = text.match(/Resets\s*(\d{1,2}:\d{2}\s*(?:am|pm)\s*(?:\([^)]+\))?)/i);
 
   if (!usedMatch) {
     return { five_hour: null, raw_ok: false };
