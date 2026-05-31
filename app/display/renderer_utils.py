@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import TypeAlias
 
 from PIL import Image, ImageDraw, ImageFont
@@ -86,14 +86,19 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
     today = date.today()
     by_day: dict[date, list[dict]] = {}
     for entry in forecast_list:
-        dt_txt = entry.get("dt_txt")
-        if not isinstance(dt_txt, str):
-            continue
+        dt_unix = entry.get("dt")
         try:
-            d = datetime.strptime(dt_txt[:10], "%Y-%m-%d").date()
-        except ValueError:
+            if dt_unix is not None:
+                # dt is a UTC Unix timestamp; fromtimestamp converts to host local time
+                d = datetime.fromtimestamp(int(dt_unix)).date()
+            else:
+                # dt_txt is UTC; convert to local before taking date
+                dt_txt = entry.get("dt_txt", "")
+                utc_dt = datetime.strptime(dt_txt[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                d = utc_dt.astimezone().date()
+        except (TypeError, ValueError, OSError):
             continue
-        if d == today:
+        if d <= today:
             continue
         by_day.setdefault(d, []).append(entry)
 
@@ -124,7 +129,7 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
             slots[0],
         )
         result.append({
-            "dt_txt": noon["dt_txt"],
+            "dt_txt": d.strftime("%Y-%m-%d 12:00:00"),  # local date, avoids UTC/local mismatch in renderer
             "weather": [{"main": mode_main}],
             "main": {"temp": avg_temp},
             "pop": max_pop,

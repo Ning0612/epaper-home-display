@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -84,11 +84,17 @@ async def test_forecast_returns_all_slots(config):
 
 
 def _make_slots(day_offset: int, conditions: list[str], temps: list[float], pops: list[float]) -> list[dict]:
-    d = (date.today() + timedelta(days=day_offset)).strftime("%Y-%m-%d")
-    return [
-        {"dt_txt": f"{d} {i*3:02d}:00:00", "weather": [{"main": c}], "main": {"temp": t}, "pop": p}
-        for i, (c, t, p) in enumerate(zip(conditions, temps, pops))
-    ]
+    target = date.today() + timedelta(days=day_offset)
+    slots = []
+    for i, (c, t, p) in enumerate(zip(conditions, temps, pops)):
+        local_dt = datetime(target.year, target.month, target.day, (i * 3) % 24)
+        slots.append({
+            "dt": int(local_dt.timestamp()),
+            "weather": [{"main": c}],
+            "main": {"temp": t},
+            "pop": p,
+        })
+    return slots
 
 
 def test_pick_daily_forecast_aggregation():
@@ -132,3 +138,32 @@ def test_pick_daily_forecast_severe_weather_wins_tie():
     slots = _make_slots(1, ["Clear", "Clear", "Rain", "Rain", "Thunderstorm", "Thunderstorm", "Thunderstorm", "Clear"], [20.0] * 8, [0.5] * 8)
     result = _pick_daily_forecast(slots, count=1)
     assert result[0]["weather"][0]["main"] == "Thunderstorm"
+
+
+def test_pick_daily_forecast_filters_stale_utc_midnight_slots():
+    """Regression: stale UTC slots (yesterday or today) must not appear after local midnight."""
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+
+    # yesterday noon UTC is always <= today in any timezone → must be filtered
+    yesterday_noon_utc = datetime(yesterday.year, yesterday.month, yesterday.day, 12, 0, 0, tzinfo=timezone.utc)
+    stale = {"dt": int(yesterday_noon_utc.timestamp()), "weather": [{"main": "Clear"}], "main": {"temp": 30.0}, "pop": 0.0}
+
+    tomorrow = today + timedelta(days=1)
+    tomorrow_local = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 12, 0, 0)
+    future = {"dt": int(tomorrow_local.timestamp()), "weather": [{"main": "Rain"}], "main": {"temp": 22.0}, "pop": 0.5}
+
+    result = _pick_daily_forecast([stale, future], count=4)
+    assert len(result) == 1
+    assert result[0]["weather"][0]["main"] == "Rain"
+
+
+def test_pick_daily_forecast_result_dt_txt_uses_local_date():
+    """Result dt_txt must reflect local date (for correct weekday display in renderer)."""
+    tomorrow = date.today() + timedelta(days=1)
+    local_dt = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 12, 0, 0)
+    slot = {"dt": int(local_dt.timestamp()), "weather": [{"main": "Snow"}], "main": {"temp": 5.0}, "pop": 0.1}
+
+    result = _pick_daily_forecast([slot], count=4)
+    assert len(result) == 1
+    assert result[0]["dt_txt"].startswith(tomorrow.strftime("%Y-%m-%d"))
