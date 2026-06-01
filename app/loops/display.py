@@ -121,16 +121,19 @@ async def _display_loop(
 
     while True:
         # Wait strategy: alert → fixed short interval; ap_mode → 30s; dashboard → wall-clock aligned.
+        # event value is preserved so callers downstream can react to specific signals
+        # (e.g. "wifi_connected" bypasses the presence-check gate).
+        event: str | None = None
         if _is_alert_active(settings):
             interval = settings.outdoor_agent.alert_refresh_interval_sec
             try:
-                await asyncio.wait_for(display_queue.get(), timeout=interval)
+                event = await asyncio.wait_for(display_queue.get(), timeout=interval)
             except asyncio.TimeoutError:
                 pass
         elif _is_ap_mode_active():
             # AP mode: static info page, refresh periodically to update timestamp
             try:
-                await asyncio.wait_for(display_queue.get(), timeout=_AP_MODE_REFRESH_INTERVAL)
+                event = await asyncio.wait_for(display_queue.get(), timeout=_AP_MODE_REFRESH_INTERVAL)
             except asyncio.TimeoutError:
                 pass
         else:
@@ -140,19 +143,24 @@ async def _display_loop(
             target = settings.display.dashboard_trigger_second
             delay = (target - now.second) % 60 or 60  # `or 60` avoids re-triggering immediately
             try:
-                await asyncio.wait_for(display_queue.get(), timeout=delay)
+                event = await asyncio.wait_for(display_queue.get(), timeout=delay)
             except asyncio.TimeoutError:
                 pass  # wall-clock trigger
 
         # Check if alert page should time out and return to dashboard.
         # When a transition occurs, drain stale events from the queue and force full refresh.
+        # "wifi_connected" is re-queued so the presence-bypass logic below can act on it.
         transitioned = _check_alert_timeout(settings)
         if transitioned:
-            # Drain stale "alert" events that accumulated during the alert session so the
-            # first dashboard frame isn't burst-triggered multiple times.
             while not display_queue.empty():
                 try:
-                    display_queue.get_nowait()
+                    drained = display_queue.get_nowait()
+                    if drained == "wifi_connected":
+                        try:
+                            display_queue.put_nowait(drained)
+                        except asyncio.QueueFull:
+                            pass
+                        break
                 except asyncio.QueueEmpty:
                     break
             refresh_count = 0   # force full refresh on first dashboard frame after alert
@@ -161,7 +169,7 @@ async def _display_loop(
             pass  # always render AP mode page regardless of presence
         elif state.display_page == "dashboard":
             _maybe_advance_carousel(settings)
-            if state.presence != "OCCUPIED":
+            if state.presence != "OCCUPIED" and event != "wifi_connected":
                 continue  # pause dashboard updates while nobody home
 
         if state.display_busy:

@@ -6,7 +6,7 @@ import os
 import subprocess
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -56,12 +56,15 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
             raise HTTPException(500, detail=f"WiFi 掃描失敗：{exc}")
 
     @router.post("/api/wifi/connect")
-    async def wifi_connect(body: _WifiConnectBody):
+    async def wifi_connect(body: _WifiConnectBody, background_tasks: BackgroundTasks):
         """Connect to a WiFi network.
 
-        Only functional when the device is in AP mode.  On success, removes
-        the AP status file so wifi_monitor transitions the display back to
-        dashboard mode within monitor_interval seconds.
+        Phase 1 (synchronous, before response): create NM connection profile.
+        AP hotspot stays up so the HTTP 200 response reaches the client.
+
+        Phase 2 (BackgroundTask, after response): activate profile.
+        AP shuts down here.  AP status file is removed only on success so the
+        portal remains available for retry if activation fails.
         """
         if state.wifi_mode != "ap":
             raise HTTPException(503, detail="裝置不在 AP 設定模式")
@@ -77,26 +80,21 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
         if password and len(password) < 8:
             raise HTTPException(400, detail="WiFi 密碼至少需要 8 個字元")
 
+        # Phase 1: build NM profile (AP stays up, client receives this response)
         try:
             async with _nmcli_lock:
-                success, message = await asyncio.to_thread(
-                    _connect_wifi_sync, ssid, password
-                )
+                ok, msg = await asyncio.to_thread(_prepare_wifi_profile_sync, ssid, password)
         except Exception as exc:
-            logger.error("WiFi connect error: %s", exc)
+            logger.error("WiFi prepare error: %s", exc)
             raise HTTPException(500, detail=f"連線失敗：{exc}")
 
-        if not success:
-            raise HTTPException(400, detail=message)
+        if not ok:
+            raise HTTPException(400, detail=msg)
 
-        # Remove AP status file → wifi_monitor will detect mode change on next poll
-        try:
-            if os.path.exists(_AP_STATUS_FILE):
-                os.unlink(_AP_STATUS_FILE)
-        except OSError as exc:
-            logger.warning("Failed to remove AP status file: %s", exc)
+        # Phase 2: activate after client receives 200 (AP will shut down)
+        background_tasks.add_task(_activate_wifi_background, ssid)
 
-        return JSONResponse({"ok": True, "message": f"已連線到「{ssid}」"})
+        return JSONResponse({"ok": True, "message": "正在切換網路，AP 熱點即將關閉..."})
 
     return router
 
@@ -170,21 +168,18 @@ def _scan_wifi_sync() -> list[dict]:
 _SETUP_CON_ID = "EpaperWifiSetup"
 
 
-def _connect_wifi_sync(ssid: str, password: str) -> tuple[bool, str]:
-    """Synchronous WiFi connect via nmcli connection add + up.
+def _prepare_wifi_profile_sync(ssid: str, password: str) -> tuple[bool, str]:
+    """Phase 1: delete stale profile + create new NM connection profile.
 
-    Uses explicit security parameters so nmcli does not need to scan the target
-    network — required because wlan0 is occupied by the AP hotspot at this point.
-    password may be empty for open (unencrypted) networks.
+    Does NOT activate the connection — the AP hotspot stays up so the HTTP
+    response can reach the client before the network is switched.
     """
     try:
-        # Remove any leftover profile from a previous setup attempt
         subprocess.run(
             ["sudo", "nmcli", "connection", "delete", _SETUP_CON_ID],
             text=True, capture_output=True, timeout=10,
         )  # ignore return code — profile may not exist
 
-        # Build add command with explicit security settings
         add_cmd = [
             "sudo", "nmcli", "connection", "add",
             "type", "wifi",
@@ -200,9 +195,21 @@ def _connect_wifi_sync(ssid: str, password: str) -> tuple[bool, str]:
         result = subprocess.run(add_cmd, text=True, capture_output=True, timeout=15)
         if result.returncode != 0:
             err = (result.stderr or result.stdout).strip()
-            return False, f"連線失敗：{err}"
+            return False, f"建立連線設定失敗：{err}"
+        return True, "profile created"
 
-        # Bring the connection up — this also terminates the AP hotspot
+    except FileNotFoundError:
+        return False, "nmcli 不可用（非 Pi 環境）"
+    except subprocess.TimeoutExpired:
+        return False, "建立連線設定逾時"
+
+
+def _activate_wifi_profile_sync() -> tuple[bool, str]:
+    """Phase 2 sync: bring up the pre-created EpaperWifiSetup connection.
+
+    This terminates the AP hotspot as a side-effect.
+    """
+    try:
         result = subprocess.run(
             ["sudo", "nmcli", "connection", "up", _SETUP_CON_ID],
             text=True, capture_output=True, timeout=30,
@@ -211,8 +218,33 @@ def _connect_wifi_sync(ssid: str, password: str) -> tuple[bool, str]:
             return True, "連線成功"
         err = (result.stderr or result.stdout).strip()
         return False, f"連線失敗：{err}"
-
     except FileNotFoundError:
         return False, "nmcli 不可用（非 Pi 環境）"
     except subprocess.TimeoutExpired:
         return False, "連線逾時（30 秒）"
+
+
+async def _activate_wifi_background(ssid: str) -> None:
+    """Phase 2 BackgroundTask: activate WiFi after HTTP response is sent.
+
+    Sleeps 1s to let ASGI flush the response before the AP shuts down.
+    AP status file is removed only on success — if activation fails, the
+    portal remains accessible for retry.
+    """
+    await asyncio.sleep(1.0)
+    try:
+        async with _nmcli_lock:
+            ok, msg = await asyncio.to_thread(_activate_wifi_profile_sync)
+        if ok:
+            try:
+                if os.path.exists(_AP_STATUS_FILE):
+                    os.unlink(_AP_STATUS_FILE)
+            except OSError as exc:
+                logger.warning("Failed to remove AP status file: %s", exc)
+            logger.info("WiFi activated: connected to %s", ssid)
+        else:
+            logger.error("WiFi activation failed for %s: %s", ssid, msg)
+            # AP status file intentionally kept — portal remains for retry
+    except Exception:
+        logger.exception("Background WiFi activation error for %s", ssid)
+        # AP status file intentionally kept — portal remains for retry
