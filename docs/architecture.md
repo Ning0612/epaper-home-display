@@ -50,7 +50,9 @@ epaper-home-display/
 │   ├── display/
 │   │   ├── epaper.py        # Waveshare 7.5" 驅動包裝（Real + Mock）
 │   │   ├── renderer.py      # 主渲染入口（800×480 Pillow 圖像）
-│   │   ├── renderer_cards.py   # 各卡片繪製函數
+│   │   ├── renderer_cards.py   # 各卡片繪製函數（儀表板）
+│   │   ├── renderer_alert.py   # 告警頁面渲染（安全事件 + 快照）
+│   │   ├── renderer_apmode.py  # WiFi AP 熱點引導頁面渲染
 │   │   ├── renderer_constants.py  # 解析度、顏色、版面常數
 │   │   ├── renderer_utils.py    # 天氣圖示、進度條等工具函數
 │   │   └── image_processor.py  # 圖片裁切、旋轉/翻轉、Floyd-Steinberg dithering
@@ -68,7 +70,9 @@ epaper-home-display/
 │   │   ├── weather.py       # OpenWeatherMap API（aiohttp）
 │   │   ├── voice.py         # aplay 音效播放
 │   │   ├── discord.py       # Discord Webhook 通知
-│   │   └── notification_manager.py  # 通知協調（裝置上線、時段結束、每日摘要）
+│   │   ├── notification_manager.py  # 通知協調（裝置上線、時段結束、每日摘要）
+│   │   ├── snapshot_client.py  # 外部攝影機快照擷取（aiohttp，共享 session）
+│   │   └── wifi_monitor.py  # WiFi 狀態監測（client/ap/unknown，讀 /tmp/epaper-ap-mode.json）
 │   ├── loops/               # asyncio 協程（由 main.py 以 gather 並行執行）
 │   │   ├── sensor.py        # 感測器讀取循環（30 秒）
 │   │   ├── presence.py      # 占用計分循環（60 秒）
@@ -91,8 +95,9 @@ epaper-home-display/
 │       ├── config_helpers.py  # config.local.yaml 讀寫工具
 │       └── routes/
 │           ├── auth.py      # 登入/登出（Session cookie）
-│           ├── read_only.py # /health, /state, /logs/*
+│           ├── read_only.py # /health, /state, /logs/*, /api/preview/alert
 │           ├── settings.py  # 設定 PUT 端點
+│           ├── wifi.py      # AP 熱點入口（/wifi portal、/api/wifi/scan、/api/wifi/connect，不需認證）
 │           ├── desk.py      # 桌面工作時段 REST API
 │           ├── ai_usage.py  # AI 使用量接收端點
 │           └── images.py    # 圖片上傳/裁切/確認/輪播管理
@@ -142,15 +147,16 @@ MQTT 告警事件（立即） ────────────► display_qu
 
 ## asyncio 協程架構
 
-`app/main.py` 中以 `asyncio.gather()` 並行執行六個協程：
+`app/main.py` 中以 `asyncio.gather()` 並行執行七個協程：
 
 | 協程 | 觸發週期 | 職責 |
 |------|---------|------|
 | `_sensor_loop()` | 每 30 秒 | 讀 DHT22 + 光線感測器，更新 state |
 | `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 桌面時段管理 + 告警決策；偵測到回家時立即喚醒 display_queue |
-| `_display_loop()` | 牆鐘 :57 秒 | 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖 |
+| `_display_loop()` | 牆鐘 :57 秒 | 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖；告警頁面快照刷新 |
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
 | `_notification_loop()` | 依排程 | Discord 每日統計摘要等定時通知 |
+| `_wifi_monitor_loop()` | 每 10 秒 | 讀取 `/tmp/epaper-ap-mode.json`；AP 模式時設定 `display_page = "ap_mode"`；AP 結束後自動切回儀表板 |
 | `server.serve()` | 持續 | FastAPI WebUI（埠 8000） |
 
 **ThreadPoolExecutor**（3 個工作執行緒）用於阻擋性硬體 I/O（DHT22 感測、SPI 傳輸、e-Paper 驅動）。
@@ -254,6 +260,14 @@ else                                                    →  INVESTIGATE
 | `codex_5h_reset` | str \| None | Codex 5h 重置時間 |
 | `codex_weekly_reset` | str \| None | Codex 週重置時間 |
 | `claude_5h_reset` | str \| None | Claude 5h 重置時間 |
+| `display_page` | Literal["dashboard", "alert", "ap_mode"] | 目前顯示頁面 |
+| `last_snapshot_image` | Any（PIL Image \| None）| 最後擷取的快照（型別標注為 Any，實際為 PIL Image，僅記憶體，不序列化）|
+| `alert_page_started_at` | datetime \| None | 告警頁面開始顯示時間（用於超時計算）|
+| `alert_last_triggered_at` | datetime \| None | 最後一次告警觸發時間 |
+| `wifi_mode` | Literal["client", "ap", "unknown"] | WiFi 模式 |
+| `ap_ssid` | str | AP 熱點 SSID（AP 模式下顯示）|
+| `ap_password` | str | AP 熱點密碼（AP 模式下顯示）|
+| `ap_ip` | str | AP 熱點 IP（AP 模式下顯示，通常 10.42.0.1）|
 | `started_at` | datetime | 服務啟動時間戳 |
 
 ---
@@ -326,7 +340,11 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/logs/presence` | 占用度日誌最近 50 筆 |
 | `/logs/events` | 系統事件日誌最近 50 筆 |
 | `/settings/config` | 讀取配置（secret 遮罩為 boolean）|
-| `/settings/wifi` | 取得 WiFi 連線資訊 |
+| `/settings/wifi` | 取得 WiFi 連線資訊（`settings.py`）|
+| `/wifi` | AP 熱點入口網站（`wifi.py`，不需認證）|
+| `/api/wifi/scan` | 掃描周邊 WiFi 網路（`wifi.py`，AP 模式限定，不需認證）|
+| `/api/wifi/connect` | 連接指定 WiFi 網路（`wifi.py`，AP 模式限定，不需認證）|
+| `/api/preview/alert` | 回傳告警頁面的 PNG 預覽（debug 用，**需認證**）|
 
 **設定更新端點（PUT）**
 

@@ -93,7 +93,7 @@ ssh pi@epaper-display.local
 
 ## REST API 參考
 
-以下為完整的 REST API 端點。以下端點**不需認證**（公開存取）：`/health`、`/login`、`/logout`、`/ai_usage`。其餘端點均需 Session cookie。
+以下為完整的 REST API 端點。以下端點**不需認證**（公開存取）：`/health`、`/login`、`/logout`、`/ai_usage`、`/wifi`、`/api/wifi/scan`、`/api/wifi/connect`。其餘端點均需 Session cookie（含 `/api/preview/alert`）。
 
 ### 認證端點
 
@@ -136,18 +136,28 @@ GET /state
   "presence": "OCCUPIED",
   "presence_score": 1.0,
   "weather_current": {"main": "Clear", "temp": 28.0},
+  "weather_forecast": [...],
+  "weather_fetched_at": "2026-05-29T10:00:00",
   "last_door_event": {"state": "closed", "timestamp": "2026-05-29T10:30:00"},
   "last_face_event": null,
   "last_alert": null,
+  "security_status": null,
+  "active_reminder": null,
+  "display_busy": false,
+  "display_page": "dashboard",
+  "alert_last_triggered_at": null,
   "claude_usage_5h": 0.42,
   "claude_usage_week": 0.0,
+  "claude_5h_reset": "18:40",
   "codex_usage_5h": 0.18,
   "codex_usage_week": 0.25,
+  "codex_5h_reset": "21:58",
+  "codex_weekly_reset": "17:38 Jun 1",
   "started_at": "2026-05-29T08:00:00"
 }
 ```
 
-> **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。`claude_usage_week` 目前未從 ai-usage-collector 接收，常態為 `0.0`。
+> **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。`claude_usage_week` 目前未從 ai-usage-collector 接收，常態為 `0.0`。`display_page` 值為 `"dashboard"`、`"alert"` 或 `"ap_mode"`。
 
 ---
 
@@ -236,11 +246,51 @@ GET /settings/wifi
 **回應範例：**
 ```json
 {
-  "ssid": "HomeNetwork",
-  "ip": "192.168.1.50",
-  "signal": -55
+  "SSID": "HomeNetwork",
+  "IP 位址": "192.168.1.50/24",
+  "訊號強度": "-55 dBm"
 }
 ```
+
+> 回應鍵為中文顯示用字串，供 WebUI 直接渲染。若無法取得（Pi 未連線或非 Pi 環境），對應值為 `"無法取得"`。
+
+---
+
+### WiFi AP 熱點入口（不需認證）
+
+以下端點僅在裝置處於 AP 熱點模式時有意義，全部不需 Session cookie 認證（設計為供行動裝置的捕獲入口網站使用）。
+
+```
+GET  /wifi                  # AP 熱點設定引導頁面（HTML）
+GET  /api/wifi/scan         # 掃描周邊 WiFi 網路（AP 模式限定）
+POST /api/wifi/connect      # 連接指定 WiFi 網路（AP 模式限定）
+```
+
+**`GET /api/wifi/scan` 回應：**
+```json
+{"networks": [{"ssid": "HomeNetwork", "signal": 75, "security": "WPA2"}, ...]}
+```
+
+若裝置不在 AP 模式則回傳 HTTP 503。同一時間只允許一個 nmcli 操作，若操作中則回傳 HTTP 429。
+
+**`POST /api/wifi/connect` 請求體：**
+```json
+{"ssid": "HomeNetwork", "password": "your-password"}
+```
+
+`password` 可省略（開放網路）。密碼需至少 8 個字元。成功後回傳 `{"ok": true, "message": "已連線到「HomeNetwork」"}`，並移除 AP 狀態檔，`wifi_monitor` 將在下一個輪詢週期後自動切回儀表板頁面。
+
+---
+
+### 告警頁面預覽
+
+```
+GET /api/preview/alert
+```
+
+回傳目前告警頁面的 PNG 截圖（**需 Session cookie 認證**）。供 WebUI 或開發者確認告警版面渲染效果，不觸發實際 e-Paper 刷新。
+
+**回應：** `Content-Type: image/png`，800×480 PNG 圖像。
 
 ---
 

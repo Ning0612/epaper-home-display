@@ -180,6 +180,53 @@ sensors:
 
 ---
 
+## 外部攝影機快照
+
+`outdoor_agent` 區段設定外部攝影機的快照整合功能。當收到 MQTT 安全告警時，系統會從此 URL 擷取即時快照並顯示於 e-Paper 告警頁面。
+
+```yaml
+outdoor_agent:
+  snapshot_url: "http://faceguard.local/snapshot"  # 外部 Agent 快照端點（HTTP GET，回傳 JPEG）
+  snapshot_timeout_sec: 2.5  # 擷取超時秒數，網路慢時可適度放寬
+  alert_page_enabled: true   # 是否啟用告警頁面（false = 仍顯示一般儀表板）
+  alert_page_timeout_sec: 120   # 告警頁面顯示秒數，超時後自動回到儀表板
+  alert_refresh_interval_sec: 3.0  # 告警頁面快照自動刷新間隔（秒）
+```
+
+**行為說明**：
+- 收到 `home/security/alert` 後立即切換至告警頁面並開始擷取快照
+- 快照擷取失敗（逾時、網路錯誤）時靜默降級，仍顯示告警頁面但無圖像
+- 超出 `alert_page_timeout_sec` 後自動切回儀表板頁面
+- `snapshot_url` 留空可完全停用快照功能，仍保留告警頁面
+
+---
+
+## WiFi AP 熱點
+
+`wifi` 區段設定 WiFi 狀態監控與 AP 熱點模式。當 Pi 無法連接 WiFi 時（由 `wifi_manager.sh` 管理），服務會偵測到 AP 狀態並在 e-Paper 上顯示連線引導畫面。
+
+```yaml
+wifi:
+  ap_ssid: "EpaperSetup"   # AP 熱點名稱（由 wifi_manager.sh 建立）
+  ap_password: "epaper123" # AP 熱點密碼
+  connect_timeout: 30       # WiFi 連線等待超時秒數（供外部腳本參考）
+  monitor_interval: 10      # WiFi 狀態輪詢間隔（秒），AP 結束後自動切回儀表板
+```
+
+**行為說明**：
+- 啟動時讀取 `/tmp/epaper-ap-mode.json` 狀態檔（由 `wifi_manager.sh` 寫入），判斷目前模式
+- AP 模式：e-Paper 顯示「掃描 QR code 連接 WiFi」引導頁，並顯示 SSID/密碼
+- 每 `monitor_interval` 秒重新偵測一次；使用者透過捕獲入口網站完成設定後自動切回儀表板
+- 使用 `nmcli` 檢查 wlan0 連接狀態；開發環境無 nmcli 時假設已連線
+
+> **重要**：`wifi.ap_ssid` / `wifi.ap_password` 是 Python 服務讀取 `/tmp/epaper-ap-mode.json` 失敗時的**顯示備援值**，並非控制 `wifi_manager.sh` 建立熱點所用的實際憑證。  
+> 實際熱點帳密由 `scripts/wifi_manager.sh` 的環境變數 `EPAPER_AP_SSID` / `EPAPER_AP_PASS` 決定（預設值同 YAML 預設，均為 `EpaperSetup` / `epaper123`）。  
+> 若需修改 AP 帳密，必須同步更新：(1) 本 YAML 設定，(2) `systemd/epaper-wifi-check.service` 的 `Environment=EPAPER_AP_SSID=...` 與 `Environment=EPAPER_AP_PASS=...`，否則顯示值與實際熱點不符。
+>
+> **權限說明**：`/tmp/epaper-ap-mode.json` 儲存 AP 密碼。`wifi_manager.sh` 使用 `mktemp`（預設 0600，路徑不可猜測）建立暫存檔，寫入 JSON 後先設定權限再 `mv` 至最終路徑；`trap` 確保任何步驟失敗時自動清除暫存檔。若 `pi` 群組存在，強制使用 `chown root:pi && chmod 640`（任一失敗視為硬錯誤並 exit 1，systemd 可偵測）；若 `pi` 群組不存在（自訂使用者名稱的 Pi OS），回退 `chmod 644`（世界可讀）。644 回退為已知安全取捨：在此情境下，`chmod 644` 施加於暫存路徑至 `mv` 之間有極短窗口，但路徑不可猜測；AP 密碼也已顯示於 e-Paper 螢幕上。若部署環境存在非信任本機帳號，建議手動建立 `pi` 群組並將服務使用者加入，以享有 640 保護。
+
+---
+
 ## 圖片輪播
 
 ```yaml
@@ -191,6 +238,9 @@ images:
   carousel_enabled: false          # 是否啟用輪播
   carousel_interval_minutes: 30    # 輪播換圖間隔（分鐘）
   carousel_mode: "sequential"      # 換圖模式：sequential（順序）/ random（隨機）
+  # allowed_formats 可選，預設允許 JPEG、PNG、WebP、GIF、BMP
+  # 若需加入 TIFF 等格式，明確列出：
+  # allowed_formats: ["JPEG", "PNG", "WEBP", "GIF", "BMP", "TIFF"]
 ```
 
 ---
@@ -284,4 +334,17 @@ images:
   carousel_enabled: false
   carousel_interval_minutes: 30
   carousel_mode: "sequential"
+
+outdoor_agent:
+  snapshot_url: "http://faceguard.local/snapshot"
+  snapshot_timeout_sec: 2.5
+  alert_page_enabled: true
+  alert_page_timeout_sec: 120
+  alert_refresh_interval_sec: 3.0
+
+wifi:
+  ap_ssid: "EpaperSetup"
+  ap_password: "epaper123"
+  connect_timeout: 30
+  monitor_interval: 10
 ```

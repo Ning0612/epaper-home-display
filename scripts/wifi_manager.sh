@@ -14,8 +14,14 @@ CON_NAME="EpaperHotspot"
 
 log() { logger -t "$LOG_TAG" -- "$*"; }
 
-# Remove stale status file from previous boot
-rm -f "$STATUS_FILE"
+# Remove stale status file from previous boot.
+# Guard against TOCTOU: if STATUS_FILE is a directory (e.g. local privilege escalation attempt), abort.
+if [ -d "$STATUS_FILE" ]; then
+    log "ERROR: $STATUS_FILE is a directory — possible TOCTOU; aborting"
+    exit 1
+fi
+rm -f "$STATUS_FILE" \
+    || { log "ERROR: Failed to remove stale STATUS_FILE — aborting to prevent partial state"; exit 1; }
 
 log "Waiting up to ${CONNECT_TIMEOUT}s for WiFi connection..."
 
@@ -50,13 +56,35 @@ AP_IP=$(ip -4 addr show wlan0 2>/dev/null \
     | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
 AP_IP="${AP_IP:-10.42.0.1}"
 
-# Write status file using python3 to ensure correct JSON escaping
+# Write AP status file with explicit error handling and temp-file cleanup.
+TMP_STATUS="$(mktemp /tmp/.epaper-ap-XXXXXX)" || { log "ERROR: mktemp failed"; exit 1; }
+# Guarantee cleanup of temp file on any exit after this point.
+trap 'rm -f "$TMP_STATUS"' EXIT INT TERM
+
 python3 -c "
 import json, sys
 data = {'mode': 'ap', 'ssid': sys.argv[1], 'password': sys.argv[2], 'ip': sys.argv[3]}
 print(json.dumps(data))
-" "$AP_SSID" "$AP_PASS" "$AP_IP" > "$STATUS_FILE"
-chmod 600 "$STATUS_FILE"
+" "$AP_SSID" "$AP_PASS" "$AP_IP" > "$TMP_STATUS" \
+    || { log "ERROR: Failed to write AP status JSON"; exit 1; }
+
+if getent group pi > /dev/null 2>&1; then
+    # pi group exists: hard fail rather than silently downgrade to world-readable.
+    chown root:pi "$TMP_STATUS" \
+        || { log "ERROR: chown root:pi failed — cannot safely restrict AP status file"; exit 1; }
+    chmod 640 "$TMP_STATUS" \
+        || { log "ERROR: chmod 640 failed"; exit 1; }
+else
+    # No pi group on this OS; 644 is the only option to let the service user read the file.
+    # Known trade-off — see docs/configuration.md for security implications.
+    chmod 644 "$TMP_STATUS" \
+        || { log "ERROR: chmod 644 failed"; exit 1; }
+fi
+
+# mv -T (Linux): fails if STATUS_FILE was replaced by a directory after the initial rm -f check.
+mv -T "$TMP_STATUS" "$STATUS_FILE" \
+    || { log "ERROR: mv -T to STATUS_FILE failed — possible TOCTOU or filesystem error"; exit 1; }
+trap - EXIT INT TERM  # mv succeeded; unregister cleanup so STATUS_FILE is not deleted
 
 log "AP hotspot started: SSID=${AP_SSID} IP=${AP_IP}"
 exit 0

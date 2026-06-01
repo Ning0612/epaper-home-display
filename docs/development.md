@@ -113,7 +113,13 @@ display:
 | `test_reminder.py` | `app/logic/reminder.py` | 各提醒觸發條件 |
 | `test_renderer.py` | `app/display/renderer.py` | 圖像渲染（Pillow mock）|
 | `test_state.py` | `app/state.py` | 狀態初始化與更新 |
+| `test_desk_session.py` | `app/logic/desk_session.py` | 桌面工作時段狀態機 |
+| `test_image_processor.py` | `app/display/image_processor.py` | 圖片裁切與 dithering |
 | `test_weather_service.py` | `app/services/weather.py` | API 回應解析（aiohttp mock）|
+
+> **注意**：`tests/conftest.py` 為全域測試前置設定，強制設定 `RPI_MOCK=1` 環境變數，確保所有測試均使用 mock 硬體，不需也不應在 Pi 以外的環境安裝 GPIO 套件。
+
+> **測試覆蓋缺口**：以下新增模組目前尚無直接測試，邊界條件未受回歸保護：`app/services/wifi_monitor.py`（AP 狀態檔損壞、nmcli 失敗）、`app/services/snapshot_client.py`（逾時、大檔案拒絕）、`app/display/renderer_alert.py`、`app/display/renderer_apmode.py`、`app/webui/routes/wifi.py`（未認證 WiFi API 行為）。有意新增測試覆蓋時可優先補上這些模組。
 
 ---
 
