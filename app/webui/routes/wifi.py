@@ -102,20 +102,32 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
 
 
 def _scan_wifi_sync() -> list[dict]:
-    """Synchronous WiFi scan via nmcli (requires sudo NOPASSWD for pi user)."""
+    """Synchronous WiFi scan via nmcli (requires sudo NOPASSWD for pi user).
+
+    Pi Zero 2W has a single-radio chip; when wlan0 is in AP/hotspot mode,
+    forcing a new scan (--rescan yes) causes nmcli to exit 1.  We use cached
+    results first (--rescan no), then fall back to --rescan auto if the cache
+    is empty.  The ifname restriction is intentionally omitted so NetworkManager
+    can return results regardless of which virtual interface is active.
+    """
     import re
-    try:
-        out = subprocess.check_output(
-            [
-                "sudo", "nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY",
-                "dev", "wifi", "list", "ifname", "wlan0", "--rescan", "yes",
-            ],
+
+    def _run_scan(rescan: str) -> str:
+        return subprocess.check_output(
+            ["sudo", "nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY",
+             "dev", "wifi", "list", "--rescan", rescan],
             text=True, stderr=subprocess.DEVNULL, timeout=20,
         )
+
+    try:
+        out = _run_scan("no")
+        if not out.strip():
+            # Cache empty — let NM decide whether to scan
+            out = _run_scan("auto")
     except FileNotFoundError:
-        # nmcli not available (non-Pi environment)
         return []
     except subprocess.CalledProcessError as exc:
+        # Both attempts failed (e.g. NM not running); propagate
         raise RuntimeError(f"nmcli exited {exc.returncode}") from exc
 
     # nmcli -t escapes literal colons in values as \:
