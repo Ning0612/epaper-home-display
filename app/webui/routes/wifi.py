@@ -143,20 +143,51 @@ def _scan_wifi_sync() -> list[dict]:
     return networks
 
 
-def _connect_wifi_sync(ssid: str, password: str) -> tuple[bool, str]:
-    """Synchronous WiFi connect via nmcli (requires sudo NOPASSWD for pi user).
+_SETUP_CON_ID = "EpaperWifiSetup"
 
+
+def _connect_wifi_sync(ssid: str, password: str) -> tuple[bool, str]:
+    """Synchronous WiFi connect via nmcli connection add + up.
+
+    Uses explicit security parameters so nmcli does not need to scan the target
+    network — required because wlan0 is occupied by the AP hotspot at this point.
     password may be empty for open (unencrypted) networks.
     """
-    cmd = ["sudo", "nmcli", "dev", "wifi", "connect", ssid, "ifname", "wlan0"]
-    if password:
-        cmd += ["password", password]
     try:
-        result = subprocess.run(cmd, text=True, capture_output=True, timeout=30)
+        # Remove any leftover profile from a previous setup attempt
+        subprocess.run(
+            ["sudo", "nmcli", "connection", "delete", _SETUP_CON_ID],
+            text=True, capture_output=True, timeout=10,
+        )  # ignore return code — profile may not exist
+
+        # Build add command with explicit security settings
+        add_cmd = [
+            "sudo", "nmcli", "connection", "add",
+            "type", "wifi",
+            "connection.id", _SETUP_CON_ID,
+            "ssid", ssid,
+        ]
+        if password:
+            add_cmd += [
+                "wifi-sec.key-mgmt", "wpa-psk",
+                "wifi-sec.psk", password,
+            ]
+
+        result = subprocess.run(add_cmd, text=True, capture_output=True, timeout=15)
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout).strip()
+            return False, f"連線失敗：{err}"
+
+        # Bring the connection up — this also terminates the AP hotspot
+        result = subprocess.run(
+            ["sudo", "nmcli", "connection", "up", _SETUP_CON_ID],
+            text=True, capture_output=True, timeout=30,
+        )
         if result.returncode == 0:
             return True, "連線成功"
         err = (result.stderr or result.stdout).strip()
         return False, f"連線失敗：{err}"
+
     except FileNotFoundError:
         return False, "nmcli 不可用（非 Pi 環境）"
     except subprocess.TimeoutExpired:
