@@ -113,6 +113,17 @@ class OutdoorAgentConfig:
     alert_refresh_interval_sec: float = 3.0
 
 
+_AP_STATUS_FILE = "/tmp/epaper-ap-mode.json"   # shared constant with wifi_manager.sh
+
+
+@dataclass
+class WifiConfig:
+    ap_ssid: str = "EpaperSetup"
+    ap_password: str = "epaper123"   # AP 熱點密碼，至少 8 個字元（建議修改）
+    connect_timeout: int = 30       # 開機等待 WiFi 連線的秒數
+    monitor_interval: int = 10      # 定期偵測 WiFi 模式的間隔（秒）
+
+
 @dataclass
 class Settings:
     mqtt: MQTTConfig = field(default_factory=MQTTConfig)
@@ -125,6 +136,7 @@ class Settings:
     webui: WebUIConfig = field(default_factory=WebUIConfig)
     images: ImagesConfig = field(default_factory=ImagesConfig)
     outdoor_agent: OutdoorAgentConfig = field(default_factory=OutdoorAgentConfig)
+    wifi: WifiConfig = field(default_factory=WifiConfig)
     timezone: str = "Asia/Taipei"
 
 

@@ -22,6 +22,7 @@ from app.services.mqtt_client import MQTTService, make_done_callback
 from app.services.notification_manager import NotificationManager
 from app.services.voice import VoiceService
 from app.services.weather import WeatherService
+from app.services.wifi_monitor import _wifi_monitor_loop
 from app.storage.db import init_db
 from app.storage.logs import end_desk_session, get_ongoing_desk_session, log_system_event
 from app.storage._log_images import get_unconfirmed_images, delete_image_record
@@ -105,6 +106,7 @@ async def main() -> None:
             _display_loop(epaper, executor, display_queue, settings, mqtt_service),
             _weather_loop(weather_service, settings),
             _notification_loop(settings, notification_manager),
+            _wifi_monitor_loop(display_queue, settings),
             server.serve(),
         )
     finally:

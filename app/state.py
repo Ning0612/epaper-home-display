@@ -41,10 +41,15 @@ class AgentState:
     codex_weekly_reset: str | None = None
     claude_5h_reset: str | None = None
 
-    display_page: Literal["dashboard", "alert"] = "dashboard"
+    display_page: Literal["dashboard", "alert", "ap_mode"] = "dashboard"
     last_snapshot_image: Any = None          # PIL Image | None — set by display loop
     alert_page_started_at: datetime | None = None
     alert_last_triggered_at: datetime | None = None
+
+    wifi_mode: Literal["client", "ap", "unknown"] = "unknown"
+    ap_ssid: str = ""
+    ap_password: str = ""
+    ap_ip: str = ""
 
     started_at: datetime = field(default_factory=datetime.now)
 

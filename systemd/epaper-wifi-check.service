@@ -1,0 +1,22 @@
+[Unit]
+Description=ePaper WiFi Setup Check
+# Must start after NetworkManager so nmcli is usable
+After=NetworkManager.service
+Wants=NetworkManager.service
+# Must complete before the main display service starts
+Before=epaper-home-display.service
+
+[Service]
+Type=oneshot
+# Run as root so nmcli hotspot requires no polkit interaction
+User=root
+ExecStart=/home/pi/epaper-home-display/scripts/wifi_manager.sh
+# Remain "active" after exit so the Before= dependency triggers correctly
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+# Script waits up to 30s for WiFi + a few seconds to start AP = 60s is safe
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

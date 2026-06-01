@@ -9,6 +9,7 @@ from datetime import datetime as _DateTime, timedelta as _timedelta
 
 from app.display.renderer import render_dashboard
 from app.display.renderer_alert import render_alert_page
+from app.display.renderer_apmode import render_ap_mode_page
 from app.services.snapshot_client import fetch_snapshot
 from app.state import state
 
@@ -22,6 +23,11 @@ def _is_alert_active(settings) -> bool:
         and settings.outdoor_agent.alert_page_enabled
         and bool(settings.outdoor_agent.snapshot_url)
     )
+
+
+def _is_ap_mode_active() -> bool:
+    """True when device is in AP mode and the AP setup page should be displayed."""
+    return state.wifi_mode == "ap"
 
 
 def _check_alert_timeout(settings) -> bool:
@@ -97,11 +103,17 @@ async def _display_loop(
     loop = asyncio.get_event_loop()
 
     while True:
-        # Wait strategy: alert mode uses a fixed short interval; dashboard mode aligns to wall-clock.
+        # Wait strategy: alert → fixed short interval; ap_mode → 30s; dashboard → wall-clock aligned.
         if _is_alert_active(settings):
             interval = settings.outdoor_agent.alert_refresh_interval_sec
             try:
                 await asyncio.wait_for(display_queue.get(), timeout=interval)
+            except asyncio.TimeoutError:
+                pass
+        elif _is_ap_mode_active():
+            # AP mode: static info page, refresh every 30s to update timestamp
+            try:
+                await asyncio.wait_for(display_queue.get(), timeout=30.0)
             except asyncio.TimeoutError:
                 pass
         else:
@@ -128,7 +140,9 @@ async def _display_loop(
                     break
             refresh_count = 0   # force full refresh on first dashboard frame after alert
 
-        if state.display_page == "dashboard":
+        if state.display_page == "ap_mode":
+            pass  # always render AP mode page regardless of presence
+        elif state.display_page == "dashboard":
             _maybe_advance_carousel(settings)
             if state.presence != "OCCUPIED":
                 continue  # pause dashboard updates while nobody home
@@ -160,6 +174,13 @@ async def _display_loop(
                 )
                 # Do not increment refresh_count — alert uses fast refresh exclusively;
                 # dashboard resumes from its previous cadence position when we return.
+            elif state.display_page == "ap_mode":
+                actual_full_refresh = (refresh_count % max(1, settings.display.full_refresh_every) == 0)
+                image = render_ap_mode_page(state, settings, now)
+                await loop.run_in_executor(
+                    executor, functools.partial(epaper.display, image, actual_full_refresh)
+                )
+                refresh_count += 1
             else:
                 actual_full_refresh = (refresh_count % max(1, settings.display.full_refresh_every) == 0)
                 # Advance clock by display lag so the rendered HH:MM matches the

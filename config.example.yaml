@@ -69,3 +69,13 @@ outdoor_agent:
   alert_page_timeout_sec: 120           # 無新告警超過此秒數後自動返回 Dashboard
   alert_refresh_interval_sec: 3.0      # 警示頁面刷新間隔（秒）
 
+wifi:
+  ap_ssid: "EpaperSetup"               # AP 熱點名稱（建議改為不易猜測的名稱）
+  ap_password: "epaper123"             # AP 熱點密碼（至少 8 個字元，強烈建議修改預設值）
+  connect_timeout: 30                  # 開機等待 WiFi 連線的秒數，超過後啟動 AP 模式
+  monitor_interval: 10                 # 定期偵測 WiFi 模式的間隔（秒）
+  # 注意：修改 ap_ssid/ap_password 後，需同步更新 systemd/epaper-wifi-check.service
+  # 在 [Service] 區段加入：
+  #   Environment=EPAPER_AP_SSID=你的SSID
+  #   Environment=EPAPER_AP_PASS=你的密碼
+
