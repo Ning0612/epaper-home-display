@@ -113,7 +113,8 @@ class OutdoorAgentConfig:
     alert_refresh_interval_sec: float = 3.0
 
 
-_AP_STATUS_FILE = "/tmp/epaper-ap-mode.json"   # shared constant with wifi_manager.sh
+_AP_STATUS_FILE = "/tmp/epaper-ap-mode.json"        # shared constant with wifi_manager.sh
+_WIFI_SCAN_CACHE_FILE = "/tmp/epaper-wifi-scan-cache.txt"  # pre-scan cache written before AP starts
 
 
 @dataclass

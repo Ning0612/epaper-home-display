@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from app.config import _AP_STATUS_FILE
+from app.config import _AP_STATUS_FILE, _WIFI_SCAN_CACHE_FILE
 from app.state import state
 from app.webui.templates.wifi import _WIFI_HTML
 
@@ -101,42 +101,13 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
     return router
 
 
-def _scan_wifi_sync() -> list[dict]:
-    """Synchronous WiFi scan via nmcli (requires sudo NOPASSWD for pi user).
-
-    Pi Zero 2W has a single-radio chip; when wlan0 is in AP/hotspot mode,
-    forcing a new scan (--rescan yes) causes nmcli to exit 1.  We use cached
-    results first (--rescan no), then fall back to --rescan auto if the cache
-    is empty.  The ifname restriction is intentionally omitted so NetworkManager
-    can return results regardless of which virtual interface is active.
-    """
+def _parse_nmcli_scan(output: str) -> list[dict]:
+    """Parse `nmcli -t -f SSID,SIGNAL,SECURITY` output into a sorted network list."""
     import re
-
-    def _run_scan(rescan: str) -> str:
-        return subprocess.check_output(
-            ["sudo", "nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY",
-             "dev", "wifi", "list", "--rescan", rescan],
-            text=True, stderr=subprocess.DEVNULL, timeout=20,
-        )
-
-    try:
-        out = _run_scan("no")
-        if not out.strip():
-            # Cache empty — let NM decide whether to scan
-            out = _run_scan("auto")
-    except FileNotFoundError:
-        return []
-    except subprocess.CalledProcessError as exc:
-        # Both attempts failed (e.g. NM not running); propagate
-        raise RuntimeError(f"nmcli exited {exc.returncode}") from exc
-
-    # nmcli -t escapes literal colons in values as \:
-    # Split on unescaped colons using a negative lookbehind
     _split = re.compile(r"(?<!\\):")
-
     networks: list[dict] = []
     seen: set[str] = set()
-    for line in out.strip().splitlines():
+    for line in output.strip().splitlines():
         parts = _split.split(line, maxsplit=2)
         if len(parts) < 3:
             continue
@@ -150,9 +121,50 @@ def _scan_wifi_sync() -> list[dict]:
             signal = 0
         security = parts[2].strip() or "Open"
         networks.append({"ssid": ssid, "signal": signal, "security": security})
-
     networks.sort(key=lambda n: n["signal"], reverse=True)
     return networks
+
+
+def _scan_wifi_sync() -> list[dict]:
+    """Synchronous WiFi scan via nmcli (requires sudo NOPASSWD for pi user).
+
+    Pi Zero 2W has a single-radio chip; when wlan0 is in AP/hotspot mode,
+    forcing a live scan causes nmcli to fail.  wifi_manager.sh pre-scans before
+    starting the hotspot and writes results to _WIFI_SCAN_CACHE_FILE — we read
+    that first.  Live scan is the fallback for client mode or missing cache.
+    """
+    # AP mode: use pre-scan cache written by wifi_manager.sh before hotspot started.
+    # Single radio (CYW43438) cannot scan while hotspot is active.
+    in_ap_mode = os.path.exists(_AP_STATUS_FILE)
+    if os.path.exists(_WIFI_SCAN_CACHE_FILE):
+        try:
+            with open(_WIFI_SCAN_CACHE_FILE, "r", encoding="utf-8") as f:
+                networks = _parse_nmcli_scan(f.read())
+            if networks:
+                return networks
+        except OSError:
+            pass
+    if in_ap_mode:
+        return []  # live scan impossible; hotspot occupies the radio
+
+    # Fallback: live scan (client mode only)
+    def _run_scan(rescan: str) -> str:
+        return subprocess.check_output(
+            ["sudo", "nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY",
+             "dev", "wifi", "list", "--rescan", rescan],
+            text=True, stderr=subprocess.DEVNULL, timeout=20,
+        )
+
+    try:
+        out = _run_scan("no")
+        if not out.strip():
+            out = _run_scan("auto")
+    except FileNotFoundError:
+        return []
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"nmcli exited {exc.returncode}") from exc
+
+    return _parse_nmcli_scan(out)
 
 
 _SETUP_CON_ID = "EpaperWifiSetup"

@@ -7,6 +7,7 @@ set -u
 
 LOG_TAG="epaper-wifi-manager"
 STATUS_FILE="/tmp/epaper-ap-mode.json"
+SCAN_CACHE_FILE="/tmp/epaper-wifi-scan-cache.txt"
 AP_SSID="${EPAPER_AP_SSID:-EpaperSetup}"
 AP_PASS="${EPAPER_AP_PASS:-epaper123}"
 CONNECT_TIMEOUT="${EPAPER_CONNECT_TIMEOUT:-30}"
@@ -22,6 +23,8 @@ if [ -d "$STATUS_FILE" ]; then
 fi
 rm -f "$STATUS_FILE" \
     || { log "ERROR: Failed to remove stale STATUS_FILE — aborting to prevent partial state"; exit 1; }
+# Clean stale scan cache from previous boot (non-critical; ignore failure).
+rm -f "$SCAN_CACHE_FILE" || true
 
 log "Waiting up to ${CONNECT_TIMEOUT}s for WiFi connection..."
 
@@ -38,6 +41,30 @@ while [ "$ELAPSED" -lt "$CONNECT_TIMEOUT" ]; do
 done
 
 log "No WiFi connection after ${CONNECT_TIMEOUT}s — starting AP hotspot"
+
+# Pre-scan before AP: Pi Zero 2W single radio cannot scan while in hotspot mode.
+# Use mktemp + mv -T for atomic write to prevent symlink TOCTOU in /tmp.
+log "Pre-scanning WiFi networks before starting hotspot..."
+TMP_SCAN="$(mktemp /tmp/.epaper-scan-XXXXXX)" \
+    || { log "WARN: mktemp for scan cache failed; skipping pre-scan"; TMP_SCAN=""; }
+if [ -n "$TMP_SCAN" ]; then
+    if nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list --rescan auto \
+            > "$TMP_SCAN" 2>/dev/null; then
+        COUNT=$(grep -c . "$TMP_SCAN" 2>/dev/null || echo 0)
+        if getent group pi > /dev/null 2>&1; then
+            chown root:pi "$TMP_SCAN" 2>/dev/null || true
+            chmod 640 "$TMP_SCAN" 2>/dev/null || true
+        else
+            chmod 644 "$TMP_SCAN" 2>/dev/null || true
+        fi
+        mv -T "$TMP_SCAN" "$SCAN_CACHE_FILE" \
+            && log "Pre-scan complete: ${COUNT} networks cached" \
+            || { rm -f "$TMP_SCAN"; log "WARN: scan cache mv -T failed"; }
+    else
+        rm -f "$TMP_SCAN"
+        log "Pre-scan failed — portal will show empty list"
+    fi
+fi
 
 # Remove any leftover connection profile from a previous run
 nmcli connection delete "$CON_NAME" 2>/dev/null || true
