@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import asyncio
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.services.weather import WeatherService
@@ -49,5 +50,9 @@ def create_app(
     app.include_router(create_ai_usage_router())
     app.include_router(create_images_router(settings, display_queue))
     app.include_router(create_wifi_router(settings))
+
+    @app.get("/")
+    async def root():
+        return RedirectResponse(url="/settings", status_code=302)
 
     return app

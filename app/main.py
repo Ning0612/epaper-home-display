@@ -91,10 +91,19 @@ async def main() -> None:
     logger.info("WebUI → http://%s:%d", settings.webui.host, settings.webui.port)
 
     if settings.discord.notify_device_online:
+        local_ip: str | None = None
         try:
-            local_ip = socket.gethostbyname(socket.gethostname())
+            # Connect a UDP socket to determine the outbound LAN IP.
+            # No data is sent; the OS selects the correct routing interface.
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as _s:
+                _s.connect(("8.8.8.8", 80))
+                local_ip = _s.getsockname()[0]
         except Exception:
-            local_ip = settings.webui.host
+            pass
+        # Fallback: use configured host if it is a real address; otherwise use mDNS hostname.
+        if not local_ip or local_ip.startswith(("0.", "127.")):
+            h = settings.webui.host
+            local_ip = h if (h and h not in ("0.0.0.0",) and not h.startswith("127.")) else "epaper-display.local"
         webui_url = f"http://{local_ip}:{settings.webui.port}"
         loop.call_later(
             5, lambda: asyncio.ensure_future(
