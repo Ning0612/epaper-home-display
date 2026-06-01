@@ -9,6 +9,11 @@ log() { logger -t "$LOG_TAG" "$*"; }
 
 cd "$REPO_DIR" || { log "ERROR: cannot cd to $REPO_DIR"; exit 1; }
 
+# Prevent +x conflicts: Windows commits don't carry execute bits, but the Pi
+# needs scripts to be executable.  Tracking fileMode would cause every pull to
+# see modified files and abort.  This setting is idempotent.
+git config core.fileMode false
+
 # Fetch; skip if network unavailable
 if ! git fetch origin --quiet 2>/dev/null; then
     log "git fetch failed (network issue?), skipping"
@@ -31,6 +36,9 @@ if [ "$PULL_STATUS" -ne 0 ]; then
     log "git pull failed (exit $PULL_STATUS), aborting update"
     exit 1
 fi
+
+# Restore execute permissions on scripts after pull (Windows commits strip +x).
+chmod +x "$REPO_DIR/scripts/"*.sh
 
 REQ_AFTER=$(md5sum requirements.txt 2>/dev/null | cut -d' ' -f1 || echo "")
 if [ "$REQ_BEFORE" != "$REQ_AFTER" ]; then
