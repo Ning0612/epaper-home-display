@@ -95,15 +95,15 @@ print(json.dumps(data))
 " "$AP_SSID" "$AP_PASS" "$AP_IP" > "$TMP_STATUS" \
     || { log "ERROR: Failed to write AP status JSON"; exit 1; }
 
-if getent group pi > /dev/null 2>&1; then
-    # pi group exists: hard fail rather than silently downgrade to world-readable.
-    chown root:pi "$TMP_STATUS" \
-        || { log "ERROR: chown root:pi failed — cannot safely restrict AP status file"; exit 1; }
-    chmod 640 "$TMP_STATUS" \
-        || { log "ERROR: chmod 640 failed"; exit 1; }
+if getent passwd pi > /dev/null 2>&1; then
+    # File must be owned by pi so the service (running as pi) can delete it on WiFi connect.
+    # /tmp has sticky bit: only the file owner can delete their own files.
+    chown pi "$TMP_STATUS" \
+        || { log "ERROR: chown pi failed — cannot safely set AP status file owner"; exit 1; }
+    chmod 600 "$TMP_STATUS" \
+        || { log "ERROR: chmod 600 failed"; exit 1; }
 else
-    # No pi group on this OS; 644 is the only option to let the service user read the file.
-    # Known trade-off — see docs/configuration.md for security implications.
+    # No pi user on this OS; 644 lets any service user read the file.
     chmod 644 "$TMP_STATUS" \
         || { log "ERROR: chmod 644 failed"; exit 1; }
 fi

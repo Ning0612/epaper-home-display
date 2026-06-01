@@ -23,16 +23,11 @@ _WIFI_HTML = r"""<!DOCTYPE html>
       width:100%;padding:.45rem .75rem;border:1px solid var(--border);
       border-radius:6px;font-size:.875rem;color:var(--text);background:var(--bg);outline:none;
       margin-bottom:.75rem}
-    input[type=text]:focus,input[type=password]:focus{border-color:var(--primary)}
+    input:focus{border-color:var(--primary)}
     input:disabled{opacity:.5;cursor:not-allowed}
-    .btn{padding:.5rem 1.1rem;border:none;border-radius:6px;font-size:.83rem;font-weight:600;
-         cursor:pointer;transition:filter .15s;display:inline-flex;align-items:center;gap:.4rem}
-    .btn-p{background:var(--primary);color:#060A14}.btn-p:hover{filter:brightness(1.1)}
-    .btn-p:disabled{opacity:.5;cursor:not-allowed}
-    .btn-s{background:var(--surface);border:1px solid var(--border);color:var(--text)}
-    .btn-s:disabled{opacity:.5;cursor:not-allowed}
-    .scan-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
-    .scan-hint{font-size:.75rem;color:var(--muted)}
+    .section-title{font-size:.75rem;color:var(--muted);margin-bottom:.4rem;display:flex;align-items:center;justify-content:space-between}
+    .refresh-link{font-size:.72rem;color:var(--primary);cursor:pointer;background:none;border:none;padding:0;text-decoration:underline}
+    .refresh-link:disabled{opacity:.5;cursor:not-allowed}
     .net-list{margin-bottom:.75rem}
     .net-item{display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;
               border:1px solid var(--border);border-radius:7px;margin-bottom:.35rem;
@@ -42,16 +37,22 @@ _WIFI_HTML = r"""<!DOCTYPE html>
     .net-ssid{font-weight:600;font-size:.88rem;flex:1;word-break:break-all}
     .net-sig{font-size:.73rem;color:var(--muted);white-space:nowrap}
     .net-lock{font-size:.82rem}
+    .net-empty{font-size:.82rem;color:var(--muted);padding:.35rem 0}
     .divider{border:none;border-top:1px solid var(--border);margin:.75rem 0}
-    .msg{padding:.55rem .85rem;border-radius:6px;font-size:.82rem;font-weight:500;margin-top:.75rem;line-height:1.4}
+    .connect-btn{width:100%;padding:.55rem;border:none;border-radius:6px;font-size:.9rem;
+                 font-weight:700;cursor:pointer;background:var(--primary);color:#060A14;
+                 display:flex;align-items:center;justify-content:center;gap:.5rem;transition:filter .15s}
+    .connect-btn:hover{filter:brightness(1.1)}
+    .connect-btn:disabled{opacity:.5;cursor:not-allowed}
+    .msg{padding:.55rem .85rem;border-radius:6px;font-size:.82rem;font-weight:500;margin-top:.75rem;line-height:1.5}
     .msg.ok{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:var(--green)}
     .msg.err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red)}
     .msg.info{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:var(--primary)}
     .msg.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:var(--amber)}
-    .spin{display:inline-block;width:1rem;height:1rem;border:2px solid currentColor;
+    .spin{display:inline-block;width:.9rem;height:.9rem;border:2px solid currentColor;
           border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .sig-bar{display:flex;gap:1px;align-items:flex-end;height:14px;flex-shrink:0}
+    .sig-bar{display:flex;gap:1px;align-items:flex-end;height:13px;flex-shrink:0}
     .sig-bar span{width:3px;background:var(--muted);border-radius:1px}
     .sig-bar.s4 span{background:var(--green)}
     .sig-bar.s3 span:nth-child(-n+3){background:var(--green)}
@@ -62,25 +63,27 @@ _WIFI_HTML = r"""<!DOCTYPE html>
 <body>
 <div class="card">
   <h1>📡 WiFi 設定</h1>
-  <p class="sub">輸入 WiFi 名稱，或點選掃描後從清單選取，連線後裝置將自動切回正常顯示。</p>
+  <p class="sub">從清單點選，或直接輸入 WiFi 名稱（SSID），再輸入密碼連線。</p>
 
-  <label for="ssidInput">WiFi 名稱（SSID）</label>
-  <input type="text" id="ssidInput" placeholder="手動輸入或從下方選取" autocomplete="off"
-         onkeydown="if(event.key==='Enter')document.getElementById('pwdInput').focus()">
-
-  <div class="scan-row">
-    <button class="btn btn-s" id="scanBtn" onclick="scan()">🔍 掃描 WiFi 網路</button>
-    <span id="scanHint" class="scan-hint"></span>
+  <div class="section-title">
+    <span>附近的 WiFi 網路</span>
+    <button class="refresh-link" id="refreshBtn" onclick="loadNetworks()">重新整理</button>
   </div>
-  <div id="netList" class="net-list"></div>
+  <div id="netList" class="net-list">
+    <div class="net-empty"><span class="spin"></span> 正在載入...</div>
+  </div>
 
   <hr class="divider">
 
-  <label for="pwdInput">WiFi 密碼（開放網路請留空）</label>
+  <label for="ssidInput">WiFi 名稱（SSID）</label>
+  <input type="text" id="ssidInput" placeholder="點選上方清單或在此手動輸入" autocomplete="off"
+         onkeydown="if(event.key==='Enter')document.getElementById('pwdInput').focus()">
+
+  <label for="pwdInput">密碼（開放網路請留空）</label>
   <input type="password" id="pwdInput" placeholder="WiFi 密碼" autocomplete="off"
          onkeydown="if(event.key==='Enter')doConnect()">
 
-  <button class="btn btn-p" id="connectBtn" onclick="doConnect()" style="width:100%">連線</button>
+  <button class="connect-btn" id="connectBtn" onclick="doConnect()">連線</button>
 
   <div id="msg" style="display:none"></div>
 </div>
@@ -91,49 +94,45 @@ function sigBars(s){
   var c=sigClass(s),h=['4px','7px','10px','13px'];
   return '<div class="sig-bar '+c+'">'+h.map(function(x){return'<span style="height:'+x+'"></span>';}).join('')+'</div>';
 }
-function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function showMsg(t,m){var e=document.getElementById('msg');e.className='msg '+t;e.innerHTML=m;e.style.display='block';}
 function hideMsg(){document.getElementById('msg').style.display='none';}
-function setFormDisabled(v){
-  ['ssidInput','pwdInput','scanBtn','connectBtn'].forEach(function(id){
+function setDisabled(v){
+  ['ssidInput','pwdInput','connectBtn','refreshBtn'].forEach(function(id){
     document.getElementById(id).disabled=v;
   });
 }
 
-function scan(){
-  var btn=document.getElementById('scanBtn');
-  var hint=document.getElementById('scanHint');
-  btn.disabled=true;
-  btn.innerHTML='<span class="spin"></span> 掃描中...';
-  hint.textContent='';
-  hideMsg();
+function loadNetworks(){
+  var rb=document.getElementById('refreshBtn');
+  rb.disabled=true;
+  document.getElementById('netList').innerHTML='<div class="net-empty"><span class="spin"></span> 正在載入...</div>';
   fetch('/api/wifi/scan')
     .then(function(r){
-      if(!r.ok)return r.json().then(function(d){throw new Error(d.detail||'掃描失敗');});
+      if(!r.ok)return r.json().then(function(d){throw new Error(d.detail||'載入失敗');});
       return r.json();
     })
     .then(function(data){
-      btn.disabled=false;
-      btn.innerHTML='🔍 重新掃描';
-      var nets=data.networks||[];
-      hint.textContent=nets.length?'找到 '+nets.length+' 個網路，點選填入':'未找到任何網路';
-      renderNets(nets);
+      rb.disabled=false;
+      renderNets(data.networks||[]);
     })
     .catch(function(e){
-      btn.disabled=false;
-      btn.innerHTML='🔍 掃描 WiFi 網路';
-      hint.textContent='掃描失敗：'+e.message;
+      rb.disabled=false;
+      document.getElementById('netList').innerHTML='<div class="net-empty">無法載入網路清單：'+esc(e.message)+'</div>';
     });
 }
 
 function renderNets(nets){
   var el=document.getElementById('netList');
-  if(!nets.length){el.innerHTML='';return;}
+  if(!nets.length){
+    el.innerHTML='<div class="net-empty">附近未偵測到 WiFi 網路，請手動輸入 SSID。</div>';
+    return;
+  }
   el.innerHTML=nets.map(function(n){
     var lock=(n.security&&n.security!=='Open')?'🔒':'🔓';
-    return '<div class="net-item" onclick="selectNet('+escHtml(JSON.stringify(n.ssid))+',this)">'+
+    return '<div class="net-item" onclick="selectNet('+esc(JSON.stringify(n.ssid))+',this)">'+
       sigBars(n.signal)+
-      '<span class="net-ssid">'+escHtml(n.ssid)+'</span>'+
+      '<span class="net-ssid">'+esc(n.ssid)+'</span>'+
       '<span class="net-sig">'+n.signal+'%</span>'+
       '<span class="net-lock">'+lock+'</span>'+
       '</div>';
@@ -152,8 +151,8 @@ function doConnect(){
   var ssid=document.getElementById('ssidInput').value.trim();
   if(!ssid){showMsg('err','請輸入 WiFi 名稱（SSID）');return;}
   var pwd=document.getElementById('pwdInput').value;
-  setFormDisabled(true);
-  showMsg('info','<span class="spin"></span> 正在建立連線設定，請稍候...');
+  setDisabled(true);
+  showMsg('info','<span class="spin"></span> 正在建立連線設定...');
 
   fetch('/api/wifi/connect',{
     method:'POST',
@@ -165,26 +164,28 @@ function doConnect(){
     return r.json();
   })
   .then(function(){
-    // 200 received — AP will shut down ~1s later
     showMsg('ok',
-      '✓ 連線指令已送出！<br>' +
-      'AP 熱點即將關閉，此頁面將無法存取。<br>' +
-      '裝置連上網路後，電子紙將自動切回正常顯示（約 15–30 秒）。');
+      '✓ 連線指令已送出！<br>'+
+      'AP 熱點即將關閉，此頁面將失效。<br>'+
+      '裝置連上網路後電子紙將自動切回正常顯示（約 15–30 秒）。');
   })
   .catch(function(e){
-    var isNetErr=(!e.message||e.message==='Failed to fetch'||e.message.indexOf('NetworkError')>=0||e.message.indexOf('fetch')>=0);
+    var isNetErr=(!e.message||e.message==='Failed to fetch'||
+                  e.message.indexOf('NetworkError')>=0||e.message.indexOf('Load failed')>=0);
     if(isNetErr){
-      // Network gone → AP likely already shut down (expected behavior)
       showMsg('warn',
-        '⚠️ 頁面已失去連線。<br>' +
-        '這通常代表 AP 已成功關閉並正在切換網路。<br>' +
+        '⚠️ 頁面已失去連線。<br>'+
+        '通常代表 AP 已成功關閉並正在切換網路。<br>'+
         '請等待 15–30 秒後確認裝置是否連上網路。');
     } else {
-      setFormDisabled(false);
+      setDisabled(false);
       showMsg('err','✗ 連線失敗：'+e.message);
     }
   });
 }
+
+// Auto-load network list on page open
+loadNetworks();
 </script>
 </body>
 </html>"""
