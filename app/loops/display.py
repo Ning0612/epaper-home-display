@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+import os
 import random
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime as _DateTime, timedelta as _timedelta
@@ -14,6 +15,8 @@ from app.services.snapshot_client import fetch_snapshot
 from app.state import state
 
 logger = logging.getLogger(__name__)
+
+_AP_MODE_REFRESH_INTERVAL = 30.0
 
 
 def _is_alert_active(settings) -> bool:
@@ -68,30 +71,44 @@ def _maybe_advance_carousel(settings) -> None:
 
     now = _DateTime.now()
     interval = _timedelta(minutes=max(1, settings.images.carousel_interval_minutes))
-
     if state.carousel_last_advance is not None and (now - state.carousel_last_advance) < interval:
         return
 
-    playlist = state.image_playlist
-    if settings.images.carousel_mode == "random":
-        candidates = [i for i in range(len(playlist)) if i != state.carousel_index]
-        idx = random.choice(candidates) if candidates else state.carousel_index
-    else:
-        idx = (state.carousel_index + 1) % len(playlist)
+    # Iterate until a valid image is found, removing missing files along the way.
+    while len(state.image_playlist) >= 2:
+        playlist = state.image_playlist
+        # Re-sync index on every iteration so "next" is always relative to the currently
+        # displayed image — guards against both external WebUI changes and files removed
+        # earlier in this same loop
+        if state.custom_image_path and state.custom_image_path in playlist:
+            state.carousel_index = playlist.index(state.custom_image_path)
+        else:
+            state.carousel_index = state.carousel_index % len(playlist)
+        if settings.images.carousel_mode == "random":
+            candidates = [i for i in range(len(playlist)) if i != state.carousel_index]
+            idx = random.choice(candidates) if candidates else state.carousel_index
+        else:
+            idx = (state.carousel_index + 1) % len(playlist)
 
-    import os
-    if not os.path.exists(playlist[idx]):
+        if os.path.exists(playlist[idx]):
+            state.carousel_index = idx
+            state.custom_image_path = playlist[idx]
+            state.carousel_last_advance = now
+            logger.debug("Carousel advanced to index %d: %s", idx, playlist[idx])
+            return
+
         logger.warning("Carousel image missing, removing from playlist: %s", playlist[idx])
         state.image_playlist = [p for p in state.image_playlist if p != playlist[idx]]
-        # Recurse once to try the next candidate (avoids infinite loop: list is now shorter)
-        if len(state.image_playlist) >= 2:
-            _maybe_advance_carousel(settings)
-        return
 
-    state.carousel_index = idx
-    state.custom_image_path = playlist[idx]
-    state.carousel_last_advance = now
-    logger.debug("Carousel advanced to index %d: %s", idx, playlist[idx])
+    # Playlist collapsed below 2 during cleanup; ensure custom_image_path and index are consistent
+    if not state.image_playlist:
+        state.custom_image_path = None
+        state.carousel_index = 0
+    elif state.custom_image_path not in state.image_playlist:
+        state.custom_image_path = state.image_playlist[0]
+        state.carousel_index = 0
+    else:
+        state.carousel_index = state.image_playlist.index(state.custom_image_path)
 
 
 async def _display_loop(
@@ -111,9 +128,9 @@ async def _display_loop(
             except asyncio.TimeoutError:
                 pass
         elif _is_ap_mode_active():
-            # AP mode: static info page, refresh every 30s to update timestamp
+            # AP mode: static info page, refresh periodically to update timestamp
             try:
-                await asyncio.wait_for(display_queue.get(), timeout=30.0)
+                await asyncio.wait_for(display_queue.get(), timeout=_AP_MODE_REFRESH_INTERVAL)
             except asyncio.TimeoutError:
                 pass
         else:

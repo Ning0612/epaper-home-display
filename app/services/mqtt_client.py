@@ -10,6 +10,7 @@ import paho.mqtt.client as mqtt
 
 from app.config import MQTTConfig
 from app.state import state
+from app.storage.logs import log_door_event, log_face_event
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +91,6 @@ class MQTTService:
         future.add_done_callback(make_done_callback("MQTT dispatch"))
 
     async def _dispatch(self, topic: str, payload: dict) -> None:
-        from app.storage.logs import log_door_event, log_face_event
-
         if topic == "home/security/door":
             door_state = str(payload.get("state", ""))[:64]
             state.last_door_event = payload

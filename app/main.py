@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import socket
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime as _DateTime
+
+import uvicorn
 
 from app.config import load_settings
 from app.display.epaper import create_epaper
@@ -23,8 +27,9 @@ from app.services.notification_manager import NotificationManager
 from app.services.voice import VoiceService
 from app.services.weather import WeatherService
 from app.services.wifi_monitor import _wifi_monitor_loop
+from app.state import state
 from app.storage.db import init_db
-from app.storage.logs import end_desk_session, get_ongoing_desk_session, log_system_event
+from app.storage.logs import end_desk_session, get_ongoing_desk_session, list_images, log_system_event
 from app.storage._log_images import get_unconfirmed_images, delete_image_record
 from app.webui.server import create_app
 
@@ -65,7 +70,7 @@ async def main() -> None:
     discord_service = DiscordService(settings.discord)
     notification_manager = NotificationManager(discord_service, settings.discord)
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     mqtt_service = MQTTService(settings.mqtt, display_queue, voice_service)
     mqtt_service.start(loop)
 
@@ -75,7 +80,6 @@ async def main() -> None:
 
     button.register_callback(_on_button)
 
-    import uvicorn
     uvicorn_config = uvicorn.Config(
         create_app(settings, weather_service, display_queue),
         host=settings.webui.host,
@@ -87,13 +91,12 @@ async def main() -> None:
     logger.info("WebUI → http://%s:%d", settings.webui.host, settings.webui.port)
 
     if settings.discord.notify_device_online:
-        import socket
         try:
             local_ip = socket.gethostbyname(socket.gethostname())
         except Exception:
             local_ip = settings.webui.host
         webui_url = f"http://{local_ip}:{settings.webui.port}"
-        asyncio.get_event_loop().call_later(
+        loop.call_later(
             5, lambda: asyncio.ensure_future(
                 notification_manager.send_device_online(webui_url)
             )
@@ -117,10 +120,6 @@ async def main() -> None:
 
 async def _init_image_state(settings) -> None:
     """Clean orphan uploads, load confirmed images into state.image_playlist."""
-    import os
-    from app.state import state
-    from app.storage.logs import list_images
-
     # Remove orphan uploads (interrupted before confirm)
     orphans = await get_unconfirmed_images()
     for orphan in orphans:

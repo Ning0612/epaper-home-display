@@ -46,11 +46,9 @@ async def _check_and_update(display_queue: asyncio.Queue, settings: "Settings") 
         # Always enforce ap_mode page while in AP — this repairs the page if an
         # MQTT alert or other event changed display_page away from ap_mode.
         if state.display_page != "ap_mode":
+            prev_page = state.display_page
             state.display_page = "ap_mode"
-            logger.info(
-                "AP mode active (prev_page=%s), restoring ap_mode display",
-                state.display_page,
-            )
+            logger.info("AP mode active (prev_page=%s), restoring ap_mode display", prev_page)
             try:
                 display_queue.put_nowait("wifi_ap_mode")
             except asyncio.QueueFull:
