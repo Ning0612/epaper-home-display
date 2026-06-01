@@ -34,13 +34,10 @@ def render_ap_mode_page(state: Any, settings: Any, now: datetime | None = None) 
 
 
 def _draw_header(draw: ImageDraw.ImageDraw) -> None:
-    # Title
-    _cx_text(draw, "WiFi  設定模式", 0, _W, 18, _font(28, bold=True))
-    # Separator
+    _cx_text(draw, "WiFi Setup Mode", 0, _W, 18, _font(28, bold=True))
     y_sep = 62
     draw.line([(PAD * 4, y_sep), (_W - PAD * 4, y_sep)], fill=FG, width=1)
-    # Subtitle
-    _cx_text(draw, "請先將手機或電腦連接以下 WiFi 熱點", 0, _W, 74, _font(14))
+    _cx_text(draw, "Connect your phone or laptop to the following WiFi hotspot", 0, _W, 74, _font(14))
 
 
 def _draw_wifi_info(draw: ImageDraw.ImageDraw, state: Any, settings: Any) -> None:
@@ -50,10 +47,8 @@ def _draw_wifi_info(draw: ImageDraw.ImageDraw, state: Any, settings: Any) -> Non
     block_w = _W - _MX * 2
     label_w = 100
 
-    # SSID block
     _draw_info_block(draw, "SSID", ssid, _MX, 102, block_w, 60, label_w)
-    # Password block
-    _draw_info_block(draw, "密碼", password, _MX, 174, block_w, 60, label_w)
+    _draw_info_block(draw, "Password", password, _MX, 174, block_w, 60, label_w)
 
     # Separator
     draw.line([(PAD * 4, 248), (_W - PAD * 4, 248)], fill=FG, width=1)
@@ -85,8 +80,7 @@ def _draw_url_panel(draw: ImageDraw.ImageDraw, state: Any, settings: Any) -> Non
     port = settings.webui.port
     url = f"http://{ip}:{port}/wifi"
 
-    # Instruction label
-    _cx_text(draw, "連線後，在瀏覽器開啟以下網址：", 0, _W, 258, _font(14))
+    _cx_text(draw, "After connecting, open this URL in your browser:", 0, _W, 258, _font(14))
 
     # URL box
     box_x = _MX
@@ -105,11 +99,11 @@ def _draw_url_panel(draw: ImageDraw.ImageDraw, state: Any, settings: Any) -> Non
 def _draw_footer(draw: ImageDraw.ImageDraw, now: datetime) -> None:
     _cx_text(
         draw,
-        "連線 WiFi 後此畫面將自動消失，裝置回到正常儀表板模式",
+        "Once connected to WiFi, this screen will disappear automatically.",
         0, _W, 362, _font(13),
     )
     _cx_text(
         draw,
-        f"更新時間：{now.strftime('%H:%M')}",
+        f"Updated: {now.strftime('%H:%M')}",
         0, _W, 390, _font(14),
     )

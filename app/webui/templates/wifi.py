@@ -129,7 +129,9 @@ function renderNets(nets) {
   el.innerHTML = nets.map(function(n) {
     var lock = (n.security && n.security !== 'Open') ? '🔒' : '🔓';
     var id = 'net-' + encodeURIComponent(n.ssid);
-    return '<div class="net-item" onclick="selectNet(' + JSON.stringify(n.ssid) + ')" id="' + id + '">' +
+    // JSON.stringify produces double-quoted strings; escHtml converts " → &quot;
+    // so the onclick attribute boundary is preserved when the browser parses the HTML.
+    return '<div class="net-item" onclick="selectNet(' + escHtml(JSON.stringify(n.ssid)) + ')" id="' + id + '">' +
       sigBars(n.signal) +
       '<span class="net-ssid">' + escHtml(n.ssid) + '</span>' +
       '<span class="net-sig">' + n.signal + '%</span>' +
