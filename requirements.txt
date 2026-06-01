@@ -10,7 +10,7 @@ passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.9
 itsdangerous>=2.1
 
-# Pi hardware — comment out for laptop dev, install on Pi only
+# Pi hardware -- comment out for laptop dev, install on Pi only
 # adafruit-circuitpython-dht>=3.7
 # spidev>=3.6
 # RPi.GPIO>=0.7
