@@ -7,7 +7,7 @@ from typing import TypeAlias
 
 from PIL import Image, ImageDraw, ImageFont
 
-from app.display.renderer_constants import FG, _WEATHER_SEVERITY
+from app.display.renderer_constants import FG, COLOR_RED, COLOR_BLUE, _WEATHER_SEVERITY
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +138,17 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
     return result
 
 
+def _temp_color(temp: float | None) -> tuple[int, int, int]:
+    """Return display color for a temperature value."""
+    if temp is None:
+        return FG
+    if temp >= 30:
+        return COLOR_RED
+    if temp <= 15:
+        return COLOR_BLUE
+    return FG
+
+
 def _cx_text(
     draw: ImageDraw.ImageDraw,
     text: str,
@@ -145,8 +156,9 @@ def _cx_text(
     col_w: int,
     y: int,
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    fill: tuple[int, int, int] = FG,
 ) -> None:
     """Draw text horizontally centered within [col_x, col_x+col_w)."""
     bb = draw.textbbox((0, 0), text, font=font)
     tw = bb[2] - bb[0]
-    draw.text((col_x + (col_w - tw) // 2, y), text, font=font, fill=FG)
+    draw.text((col_x + (col_w - tw) // 2, y), text, font=font, fill=fill)

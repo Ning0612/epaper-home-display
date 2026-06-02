@@ -17,7 +17,7 @@ from app.display.renderer_constants import (
 )
 from app.display.renderer_utils import (
     _font, _cx_text, _paste_icon, _draw_progress_bar,
-    _pick_daily_forecast, _weather_item,
+    _pick_daily_forecast, _weather_item, _temp_color,
 )
 
 if TYPE_CHECKING:
@@ -73,7 +73,7 @@ def _draw_card_weather(
         _cx_text(draw, now_main[:4], now_x, now_w, fc_y0 + ICO + 10, _font(14, bold=True))
 
     now_temp_str = f"{now_temp:.0f}°" if isinstance(now_temp, (int, float)) else "--"
-    _cx_text(draw, now_temp_str, now_x, now_w, fc_y0 + TMP, _font(18, bold=True))
+    _cx_text(draw, now_temp_str, now_x, now_w, fc_y0 + TMP, _font(18, bold=True), fill=_temp_color(now_temp))
 
     sep_x = ix + now_w + fc_gap // 2
     fc_bottom = WEATHER_Y + WEATHER_H - PAD
@@ -102,7 +102,7 @@ def _draw_card_weather(
 
         fc_temp = entry.get("main", {}).get("temp")
         fc_temp_str = f"{fc_temp:.0f}°" if isinstance(fc_temp, (int, float)) else "--"
-        _cx_text(draw, fc_temp_str, col_x, daily_w, fc_y0 + TMP, _font(18, bold=True))
+        _cx_text(draw, fc_temp_str, col_x, daily_w, fc_y0 + TMP, _font(18, bold=True), fill=_temp_color(fc_temp))
 
         pop = entry.get("pop") or 0
         try:
@@ -160,7 +160,7 @@ def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     sy = iy + max(0, (ih - content_h) // 2)
 
     _cx_text(draw, "Indoor", ix, iw, sy, _font(14, bold=True))
-    _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17, bold=True))
+    _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17, bold=True), fill=_temp_color(state.temperature))
     _cx_text(draw, hum_str, ix, iw, sy + 41, _font(17, bold=True))
 
 
