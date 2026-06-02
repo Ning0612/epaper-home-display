@@ -234,9 +234,17 @@ def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     iw = USAGE_W - 2 * PAD
     ih = USAGE_H - 2 * PAD
 
-    content_h = 60
+    # Claude section (y+0..y+47) + separator + Codex section (y+52..y+83)
+    content_h = 99
     sy = iy + max(0, (ih - content_h) // 2)
 
-    _cx_text(draw, "Claude Usage", ix, iw, sy, _font(14, bold=True))
-    _draw_usage_row(draw, ix, sy + 20, "5h", state.claude_usage_5h,  state.claude_5h_reset, iw)
-    _draw_usage_row(draw, ix, sy + 40, "7d", state.claude_usage_week, state.claude_7d_reset, iw)
+    _cx_text(draw, "Claude", ix, iw, sy, _font(13, bold=True))
+    _draw_usage_row(draw, ix, sy + 16, "5h", state.claude_usage_5h, state.claude_5h_reset, iw)
+    _draw_usage_row(draw, ix, sy + 32, "7d", state.claude_usage_week, state.claude_7d_reset, iw)
+
+    sep_y = sy + 49
+    draw.line([(ix, sep_y), (ix + iw - 1, sep_y)], fill=FG, width=1)
+
+    _cx_text(draw, "Codex", ix, iw, sep_y + 3, _font(13, bold=True))
+    _draw_usage_row(draw, ix, sep_y + 19, "5h", state.codex_usage_5h, state.codex_5h_reset, iw)
+    _draw_usage_row(draw, ix, sep_y + 35, "7d", state.codex_usage_week, state.codex_7d_reset, iw)

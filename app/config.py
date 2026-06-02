@@ -132,6 +132,12 @@ class ClaudeUsageConfig:
 
 
 @dataclass
+class CodexUsageConfig:
+    creds_path: str = "data/codex_creds.json"
+    poll_interval_seconds: int = 600
+
+
+@dataclass
 class Settings:
     mqtt: MQTTConfig = field(default_factory=MQTTConfig)
     weather: WeatherConfig = field(default_factory=WeatherConfig)
@@ -145,6 +151,7 @@ class Settings:
     outdoor_agent: OutdoorAgentConfig = field(default_factory=OutdoorAgentConfig)
     wifi: WifiConfig = field(default_factory=WifiConfig)
     claude_usage: ClaudeUsageConfig = field(default_factory=ClaudeUsageConfig)
+    codex_usage: CodexUsageConfig = field(default_factory=CodexUsageConfig)
     timezone: str = "Asia/Taipei"
 
 
