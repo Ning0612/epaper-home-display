@@ -262,8 +262,8 @@ else                                                    →  INVESTIGATE
 | `claude_5h_reset` | str \| None | Claude 5h 重置時間 |
 | `display_page` | Literal["dashboard", "alert", "ap_mode"] | 目前顯示頁面 |
 | `last_snapshot_image` | Any（PIL Image \| None）| 最後擷取的快照（型別標注為 Any，實際為 PIL Image，僅記憶體，不序列化）|
-| `alert_page_started_at` | datetime \| None | 告警頁面開始顯示時間（用於超時計算）|
-| `alert_last_triggered_at` | datetime \| None | 最後一次告警觸發時間 |
+| `alert_page_started_at` | datetime \| None | 告警頁面首次進入時間（由 MQTT callback 設定，僅在非 alert 狀態時更新）|
+| `alert_last_triggered_at` | datetime \| None | 最後一次告警觸發時間（**用於超時計算**：超過 `alert_page_timeout_sec` 後切回儀表板）|
 | `wifi_mode` | Literal["client", "ap", "unknown"] | WiFi 模式 |
 | `ap_ssid` | str | AP 熱點 SSID（AP 模式下顯示）|
 | `ap_password` | str | AP 熱點密碼（AP 模式下顯示）|
@@ -323,6 +323,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
+| GET | `/` | 已登入時重新導向至 `/settings`；未登入的瀏覽器請求導向 `/login?next=/`；非 HTML 請求回傳 `401` |
 | GET | `/login` | 登入頁面（首次使用時顯示密碼設定表單）|
 | POST | `/login` | 提交密碼，成功後 redirect 至目標頁面 |
 | GET | `/logout` | 清除 session，redirect 至 `/login` |
@@ -339,12 +340,17 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/logs/env` | 環境日誌（溫濕度、光線）最近 50 筆 |
 | `/logs/presence` | 占用度日誌最近 50 筆 |
 | `/logs/events` | 系統事件日誌最近 50 筆 |
-| `/settings/config` | 讀取配置（secret 遮罩為 boolean）|
-| `/settings/wifi` | 取得 WiFi 連線資訊（`settings.py`）|
+| `/settings/config` | 讀取配置（`api_key`/`webhook_url` 遮罩為 boolean；`password_hash`/`session_secret` 移除）|
+| `/settings/wifi` | 取得 WiFi 連線資訊（SSID、IP、訊號強度）|
 | `/wifi` | AP 熱點入口網站（`wifi.py`，不需認證）|
-| `/api/wifi/scan` | 掃描周邊 WiFi 網路（`wifi.py`，AP 模式限定，不需認證）|
-| `/api/wifi/connect` | 連接指定 WiFi 網路（`wifi.py`，AP 模式限定，不需認證）|
+| `/api/wifi/scan` | 掃描周邊 WiFi 網路（GET，AP 模式限定，不需認證）|
 | `/api/preview/alert` | 回傳告警頁面的 PNG 預覽（debug 用，**需認證**）|
+
+**WiFi AP 管理端點（POST，不需認證）**
+
+| 路徑 | 說明 |
+|------|------|
+| `/api/wifi/connect` | 連接指定 WiFi 網路（AP 模式限定）；兩階段：Phase 1 建立 NM 設定檔（同步），Phase 2 啟動連線（背景任務）|
 
 **設定更新端點（PUT）**
 
@@ -358,6 +364,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/settings/voice` | 更新語音設定 |
 | `/settings/notifications` | 更新 Discord Webhook |
 | `/settings/general` | 更新時區 |
+| `/settings/auth` | 修改 WebUI 密碼（需提供目前密碼驗證）|
 
 **圖片管理（Images）**
 
@@ -388,7 +395,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 |------|------|
 | `/ai_usage` | 接收 ai-usage-collector 推送的 AI 使用量資料 |
 
-所有 PUT /settings/* 端點變更會原子化寫入 `config.local.yaml`，重啟服務後生效。
+所有 PUT /settings/* 端點變更會原子化寫入 `config.local.yaml`，並同時更新記憶體中的設定物件。**天氣、顯示器、在場偵測、語音、Discord 通知、時區、密碼**等設定立即生效（下次排程執行時採用新值）。**MQTT** 設定雖寫入 YAML，但現有連線不會自動重建，需重啟服務才生效。
 
 ---
 

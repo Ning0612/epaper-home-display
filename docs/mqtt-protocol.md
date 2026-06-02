@@ -88,8 +88,9 @@
 | `agent` | string | 發送方識別碼 |
 
 **效果**：
-- 更新 `state.last_alert`
-- 立即觸發 `display_queue.put_nowait("alert")`，e-Paper 立即刷新
+- 更新 `state.last_alert`、`state.alert_last_triggered_at`
+- 設定 `state.display_page = "alert"` 並立即觸發 `display_queue.put_nowait("alert")`
+- 渲染條件：僅在 `outdoor_agent.alert_page_enabled: true` **且** `outdoor_agent.snapshot_url` 非空時，display loop 實際渲染告警頁面；否則 `_check_alert_timeout()` 立即重置 `display_page = "dashboard"`
 - 播放 `alert.wav` 音效（USB 喇叭，需 `voice.enabled: true` 且 `assets/sounds/alert.wav` 存在）
 - Discord 告警通知由 **Agent 1** 負責發送，本服務不發送
 
@@ -186,11 +187,17 @@ Agent 1 的系統狀態心跳。
 ```json
 {
   "status": "updated",
+  "page": "dashboard",
   "refresh_type": "fast",
   "agent": "epaper-home-display",
   "timestamp": "2026-05-29T10:30:00.123456"
 }
 ```
+
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| `page` | string | 本次渲染的頁面類型：`"dashboard"`、`"alert"` 或 `"ap_mode"` |
+| `refresh_type` | string | 刷新方式：`"full"`（完整刷新）或 `"fast"`（快速局部刷新）|
 
 ---
 

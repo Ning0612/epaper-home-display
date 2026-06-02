@@ -18,7 +18,7 @@ ssh pi@epaper-display.local
 # 若 mDNS 可用，也可直接 http://epaper-display.local:8000/settings
 ```
 
-> **認證機制**：WebUI 受密碼保護。首次存取時會顯示密碼設定頁面，設定後密碼雜湊值儲存至 `config.local.yaml`。Session cookie 有效期為瀏覽器關閉前。若忘記密碼，可刪除 `config.local.yaml` 中的 `webui.password_hash` 欄位重設。
+> **認證機制**：WebUI 受密碼保護。首次存取時會顯示密碼設定頁面，設定後密碼雜湊值儲存至 `config.local.yaml`。Session cookie 有效期 7 天（每次請求滾動續期）。若忘記密碼，可刪除 `config.local.yaml` 中的 `webui.password_hash` 欄位重設。
 
 ---
 
@@ -98,6 +98,7 @@ ssh pi@epaper-display.local
 ### 認證端點
 
 ```
+GET  /               # 已登入時重新導向至 /settings；未登入的瀏覽器請求（Accept: text/html）導向 /login?next=/；非 HTML 請求（curl 等）回傳 401
 GET  /login          # 顯示登入頁面（初次使用時為密碼設定頁）
 POST /login          # 提交密碼（form: password, password_confirm, next）
 GET  /logout         # 清除 session，redirect 至 /login
@@ -219,7 +220,7 @@ GET /logs/events
 GET /settings/config
 ```
 
-回傳目前生效的設定值。**敏感欄位（API Key、Webhook URL）以 `true/false` 表示是否已設定，不回傳原始值。**
+回傳目前生效的設定值。**敏感欄位以遮罩處理，不回傳原始值。**
 
 **回應範例：**
 ```json
@@ -229,11 +230,12 @@ GET /settings/config
   "display": {"model": "epd7in5_V2", "dashboard_trigger_second": 57, "full_refresh_every": 10},
   "sensors": {"light": {"bright_threshold": 500}, ...},
   "discord": {"webhook_set": false},
+  "webui": {"host": "0.0.0.0", "port": 8000},
   "timezone": "Asia/Taipei"
 }
 ```
 
-> **注意**：`weather.api_key` 欄位替換為 `api_key_set`（boolean），`discord.webhook_url` 替換為 `webhook_set`（boolean），原始 secret 值不會回傳。
+> **遮罩規則**：`weather.api_key` 替換為 `api_key_set`（boolean）；`discord.webhook_url` 替換為 `webhook_set`（boolean）；`webui.password_hash` 與 `webui.session_secret` 直接移除，不出現於回應中。
 
 ---
 
@@ -278,7 +280,11 @@ POST /api/wifi/connect      # 連接指定 WiFi 網路（AP 模式限定）
 {"ssid": "HomeNetwork", "password": "your-password"}
 ```
 
-`password` 可省略（開放網路）。密碼需至少 8 個字元。成功後回傳 `{"ok": true, "message": "已連線到「HomeNetwork」"}`，並移除 AP 狀態檔，`wifi_monitor` 將在下一個輪詢週期後自動切回儀表板頁面。
+`password` 可省略（開放網路）。密碼需至少 8 個字元。
+
+連線流程分兩個階段：
+- **Phase 1（同步，含於 HTTP 回應前）**：建立 NetworkManager 連線設定檔；AP 熱點保持啟動，確保客戶端能收到回應。回傳 `{"ok": true, "message": "正在切換網路，AP 熱點即將關閉..."}`。
+- **Phase 2（背景任務，回應送出後）**：啟動連線設定檔，AP 熱點關閉；成功後移除 AP 狀態檔，`wifi_monitor` 將在下一個輪詢週期後自動切回儀表板頁面。若啟動失敗，AP 狀態檔保留不刪除，以便使用者重試。
 
 ---
 
@@ -557,6 +563,13 @@ Content-Type: application/json
 DELETE /api/images/{id}
 ```
 
+### 取得圖片檔案
+
+```
+GET /api/images/file/{id}        # 取得已確認的 display PNG（280×448，Floyd-Steinberg dithering）
+GET /api/images/original/{id}    # 取得原始上傳檔案
+```
+
 ### 輪播設定
 
 ```
@@ -632,7 +645,10 @@ GET /api/desk/sessions?limit=20
 
 **優先度**：`config.local.yaml` > `config.yaml` > 程式碼預設值
 
-重啟服務後新設定生效：
+**生效時機**：
+- **立即生效（記憶體更新）**：天氣（含地點）、顯示器、在場偵測、語音、Discord 通知、時區、密碼。下次觸發渲染或排程執行時即採用新值，無需重啟。
+- **需重啟服務才生效**：MQTT 設定（`broker_host` / `broker_port` / `client_id`）。設定已寫入 YAML，但現有的 MQTT 連線不會自動重建，需手動重啟：
+
 ```bash
 ssh pi@epaper-display.local 'sudo systemctl restart epaper-home-display'
 ```

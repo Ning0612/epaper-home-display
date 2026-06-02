@@ -48,6 +48,9 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         dc = d.get("discord", {})
         webhook = dc.pop("webhook_url", "")
         dc["webhook_set"] = bool(webhook)
+        wu = d.get("webui", {})
+        wu.pop("password_hash", None)
+        wu.pop("session_secret", None)
         return JSONResponse(d)
 
     @router.get("/settings/wifi")

@@ -197,7 +197,7 @@ outdoor_agent:
 - 收到 `home/security/alert` 後立即切換至告警頁面並開始擷取快照
 - 快照擷取失敗（逾時、網路錯誤）時靜默降級，仍顯示告警頁面但無圖像
 - 超出 `alert_page_timeout_sec` 後自動切回儀表板頁面
-- `snapshot_url` 留空可完全停用快照功能，仍保留告警頁面
+- `snapshot_url` 留空或 `alert_page_enabled: false` 時，MQTT callback 仍會短暫設定 `display_page = "alert"`，但 display loop 在每次渲染前執行 `_check_alert_timeout()` 時會立即重置為 `"dashboard"`，實際上不會渲染告警頁面（`/state` 端點可能短暫顯示 `display_page: "alert"`）
 
 ---
 
