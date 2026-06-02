@@ -66,11 +66,15 @@ def _make_state() -> AgentState:
 
 
 if __name__ == "__main__":
+    import os
     s = load_settings()
     st = _make_state()
 
-    quantize_to_epaper_palette(render_dashboard(st, s)).save("preview_dashboard.png")
-    quantize_to_epaper_palette(render_alert_page(st, s)).save("preview_alert.png")
-    quantize_to_epaper_palette(render_ap_mode_page(st, s)).save("preview_apmode.png")
+    out_dir = os.path.join(os.path.dirname(__file__), "..", "docs", "images")
+    os.makedirs(out_dir, exist_ok=True)
 
-    print("Saved: preview_dashboard.png  preview_alert.png  preview_apmode.png")
+    quantize_to_epaper_palette(render_dashboard(st, s)).save(os.path.join(out_dir, "preview_dashboard.png"))
+    quantize_to_epaper_palette(render_alert_page(st, s)).save(os.path.join(out_dir, "preview_alert.png"))
+    quantize_to_epaper_palette(render_ap_mode_page(st, s)).save(os.path.join(out_dir, "preview_apmode.png"))
+
+    print("Saved: docs/images/preview_dashboard.png  preview_alert.png  preview_apmode.png")

@@ -2,7 +2,27 @@
 
 以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 六色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測、安全偵測與天氣資訊，並與 Agent 1 透過 MQTT 協同工作。
 
-![預覽](preview.png)
+## 畫面預覽
+
+### 儀表板（Dashboard）
+
+![儀表板預覽](docs/images/preview_dashboard.png)
+
+主畫面，每分鐘自動更新。左側顯示日期時間、天氣（即時 + 4 天預報）；右下角為室內溫濕度、Agent 1 安全狀態、Claude / Codex AI 使用量進度條（附重置時間）；右側為圖片輪播區。
+
+### 安全告警（Alert）
+
+![告警頁預覽](docs/images/preview_alert.png)
+
+收到 `home/security/alert` 時立即切換至此頁面，顯示攝影機即時快照（若已設定 `outdoor_agent.snapshot_url`）、門狀態、最後辨識人臉與告警訊息。超過 `alert_page_timeout_sec`（預設 120 秒）後自動返回儀表板。
+
+### WiFi 設定模式（AP Mode）
+
+![AP 模式預覽](docs/images/preview_apmode.png)
+
+Pi 無法連上 WiFi 時自動顯示此頁，引導用戶掃描 QR code（或直接連接 SSID）並透過捕獲入口網站（`http://10.42.0.1:8000/wifi`）完成設定。完成後自動切回儀表板。
+
+> 預覽圖由 `scripts/preview_render.py` 以 mock 資料生成，輸出至 `docs/images/`。
 
 ---
 

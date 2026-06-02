@@ -161,7 +161,7 @@ Run after every display-related edit:
 ./.venv/Scripts/python.exe -m scripts.preview_render
 ```
 
-Saves `preview_dashboard.png`, `preview_alert.png`, `preview_apmode.png` in the project root.
+Saves `preview_dashboard.png`, `preview_alert.png`, `preview_apmode.png` in `docs/images/`.
 Mock data includes: indoor sensors, Claude/Codex usage with reset times, current weather + 4-day forecast, Agent1 events.
 To adjust mock data, edit `scripts/preview_render.py`.
 
