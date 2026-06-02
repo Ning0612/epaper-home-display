@@ -14,12 +14,17 @@
 python tools/claude_auth.py
 ```
 
+### 前置條件
+
+需先自行安裝 Claude Code 並完成登入。
+
 ### 運作邏輯
 
 | 情境 | 行為 |
 |------|------|
 | 筆電已安裝 Claude Code | 自動從 `~/.claude/.credentials.json` 提取，無需瀏覽器授權 |
-| 未找到 Claude Code 憑證 | 走 OAuth PKCE 手動授權流程：開啟瀏覽器 → 登入 → 貼上 callback URL |
+| 未找到 Claude Code 憑證 | 提示自行安裝並登入後重新執行 |
+| credentials 格式無效 | 提示確認 Claude Code 已正常登入後重新執行 |
 
 ### 輸出
 
@@ -42,11 +47,7 @@ Pi 上的 `_claude_usage_loop` 會在下次輪詢時自動載入憑證。Access 
 
 ### 前置條件
 
-需先安裝 Codex CLI 並完成登入：
-
-```bash
-codex login
-```
+需先自行安裝 Codex CLI 並完成登入（`codex login`）。
 
 ### 執行
 

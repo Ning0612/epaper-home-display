@@ -48,7 +48,7 @@ def main() -> None:
 
     if not os.path.exists(_CODEX_AUTH):
         print(f"找不到 Codex auth 檔案：{_CODEX_AUTH}")
-        print("請先安裝 Codex CLI 並登入（codex login），再執行此腳本。")
+        print("請先自行安裝 Codex CLI 並完成登入（codex login），再重新執行本腳本。")
         return
 
     print(f"找到 Codex credentials：{_CODEX_AUTH}")
