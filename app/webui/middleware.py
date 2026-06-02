@@ -6,7 +6,7 @@ from starlette.requests import Request
 
 
 class _AuthMiddleware(BaseHTTPMiddleware):
-    _PUBLIC = frozenset({"/health", "/login", "/logout", "/ai_usage"})
+    _PUBLIC = frozenset({"/health", "/login", "/logout"})
     # Prefix-matched public routes (AP mode WiFi portal — no login required)
     _PUBLIC_PREFIXES = ("/wifi", "/api/wifi/")
 

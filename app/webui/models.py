@@ -8,15 +8,6 @@ class _LocationBody(BaseModel):
     lon: float
 
 
-class _AIUsageBody(BaseModel):
-    codex_5h_pct: float | None = None
-    codex_5h_reset: str | None = None
-    codex_weekly_pct: float | None = None
-    codex_weekly_reset: str | None = None
-    claude_5h_pct: float | None = None
-    claude_5h_reset: str | None = None
-
-
 class _WeatherBody(BaseModel):
     api_key: str | None = None
     units: str | None = None

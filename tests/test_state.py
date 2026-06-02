@@ -34,8 +34,8 @@ def test_stub_usage_fields_default_to_none():
     assert s.custom_image_path is None
     assert s.claude_usage_5h is None
     assert s.claude_usage_week is None
-    assert s.codex_usage_5h is None
-    assert s.codex_usage_week is None
+    assert s.claude_5h_reset is None
+    assert s.claude_7d_reset is None
 
 
 def test_independent_instances_do_not_share_forecast():

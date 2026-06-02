@@ -44,13 +44,10 @@ def create_read_only_router(settings: "Settings | None" = None) -> APIRouter:
                 if state.alert_last_triggered_at else None
             ),
             "started_at": state.started_at.isoformat(),
-            "codex_usage_5h": state.codex_usage_5h,
-            "codex_usage_week": state.codex_usage_week,
-            "codex_5h_reset": state.codex_5h_reset,
-            "codex_weekly_reset": state.codex_weekly_reset,
             "claude_usage_5h": state.claude_usage_5h,
             "claude_usage_week": state.claude_usage_week,
             "claude_5h_reset": state.claude_5h_reset,
+            "claude_7d_reset": state.claude_7d_reset,
             # last_snapshot_image is a PIL Image — intentionally excluded from JSON
         })
 

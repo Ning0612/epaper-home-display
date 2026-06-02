@@ -35,10 +35,6 @@ class AgentState:
     carousel_last_advance: datetime | None = None
     claude_usage_5h: float | None = None
     claude_usage_week: float | None = None
-    codex_usage_5h: float | None = None
-    codex_usage_week: float | None = None
-    codex_5h_reset: str | None = None
-    codex_weekly_reset: str | None = None
     claude_5h_reset: str | None = None
     claude_7d_reset: str | None = None
 

@@ -27,15 +27,6 @@ assets/sounds/*.mp3
 assets/fonts/*.ttf
 assets/fonts/*.otf
 
-# Node.js (tools/ai-usage-collector)
-tools/ai-usage-collector/node_modules/
-tools/ai-usage-collector/dist/
-tools/ai-usage-collector/data/latest.json
-tools/ai-usage-collector/src/debug-raw.ts
-tools/ai-usage-collector/.env.*
-tools/ai-usage-collector/logs/*.log
-tools/ai-usage-collector/logs/*.err
-tools/ai-usage-collector/scripts/run.cmd
 
 # IDE
 .vscode/

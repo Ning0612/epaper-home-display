@@ -69,15 +69,6 @@ async def log_system_event(level: str, module: str, message: str) -> None:
         await db.commit()
 
 
-async def log_ai_usage(data: dict) -> None:
-    async with connect() as db:
-        await db.execute(
-            "INSERT INTO ai_usage_logs (ts, raw_json) VALUES (?,?)",
-            (_now(), json.dumps(data)),
-        )
-        await db.commit()
-
-
 async def get_recent_door_events(seconds: int = 300) -> list[dict]:
     cutoff = (datetime.now() - timedelta(seconds=seconds)).isoformat()
     async with connect() as db:
