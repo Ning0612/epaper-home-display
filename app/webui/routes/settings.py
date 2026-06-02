@@ -3,19 +3,21 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+import os
 import re
 import subprocess
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.requests import Request
 
 from app.webui.config_helpers import _save_to_config
 from app.webui.models import (
     _LocationBody, _WeatherBody, _MQTTBody, _DisplayBody,
     _PresenceBody, _VoiceBody, _NotificationsBody, _GeneralBody, _AuthBody,
 )
-from app.webui.routes.auth import _pwd_ctx
+from app.webui.routes.auth import _pwd_ctx, _pw_version
 from app.webui.templates.settings import _SETTINGS_HTML
 
 if TYPE_CHECKING:
@@ -23,6 +25,8 @@ if TYPE_CHECKING:
     from app.services.weather import WeatherService
 
 logger = logging.getLogger(__name__)
+
+_ALLOWED_PLAYERS = frozenset({"aplay", "mpg123", "mpg321", "omxplayer", "paplay", "cvlc"})
 
 
 def create_settings_router(settings: "Settings", weather_service: "WeatherService") -> APIRouter:
@@ -188,8 +192,14 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
     @router.put("/settings/voice")
     async def set_voice(body: _VoiceBody):
         patch = body.model_dump(exclude_none=True)
-        if "player" in patch and not patch["player"].strip():
-            raise HTTPException(400, detail="player must not be empty")
+        if "player" in patch:
+            player = os.path.basename(patch["player"].strip())
+            if player not in _ALLOWED_PLAYERS:
+                raise HTTPException(
+                    400,
+                    detail=f"player must be one of: {', '.join(sorted(_ALLOWED_PLAYERS))}",
+                )
+            patch["player"] = player
         if not patch:
             return {"ok": True}
 
@@ -264,7 +274,7 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         return {"ok": True}
 
     @router.put("/settings/auth")
-    async def set_auth(body: _AuthBody):
+    async def set_auth(request: Request, body: _AuthBody):
         if not settings.webui.password_hash:
             raise HTTPException(400, detail="No password configured. Use the login page for first-time setup.")
         if not _pwd_ctx.verify(body.current_password, settings.webui.password_hash):
@@ -274,6 +284,8 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         new_hash = _pwd_ctx.hash(body.new_password)
         _save_to_config({"webui": {"password_hash": new_hash}})
         settings.webui.password_hash = new_hash
+        # Keep current session valid with new version; all other sessions will be invalidated
+        request.session["pw_version"] = _pw_version(new_hash, settings.webui.session_secret)
         return {"ok": True}
 
     return router

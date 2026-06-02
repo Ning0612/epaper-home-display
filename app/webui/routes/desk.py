@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse
 
 from app.state import state
@@ -109,7 +109,7 @@ def create_desk_router(settings: "Settings") -> APIRouter:
         return {"timeline_24h": timeline_24h, "daily_30d": daily_30d}
 
     @router.get("/api/desk/sessions")
-    async def desk_sessions(limit: int = 20):
+    async def desk_sessions(limit: int = Query(20, ge=1, le=200)):
         from app.storage.logs import get_recent_sessions
         return {"sessions": await get_recent_sessions(limit)}
 

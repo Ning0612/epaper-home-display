@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 _TARGET_W = 280   # IMAGE_W - 2 * PAD
 _TARGET_H = 448   # IMAGE_H - 2 * PAD
 
-# Prevent decompression bomb attacks
-Image.MAX_IMAGE_PIXELS = 100_000_000  # 100 MP hard limit
+# Prevent decompression bomb / memory exhaustion on Pi Zero 2W
+Image.MAX_IMAGE_PIXELS = 25_000_000  # 25 MP hard limit
 
 # Mirrors epd7in3e.py getbuffer() palette — keep in sync with the hardware driver.
 # Slot 4 is the Orange placeholder (commented out in the driver); filled with Black.
@@ -74,7 +74,10 @@ def make_display_image(
                 img = img.transpose(Image.Transpose.ROTATE_90)    # 270 CW = 90 CCW
 
         if crop is not None:
-            x, y, w, h = (int(crop[k]) for k in ("x", "y", "w", "h"))
+            try:
+                x, y, w, h = (int(crop[k]) for k in ("x", "y", "w", "h"))
+            except OverflowError as exc:
+                raise ValueError("Crop coordinates out of range") from exc
             if w <= 0 or h <= 0:
                 raise ValueError(f"Invalid crop: w={w}, h={h}")
             img_w, img_h = img.size

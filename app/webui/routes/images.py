@@ -67,6 +67,7 @@ def create_images_router(
         path = row["display_path"]
         if not os.path.exists(path):
             raise HTTPException(404, "Image file missing")
+        _assert_within_storage(path, settings.images.storage_dir)
         return FileResponse(path, media_type="image/png")
 
     @router.get("/api/images/original/{id}")
@@ -78,6 +79,7 @@ def create_images_router(
         path = row["tmp_path"] or row["display_path"]
         if not path or not os.path.exists(path):
             raise HTTPException(404, "Original file missing")
+        _assert_within_storage(path, settings.images.storage_dir)
         import mimetypes
         mime, _ = mimetypes.guess_type(path)
         return FileResponse(path, media_type=mime or "application/octet-stream")
@@ -127,7 +129,8 @@ def create_images_router(
         # Validate image in a thread (CPU-bound, avoids blocking event loop)
         try:
             orig_w, orig_h = await asyncio.to_thread(
-                _validate_image_sync, tmp_path, settings.images.max_pixels
+                _validate_image_sync, tmp_path, settings.images.max_pixels,
+                frozenset(settings.images.allowed_formats),
             )
         except (ValueError, Exception) as exc:
             with contextlib.suppress(OSError):
@@ -152,6 +155,7 @@ def create_images_router(
         src = row["tmp_path"] or row["display_path"]
         if not src or not os.path.exists(src):
             raise HTTPException(404, "Source file missing")
+        _assert_within_storage(src, settings.images.storage_dir)
 
         crop = {"x": body.crop.x, "y": body.crop.y, "w": body.crop.w, "h": body.crop.h}
         tf = body.transform.model_dump()
@@ -181,6 +185,7 @@ def create_images_router(
         src = row["tmp_path"] or row["display_path"]
         if not src or not os.path.exists(src):
             raise HTTPException(404, "Source file missing")
+        _assert_within_storage(src, settings.images.storage_dir)
 
         crop = {"x": body.crop.x, "y": body.crop.y, "w": body.crop.w, "h": body.crop.h}
         tf = body.transform.model_dump()
@@ -229,7 +234,7 @@ def create_images_router(
             if oldest and oldest["id"] != id:
                 deleted = await delete_image_record(oldest["id"])
                 if deleted:
-                    _remove_image_files(deleted)
+                    _remove_image_files(deleted, settings.images.storage_dir)
                     dp = deleted.get("display_path")
                     if dp in state.image_playlist:
                         state.image_playlist = [p for p in state.image_playlist if p != dp]
@@ -274,7 +279,7 @@ def create_images_router(
             state.carousel_index = 0
 
         # Remove files last (orphan tolerable, inconsistent state is not)
-        _remove_image_files(deleted)
+        _remove_image_files(deleted, settings.images.storage_dir)
 
         return {"ok": True}
 
@@ -330,15 +335,32 @@ def create_images_router(
 
 # ------------------------------------------------------------------ sync helpers (run in threads)
 
-def _validate_image_sync(tmp_path: str, max_pixels: int) -> tuple[int, int]:
+def _validate_image_sync(
+    tmp_path: str, max_pixels: int, allowed_formats: frozenset[str]
+) -> tuple[int, int]:
     from PIL import Image as _PILImage
     with _PILImage.open(tmp_path) as pimg:
         pimg.verify()
     with _PILImage.open(tmp_path) as pimg2:
+        actual_fmt = (pimg2.format or "").upper()
+        if actual_fmt not in allowed_formats:
+            raise ValueError(f"Image format {actual_fmt!r} not allowed")
         w, h = pimg2.size
         if w * h > max_pixels:
             raise ValueError(f"Image too large ({w}×{h}, max {max_pixels:,} pixels)")
         return w, h
+
+
+def _is_within_storage(path: str, storage_dir: str) -> bool:
+    real_path = os.path.realpath(path)
+    real_storage = os.path.realpath(storage_dir)
+    return real_path == real_storage or real_path.startswith(real_storage + os.sep)
+
+
+def _assert_within_storage(path: str, storage_dir: str) -> None:
+    """Raise 403 if path is not within storage_dir (guards against DB-path traversal)."""
+    if not _is_within_storage(path, storage_dir):
+        raise HTTPException(403, "File access denied")
 
 
 def _save_display_atomic(img, tmp_out: str, display_path: str) -> int:
@@ -349,12 +371,14 @@ def _save_display_atomic(img, tmp_out: str, display_path: str) -> int:
 
 # ------------------------------------------------------------------ async helpers
 
-def _remove_image_files(row: dict) -> None:
+def _remove_image_files(row: dict, storage_dir: str) -> None:
     for key in ("display_path", "tmp_path"):
         path = row.get(key)
-        if path:
+        if path and _is_within_storage(path, storage_dir):
             with contextlib.suppress(OSError):
                 os.unlink(path)
+        elif path:
+            logger.warning("Skipping delete of path outside storage: %s", path)
 
 
 async def _write_chunked(upload: UploadFile, dest: str, max_bytes: int) -> int:

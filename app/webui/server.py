@@ -34,12 +34,13 @@ def create_app(
 
     app = FastAPI(title="ePaper Home Display", version="0.1.0")
     # SessionMiddleware must be outermost so session is populated before _AuthMiddleware runs
-    app.add_middleware(_AuthMiddleware)
+    app.add_middleware(_AuthMiddleware, settings=settings)
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.webui.session_secret,
         max_age=86400 * 7,
         https_only=False,
+        same_site="strict",
     )
 
     app.include_router(create_auth_router(settings))

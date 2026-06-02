@@ -95,7 +95,7 @@ class ImagesConfig:
     storage_dir: str = "data/images"
     max_count: int = 50
     max_upload_bytes: int = 15_728_640   # 15 MB
-    max_pixels: int = 100_000_000        # 100 MP, matches image_processor limit
+    max_pixels: int = 25_000_000         # 25 MP; 100 MP would exhaust Pi Zero 2W RAM
     allowed_formats: list[str] = field(
         default_factory=lambda: ["JPEG", "PNG", "WEBP", "GIF", "BMP"]
     )

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+import math
+
+from pydantic import BaseModel, field_validator
 
 
 class _LocationBody(BaseModel):
@@ -58,6 +60,13 @@ class _CropBody(BaseModel):
     y: float
     w: float
     h: float
+
+    @field_validator("x", "y", "w", "h")
+    @classmethod
+    def _must_be_finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("must be a finite number")
+        return v
 
 
 class _TransformBody(BaseModel):

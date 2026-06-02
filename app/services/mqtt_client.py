@@ -118,7 +118,7 @@ class MQTTService:
             if self._voice_service is not None:
                 if self._voice_task is None or self._voice_task.done():
                     self._voice_task = asyncio.ensure_future(self._voice_service.play("alert.wav"))
-            logger.info("Alert: %s — switching to alert page", payload)
+            logger.info("Alert triggered — switching to alert page (agent=%s)", payload.get("agent", "?"))
 
         elif topic == "home/security/status":
             # status is a heartbeat/general update — never treated as a security alert
