@@ -37,7 +37,7 @@ def _fmt_unix_local(ts: int) -> str:
     try:
         return datetime.fromtimestamp(ts, tz=timezone.utc).astimezone().strftime("%H:%M")
     except Exception:
-        return "--"
+        return "--:--"
 
 
 def _fmt_unix_remaining(ts: int) -> str:
@@ -49,7 +49,7 @@ def _fmt_unix_remaining(ts: int) -> str:
         days, hours = diff.days, diff.seconds // 3600
         return f"{days}d {hours}h" if days > 0 else f"{hours}h"
     except Exception:
-        return "--"
+        return "--:--"
 
 
 class CodexUsageService:
@@ -192,8 +192,8 @@ def _parse_usage(body: dict) -> CodexUsageData | None:
         p_reset = primary.get("resets_at") or primary.get("reset_at")
         s_reset = secondary.get("resets_at") or secondary.get("reset_at")
 
-        reset_5h = _fmt_unix_local(p_reset) if isinstance(p_reset, (int, float)) else "--"
-        reset_7d = _fmt_unix_remaining(s_reset) if isinstance(s_reset, (int, float)) else "--"
+        reset_5h = _fmt_unix_local(p_reset) if isinstance(p_reset, (int, float)) else "--:--"
+        reset_7d = _fmt_unix_remaining(s_reset) if isinstance(s_reset, (int, float)) else "--:--"
 
         return CodexUsageData(
             usage_5h=(float(p_pct) / 100.0) if p_pct is not None else 0.0,

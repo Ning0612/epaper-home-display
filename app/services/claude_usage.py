@@ -44,7 +44,7 @@ def _fmt_reset_time(iso: str) -> str:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
         return dt.astimezone().strftime("%H:%M")
     except Exception:
-        return "--"
+        return "--:--"
 
 
 def _fmt_remaining(iso: str) -> str:
@@ -61,7 +61,7 @@ def _fmt_remaining(iso: str) -> str:
             return f"{days}d {hours}h"
         return f"{hours}h"
     except Exception:
-        return "--"
+        return "--:--"
 
 
 class ClaudeUsageService:
@@ -185,7 +185,7 @@ def _parse_usage(body: dict) -> ClaudeUsageData | None:
             usage_5h=fh["utilization"] / 100.0,
             usage_7d=(sd["utilization"] / 100.0) if sd and sd.get("utilization") is not None else 0.0,
             reset_5h=_fmt_reset_time(fh["resets_at"]),
-            reset_7d=_fmt_remaining(sd["resets_at"]) if sd else "--",
+            reset_7d=_fmt_remaining(sd["resets_at"]) if sd else "--:--",
         )
     except (KeyError, TypeError, ValueError) as exc:
         logger.warning("Unexpected Claude usage API response format: %s", exc)
