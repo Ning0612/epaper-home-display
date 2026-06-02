@@ -125,6 +125,7 @@ scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 | [docs/hardware-wiring.md](docs/hardware-wiring.md) | 完整硬體接線圖與 GPIO 腳位說明 |
 | [docs/mqtt-protocol.md](docs/mqtt-protocol.md) | MQTT 主題清單與 JSON 訊息格式規範 |
 | [docs/webui.md](docs/webui.md) | WebUI 設定介面完整使用說明與 REST API 參考 |
+| [tools/README.md](tools/README.md) | Claude / Codex OAuth 憑證設定工具說明 |
 
 ---
 
