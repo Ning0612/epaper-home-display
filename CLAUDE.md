@@ -151,6 +151,22 @@ class MockDHT22:
 
 Unit tests import mocks; hardware scripts import real drivers. Never let `import RPi.GPIO` execute during `pytest`.
 
+### Display Preview Rule
+
+**Any change to `app/display/` must be verified by rendering a preview PNG before reporting the task as done.**
+
+Run after every display-related edit:
+
+```bash
+./.venv/Scripts/python.exe -m scripts.preview_render
+```
+
+Saves `preview_dashboard.png`, `preview_alert.png`, `preview_apmode.png` in the project root.
+Mock data includes: indoor sensors, Claude/Codex usage with reset times, current weather + 4-day forecast, Agent1 events.
+To adjust mock data, edit `scripts/preview_render.py`.
+
+Open and visually inspect the saved PNGs. Check: layout intact, text readable, no clipped elements, correct image mode (RGB). Do not skip this step even for small tweaks.
+
 ---
 
 ## Tech Stack

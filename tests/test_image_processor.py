@@ -273,3 +273,23 @@ class TestMakePreviewBytes:
             assert len(data) > 0
         finally:
             os.unlink(path)
+
+    def test_pixels_are_epaper_palette_only(self):
+        """Preview bytes must contain only the 6 e-paper palette colors."""
+        _EPAPER_COLORS = {
+            (0, 0, 0),
+            (255, 255, 255),
+            (255, 255, 0),
+            (255, 0, 0),
+            (0, 0, 255),
+            (0, 255, 0),
+        }
+        # Colorful source image to exercise quantization
+        path = _make_tmp_image(color=(128, 64, 200))
+        try:
+            data = make_preview_bytes(path)
+            img = Image.open(io.BytesIO(data)).convert("RGB")
+            unknown = set(img.get_flattened_data()) - _EPAPER_COLORS
+            assert not unknown, f"Non-palette pixels found: {unknown}"
+        finally:
+            os.unlink(path)

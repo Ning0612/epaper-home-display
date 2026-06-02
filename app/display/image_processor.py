@@ -13,6 +13,25 @@ _TARGET_H = 448   # IMAGE_H - 2 * PAD
 # Prevent decompression bomb attacks
 Image.MAX_IMAGE_PIXELS = 100_000_000  # 100 MP hard limit
 
+# Mirrors epd7in3e.py getbuffer() palette — keep in sync with the hardware driver.
+# Slot 4 is the Orange placeholder (commented out in the driver); filled with Black.
+_EPAPER_PALETTE_RGB: tuple[int, ...] = (
+    0,   0,   0,    # 0 Black
+    255, 255, 255,  # 1 White
+    255, 255, 0,    # 2 Yellow
+    255, 0,   0,    # 3 Red
+    0,   0,   0,    # 4 Orange (unused → Black)
+    0,   0,   255,  # 5 Blue
+    0,   255, 0,    # 6 Green
+) + (0, 0, 0) * 249
+
+
+def quantize_to_epaper_palette(img: Image.Image) -> Image.Image:
+    """Quantize an RGB image to the 6-color e-paper palette with Floyd-Steinberg dithering."""
+    pal = Image.new("P", (1, 1))
+    pal.putpalette(_EPAPER_PALETTE_RGB)
+    return img.convert("RGB").quantize(palette=pal).convert("RGB")
+
 _ALLOWED_FORMATS = frozenset({"JPEG", "PNG", "WEBP", "GIF", "BMP", "TIFF"})
 _UPLOAD_CHUNK = 65_536  # 64 KB
 
@@ -86,8 +105,13 @@ def make_preview_bytes(
     crop: dict | None = None,
     transform: dict | None = None,
 ) -> bytes:
-    """Return dithered display image as PNG bytes for HTTP preview response."""
+    """Return six-color dithered display image as PNG bytes for HTTP preview response.
+
+    Applies the same palette quantization as the hardware driver's getbuffer(),
+    so the preview matches what the e-paper panel will actually show.
+    """
     result = make_display_image(source_path, crop, transform)
+    result = quantize_to_epaper_palette(result)
     buf = io.BytesIO()
     result.save(buf, format="PNG")
     return buf.getvalue()
