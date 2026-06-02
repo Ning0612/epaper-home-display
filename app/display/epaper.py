@@ -16,13 +16,6 @@ _LIB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", 
 if _LIB_PATH not in sys.path:
     sys.path.insert(0, _LIB_PATH)
 
-try:
-    from waveshare_epd import epd7in5_V2 as _epd_module  # type: ignore[import]
-    _HAS_DRIVER = True
-except ImportError:
-    _HAS_DRIVER = False
-
-
 class EpaperDisplay(Protocol):
     def init(self) -> None: ...
     def display(self, image: Image.Image, full_refresh: bool = False) -> None: ...
@@ -31,8 +24,8 @@ class EpaperDisplay(Protocol):
 
 
 class RealEpaper:
-    def __init__(self) -> None:
-        self._epd = _epd_module.EPD()
+    def __init__(self, epd_module) -> None:
+        self._epd = epd_module.EPD()
 
     def init(self) -> None:
         self._epd.init()
@@ -85,8 +78,12 @@ class MockEpaper:
 
 
 def create_epaper(config: DisplayConfig) -> EpaperDisplay:
-    if config.use_mock or not _HAS_DRIVER:
-        if not config.use_mock and not _HAS_DRIVER:
-            logger.warning("Waveshare driver not found in lib/ — using MockEpaper")
+    if config.use_mock:
         return MockEpaper()
-    return RealEpaper()
+    import importlib
+    try:
+        epd_module = importlib.import_module(f"waveshare_epd.{config.model}")
+    except ImportError:
+        logger.warning("Waveshare driver '%s' not found in lib/ — using MockEpaper", config.model)
+        return MockEpaper()
+    return RealEpaper(epd_module)

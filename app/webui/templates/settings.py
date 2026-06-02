@@ -110,6 +110,7 @@ _SETTINGS_CONTENT = r"""
         <div class="f">
           <label>e-Paper 型號</label>
           <select id="d-model">
+            <option value="epd7in3e">Waveshare 7.3" E (6-color)</option>
             <option value="epd7in5_V2">Waveshare 7.5" V2</option>
             <option value="epd7in5">Waveshare 7.5" V1</option>
             <option value="epd5in83_V2">Waveshare 5.83" V2</option>
@@ -415,7 +416,7 @@ async function loadCfg(){
     document.getElementById('m-port').value=m.broker_port??1883;
     document.getElementById('m-client').value=m.client_id||'';
     var d=c.display||{};
-    document.getElementById('d-model').value=d.model||'epd7in5_V2';
+    document.getElementById('d-model').value=d.model||'epd7in3e';
     document.getElementById('d-trigger').value=d.dashboard_trigger_second??57;
     document.getElementById('d-fre').value=d.full_refresh_every??10;
     var sl=(c.sensors||{}).light||{};

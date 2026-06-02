@@ -14,6 +14,8 @@ from app.display.renderer import (
     _load_weather_icon,
     _draw_progress_bar,
 )
+from app.display.renderer_alert import render_alert_page
+from app.display.renderer_apmode import render_ap_mode_page
 
 
 @pytest.fixture
@@ -29,7 +31,7 @@ def empty_state():
 def test_render_dashboard_smoke(empty_state, settings):
     img = render_dashboard(empty_state, settings)
     assert img.size == (800, 480)
-    assert img.mode == "L"
+    assert img.mode == "RGB"
 
 
 def test_render_full_state(settings):
@@ -74,7 +76,7 @@ def test_load_weather_icon_missing_returns_none():
 
 
 def test_draw_progress_bar_out_of_range_no_exception():
-    img = Image.new("L", (200, 30), 255)
+    img = Image.new("RGB", (200, 30), (255, 255, 255))
     draw = ImageDraw.Draw(img)
     _draw_progress_bar(draw, 10, 10, 140, 12, 1.5)
     _draw_progress_bar(draw, 10, 10, 140, 12, -0.5)
@@ -91,3 +93,15 @@ def test_render_long_reminder(settings):
     s.active_reminder = "A" * 100
     img = render_dashboard(s, settings)
     assert img.size == (800, 480)
+
+
+def test_render_alert_page_is_rgb(empty_state, settings):
+    img = render_alert_page(empty_state, settings)
+    assert img.size == (800, 480)
+    assert img.mode == "RGB"
+
+
+def test_render_ap_mode_page_is_rgb(empty_state, settings):
+    img = render_ap_mode_page(empty_state, settings)
+    assert img.size == (800, 480)
+    assert img.mode == "RGB"

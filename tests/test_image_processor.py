@@ -28,21 +28,20 @@ class TestMakeDisplayImage:
         finally:
             os.unlink(path)
 
-    def test_output_mode_is_grayscale(self):
+    def test_output_mode_is_rgb(self):
         path = _make_tmp_image()
         try:
             result = make_display_image(path)
-            assert result.mode == "L"
+            assert result.mode == "RGB"
         finally:
             os.unlink(path)
 
-    def test_pixels_only_black_or_white(self):
-        """Floyd-Steinberg dithering to 1-bit then L should produce only 0/255."""
+    def test_pixels_are_valid_rgb(self):
+        """Output pixels must be valid RGB values (each channel 0–255)."""
         path = _make_tmp_image()
         try:
             result = make_display_image(path)
-            pixels = set(result.get_flattened_data())
-            assert pixels.issubset({0, 255}), f"Unexpected pixel values: {pixels - {0, 255}}"
+            assert all(0 <= c <= 255 for px in result.get_flattened_data() for c in px)
         finally:
             os.unlink(path)
 
@@ -64,15 +63,15 @@ class TestMakeDisplayImage:
             os.unlink(path)
 
     def test_negative_offset_top_left_is_white(self):
-        """Negative x/y crop: out-of-bounds top-left area should be white after dithering."""
+        """Negative x/y crop: out-of-bounds top-left area should be white after padding."""
         # Black image; crop starts 50px before image on both axes.
         # The top-left region of the crop is outside the image → white padding.
         path = _make_tmp_image(size=(200, 200), color=(0, 0, 0))
         try:
             result = make_display_image(path, crop={"x": -50, "y": -50, "w": 250, "h": 250})
             assert result.size == (_TARGET_W, _TARGET_H)
-            # Top-left output pixel maps to the padding region → should be white (255)
-            assert result.getpixel((0, 0)) == 255
+            # Top-left output pixel maps to the padding region → should be white
+            assert result.getpixel((0, 0)) == (255, 255, 255)
         finally:
             os.unlink(path)
 
@@ -83,7 +82,7 @@ class TestMakeDisplayImage:
             result = make_display_image(path, crop={"x": 300, "y": 300, "w": 280, "h": 448})
             assert result.size == (_TARGET_W, _TARGET_H)
             pixels = set(result.get_flattened_data())
-            assert pixels == {255}, f"Expected all-white, got: {pixels}"
+            assert pixels == {(255, 255, 255)}, f"Expected all-white, got: {pixels}"
         finally:
             os.unlink(path)
 
@@ -95,7 +94,7 @@ class TestMakeDisplayImage:
             result = make_display_image(path, crop={"x": 100, "y": 0, "w": 300, "h": 200})
             assert result.size == (_TARGET_W, _TARGET_H)
             # Far-right output column maps to the out-of-bounds padding → white
-            assert result.getpixel((_TARGET_W - 1, _TARGET_H // 2)) == 255
+            assert result.getpixel((_TARGET_W - 1, _TARGET_H // 2)) == (255, 255, 255)
         finally:
             os.unlink(path)
 
@@ -120,7 +119,7 @@ class TestMakeDisplayImage:
         try:
             result = make_display_image(path)
             assert result.size == (_TARGET_W, _TARGET_H)
-            assert result.mode == "L"
+            assert result.mode == "RGB"
         finally:
             os.unlink(path)
 
@@ -230,8 +229,8 @@ class TestTransform:
             lx = _TARGET_W // 8          # safely in left quarter
             rx = _TARGET_W * 7 // 8     # safely in right quarter
             my = _TARGET_H // 2
-            assert result.getpixel((lx, my)) == 255, "left side should be white after flipX"
-            assert result.getpixel((rx, my)) == 0,   "right side should be black after flipX"
+            assert result.getpixel((lx, my)) == (255, 255, 255), "left side should be white after flipX"
+            assert result.getpixel((rx, my)) == (0, 0, 0),       "right side should be black after flipX"
         finally:
             os.unlink(path)
 
@@ -250,8 +249,8 @@ class TestTransform:
             lx = _TARGET_W // 8
             rx = _TARGET_W * 7 // 8
             my = _TARGET_H // 2
-            assert result.getpixel((rx, my)) == 255, "right side should be white after 90° CW"
-            assert result.getpixel((lx, my)) == 0,   "left side should be black after 90° CW"
+            assert result.getpixel((rx, my)) == (255, 255, 255), "right side should be white after 90° CW"
+            assert result.getpixel((lx, my)) == (0, 0, 0),       "left side should be black after 90° CW"
         finally:
             os.unlink(path)
 

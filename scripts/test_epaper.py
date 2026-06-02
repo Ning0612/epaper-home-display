@@ -1,4 +1,4 @@
-"""Hardware test: Waveshare 7.5" V2 e-Paper. Run on Pi: python -m scripts.test_epaper"""
+"""Hardware test: Waveshare 7.3" E (6-color) e-Paper. Run on Pi: python -m scripts.test_epaper"""
 from __future__ import annotations
 
 import sys
@@ -9,15 +9,15 @@ def main() -> None:
     try:
         import sys, os
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lib"))
-        from waveshare_epd import epd7in5_V2
+        from waveshare_epd import epd7in3e
     except ImportError as e:
         print(f"ERROR: Waveshare driver not found in lib/waveshare_epd/ — {e}")
         sys.exit(1)
 
     from PIL import Image, ImageDraw, ImageFont
 
-    print("Initialising e-Paper 7.5\" V2 ...")
-    epd = epd7in5_V2.EPD()
+    print("Initialising e-Paper 7.3\" E (6-color) ...")
+    epd = epd7in3e.EPD()
     epd.init()
     print("  init OK")
 
@@ -26,14 +26,14 @@ def main() -> None:
     print("  clear OK")
 
     print("Drawing test image ...")
-    img = Image.new("L", (800, 480), 255)
+    img = Image.new("RGB", (800, 480), (255, 255, 255))
     draw = ImageDraw.Draw(img)
-    draw.rectangle([(10, 10), (790, 470)], outline=0, width=3)
+    draw.rectangle([(10, 10), (790, 470)], outline=(0, 0, 0), width=3)
     try:
         font = ImageFont.truetype("assets/fonts/DejaVuSans.ttf", 40)
     except (IOError, OSError):
         font = ImageFont.load_default()
-    draw.text((50, 200), "ePaper Home Display Test OK", font=font, fill=0)
+    draw.text((50, 200), "ePaper Home Display Test OK", font=font, fill=(0, 0, 0))
 
     epd.display(epd.getbuffer(img))
     print("  display OK")

@@ -46,11 +46,11 @@ def _load_weather_icon(main: str, size: int) -> _IconAsset | None:
     try:
         with Image.open(path) as raw:
             raw.load()
-            icon_l = raw.convert("L").resize((size, size), Image.LANCZOS)
+            icon_img = raw.convert("RGB").resize((size, size), Image.LANCZOS)
             alpha: Image.Image | None = None
             if raw.mode == "RGBA":
                 alpha = raw.split()[3].resize((size, size), Image.LANCZOS)
-            result: _IconAsset = (icon_l, alpha)
+            result: _IconAsset = (icon_img, alpha)
     except (IOError, OSError, IndexError) as e:
         logger.warning("weather icon load failed (%s): %s", path, e)
         _ICON_CACHE[key] = None
@@ -63,8 +63,8 @@ def _paste_icon(img: Image.Image, main: str, size: int, x: int, y: int) -> bool:
     asset = _load_weather_icon(main, size)
     if asset is None:
         return False
-    icon_l, alpha = asset
-    img.paste(icon_l, (x, y), alpha)
+    icon_img, alpha = asset
+    img.paste(icon_img, (x, y), alpha)
     return True
 
 

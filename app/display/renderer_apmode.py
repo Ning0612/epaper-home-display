@@ -22,7 +22,7 @@ def render_ap_mode_page(state: Any, settings: Any, now: datetime | None = None) 
     if now is None:
         now = datetime.now()
 
-    img = Image.new("L", (_W, _H), BG)
+    img = Image.new("RGB", (_W, _H), BG)
     draw = ImageDraw.Draw(img)
 
     _draw_header(draw)

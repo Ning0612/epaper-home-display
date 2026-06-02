@@ -16,8 +16,8 @@ data/*.log
 data/claude_creds.json
 data/codex_creds.json
 
-# Waveshare driver — download from GitHub and place in lib/waveshare_epd/
-lib/waveshare_epd/epd7in5_V2.py
+# Waveshare drivers — download from GitHub and place in lib/waveshare_epd/
+lib/waveshare_epd/epd*.py
 lib/waveshare_epd/epdconfig.py
 
 # Sounds — add your own audio files

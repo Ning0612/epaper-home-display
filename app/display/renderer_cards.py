@@ -129,12 +129,12 @@ def _draw_card_image(img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentS
 
     try:
         with Image.open(state.custom_image_path) as custom:
-            if custom.size == (iw, ih):
-                # Pre-processed display PNG (dithered 280×448) — paste directly
-                img.paste(custom.convert("L"), (ix, iy))
+            if custom.size == (iw, ih) and custom.mode == "RGB":
+                # Pre-processed display PNG (280×448 RGB) — paste directly
+                img.paste(custom, (ix, iy))
             else:
                 # Legacy path: arbitrary image — convert and thumbnail
-                custom = custom.convert("L")
+                custom = custom.convert("RGB")
                 custom.thumbnail((iw, ih), Image.Resampling.LANCZOS)
                 px = ix + (iw - custom.width) // 2
                 py = iy + (ih - custom.height) // 2

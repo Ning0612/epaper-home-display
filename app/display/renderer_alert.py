@@ -18,16 +18,15 @@ _INFO_W = 160    # right panel width (= DISPLAY_W - _SNAP_W)
 
 
 def render_alert_page(state: Any, settings: Any, now: datetime | None = None) -> Image.Image:
-    """Render 800×480 alert page (L-mode grayscale).
+    """Render 800×480 alert page (RGB).
 
-    Left 640px: camera snapshot scaled from QVGA with Floyd-Steinberg dither,
-    or a placeholder when no image is available.
+    Left 640px: camera snapshot scaled from QVGA, or a placeholder when no image is available.
     Right 160px: date, large clock, door/face/alert status.
     """
     if now is None:
         now = datetime.now()
 
-    img = Image.new("L", (DISPLAY_W, DISPLAY_H), BG)
+    img = Image.new("RGB", (DISPLAY_W, DISPLAY_H), BG)
     draw = ImageDraw.Draw(img)
     _draw_snapshot_panel(img, draw, state)
     _draw_info_panel(draw, state, now)
@@ -41,8 +40,7 @@ def _draw_snapshot_panel(
     if snap is not None:
         try:
             resized = snap.convert("RGB").resize((_SNAP_W, _SNAP_H), Image.Resampling.LANCZOS)
-            dithered = resized.convert("1", dither=Image.Dither.FLOYDSTEINBERG).convert("L")
-            img.paste(dithered, (0, 0))
+            img.paste(resized, (0, 0))
             return
         except Exception as exc:
             logger.warning("Alert snapshot render failed: %s", exc)

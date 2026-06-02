@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 def render_dashboard(
     state: "AgentState", settings: "Settings", now: datetime | None = None
 ) -> Image.Image:
-    img = Image.new("L", (DISPLAY_W, DISPLAY_H), BG)
+    img = Image.new("RGB", (DISPLAY_W, DISPLAY_H), BG)
     draw = ImageDraw.Draw(img)
     if now is None:
         now = datetime.now()

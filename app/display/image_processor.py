@@ -22,12 +22,13 @@ def make_display_image(
     crop: dict | None = None,
     transform: dict | None = None,
 ) -> Image.Image:
-    """Load image, apply transforms + crop, then Floyd-Steinberg dither to 280×448 L mode.
+    """Load image, apply transforms + crop, then resize to 280×448 RGB.
 
     Transform canonical order: flipX → flipY → rotate CW (must match canvas render order).
+    The driver's getbuffer() handles six-color palette quantization internally.
 
     Returns:
-        280×448 L mode PIL Image with Floyd-Steinberg dithering applied.
+        280×448 RGB mode PIL Image.
 
     Raises:
         OSError: File cannot be opened or is not a valid image.
@@ -77,9 +78,7 @@ def make_display_image(
 
         img = img.convert("RGB")
         img = img.resize((_TARGET_W, _TARGET_H), Image.Resampling.LANCZOS)
-        # Floyd-Steinberg: RGB → 1-bit (dithering triggered here) → L mode
-        dithered = img.convert("1", dither=Image.Dither.FLOYDSTEINBERG)
-        return dithered.convert("L")
+        return img
 
 
 def make_preview_bytes(
