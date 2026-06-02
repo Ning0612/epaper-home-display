@@ -20,7 +20,7 @@
 
 ![AP 模式預覽](docs/images/preview_apmode.png)
 
-Pi 無法連上 WiFi 時自動顯示此頁，引導用戶掃描 QR code（或直接連接 SSID）並透過捕獲入口網站（`http://10.42.0.1:8000/wifi`）完成設定。完成後自動切回儀表板。
+Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並透過捕獲入口網站（`http://10.42.0.1:8000/wifi`）完成設定。完成後自動切回儀表板。
 
 > 預覽圖由 `scripts/preview_render.py` 以 mock 資料生成，輸出至 `docs/images/`。
 
@@ -100,6 +100,18 @@ journalctl -u epaper-home-display -n 50 --no-pager
 
 WebUI 設定介面：`http://<Pi_IP>:8000/settings`
 
+**（選用）啟用 AI 使用量顯示**：在筆電執行 OAuth 授權工具，再將憑證 scp 到 Pi：
+
+```bash
+# 在筆電執行
+python tools/claude_auth.py   # 產生 data/claude_creds.json
+python tools/codex_auth.py    # 產生 data/codex_creds.json
+
+# 複製到 Pi
+scp data/claude_creds.json pi@epaper-display.local:~/epaper-home-display/data/
+scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
+```
+
 ---
 
 ## 文件索引
@@ -113,8 +125,6 @@ WebUI 設定介面：`http://<Pi_IP>:8000/settings`
 | [docs/hardware-wiring.md](docs/hardware-wiring.md) | 完整硬體接線圖與 GPIO 腳位說明 |
 | [docs/mqtt-protocol.md](docs/mqtt-protocol.md) | MQTT 主題清單與 JSON 訊息格式規範 |
 | [docs/webui.md](docs/webui.md) | WebUI 設定介面完整使用說明與 REST API 參考 |
-| [tools/claude_auth.py](tools/claude_auth.py) | Claude OAuth 初次授權工具（在筆電執行，產生 data/claude_creds.json）|
-| [tools/codex_auth.py](tools/codex_auth.py) | Codex OAuth 初次授權工具（在筆電執行，產生 data/codex_creds.json）|
 
 ---
 
