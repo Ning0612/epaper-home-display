@@ -13,6 +13,7 @@ import uvicorn
 from app.config import load_settings
 from app.display.epaper import create_epaper
 from app.loops.button import _handle_button
+from app.loops.claude_usage import _claude_usage_loop
 from app.loops.display import _display_loop
 from app.loops.notification import _notification_loop
 from app.loops.presence import _presence_loop
@@ -21,6 +22,7 @@ from app.loops.weather import _weather_loop
 from app.sensors.button import create_button
 from app.sensors.dht22 import create_dht22
 from app.sensors.light_sensor import create_light_sensor
+from app.services.claude_usage import ClaudeUsageService
 from app.services.discord import DiscordService
 from app.services.mqtt_client import MQTTService, make_done_callback
 from app.services.notification_manager import NotificationManager
@@ -66,6 +68,7 @@ async def main() -> None:
     button = create_button(settings.sensors.button)
     epaper = create_epaper(settings.display)
     weather_service = WeatherService(settings.weather)
+    claude_usage_service = ClaudeUsageService(settings.claude_usage.creds_path)
     voice_service = VoiceService(settings.voice)
     discord_service = DiscordService(settings.discord)
     notification_manager = NotificationManager(discord_service, settings.discord)
@@ -117,6 +120,7 @@ async def main() -> None:
             _presence_loop(display_queue, mqtt_service, notification_manager, settings),
             _display_loop(epaper, executor, display_queue, settings, mqtt_service),
             _weather_loop(weather_service, settings),
+            _claude_usage_loop(claude_usage_service, settings),
             _notification_loop(settings, notification_manager),
             _wifi_monitor_loop(display_queue, settings),
             server.serve(),

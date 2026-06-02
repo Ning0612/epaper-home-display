@@ -13,6 +13,7 @@ config.local.yaml
 # Data
 data/*.db
 data/*.log
+data/claude_creds.json
 
 # Waveshare driver — download from GitHub and place in lib/waveshare_epd/
 lib/waveshare_epd/epd7in5_V2.py

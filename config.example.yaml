@@ -79,3 +79,8 @@ wifi:
   #   Environment=EPAPER_AP_SSID=你的SSID
   #   Environment=EPAPER_AP_PASS=你的密碼
 
+claude_usage:
+  creds_path: "data/claude_creds.json"   # OAuth token 儲存路徑（.gitignored，不要 commit）
+  poll_interval_seconds: 600              # 每 10 分鐘向 Anthropic API 拉取一次用量
+  # 初次授權：在筆電執行 python tools/claude_auth.py，授權後 scp data/claude_creds.json 到 Pi
+

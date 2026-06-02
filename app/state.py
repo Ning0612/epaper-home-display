@@ -40,6 +40,7 @@ class AgentState:
     codex_5h_reset: str | None = None
     codex_weekly_reset: str | None = None
     claude_5h_reset: str | None = None
+    claude_7d_reset: str | None = None
 
     display_page: Literal["dashboard", "alert", "ap_mode"] = "dashboard"
     last_snapshot_image: Any = None          # PIL Image | None — set by display loop
