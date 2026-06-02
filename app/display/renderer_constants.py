@@ -4,6 +4,7 @@ DISPLAY_W, DISPLAY_H = 800, 480
 BG = (255, 255, 255)
 FG = (0, 0, 0)
 COLOR_RED    = (255, 0,   0)
+COLOR_ORANGE = (255, 128, 0)   # dithered approximation (red+yellow) — not a native e-paper color
 COLOR_YELLOW = (255, 255, 0)
 COLOR_GREEN  = (0,   255, 0)
 COLOR_BLUE   = (0,   0,   255)

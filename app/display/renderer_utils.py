@@ -7,7 +7,7 @@ from typing import TypeAlias
 
 from PIL import Image, ImageDraw, ImageFont
 
-from app.display.renderer_constants import FG, COLOR_RED, COLOR_BLUE, _WEATHER_SEVERITY
+from app.display.renderer_constants import FG, COLOR_RED, COLOR_ORANGE, COLOR_GREEN, COLOR_BLUE, _WEATHER_SEVERITY
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +69,14 @@ def _paste_icon(img: Image.Image, main: str, size: int, x: int, y: int) -> bool:
 
 
 def _draw_progress_bar(
-    draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, pct: float
+    draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, pct: float,
+    fill: tuple[int, int, int] = FG,
 ) -> None:
     pct = max(0.0, min(1.0, pct))
     draw.rectangle([(x, y), (x + w - 1, y + h - 1)], outline=FG, width=1)
     fill_w = int((w - 2) * pct)
     if fill_w > 0:
-        draw.rectangle([(x + 1, y + 1), (x + fill_w, y + h - 2)], fill=FG)
+        draw.rectangle([(x + 1, y + 1), (x + fill_w, y + h - 2)], fill=fill)
 
 
 def _weather_item(payload: dict) -> dict:
@@ -136,6 +137,17 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
         })
 
     return result
+
+
+def _usage_color(pct: float | None) -> tuple[int, int, int]:
+    """Return display color for a usage progress bar: green <60%, orange 60-80%, red >=80%."""
+    if pct is None:
+        return FG
+    if pct >= 0.80:
+        return COLOR_RED
+    if pct >= 0.60:
+        return COLOR_ORANGE
+    return COLOR_GREEN
 
 
 def _temp_color(temp: float | None) -> tuple[int, int, int]:

@@ -21,13 +21,13 @@ def _make_state() -> AgentState:
     st.humidity = 61.0
     st.presence = "OCCUPIED"
 
-    # Claude usage with reset times
-    st.claude_usage_5h = 0.62
+    # Claude usage — 5h: 85% red (≥80), 7d: 41% green (<60)
+    st.claude_usage_5h = 0.85
     st.claude_usage_week = 0.41
     st.claude_5h_reset = "14:30"
     st.claude_7d_reset = "3d 2h"
 
-    # Codex usage with reset times
+    # Codex usage — 5h: 35% green (<60), 7d: 73% yellow (60–80)
     st.codex_usage_5h = 0.35
     st.codex_usage_week = 0.73
     st.codex_5h_reset = "16:45"

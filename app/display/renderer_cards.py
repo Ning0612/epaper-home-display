@@ -17,7 +17,7 @@ from app.display.renderer_constants import (
 )
 from app.display.renderer_utils import (
     _font, _cx_text, _paste_icon, _draw_progress_bar,
-    _pick_daily_forecast, _weather_item, _temp_color,
+    _pick_daily_forecast, _weather_item, _temp_color, _usage_color,
 )
 
 if TYPE_CHECKING:
@@ -207,6 +207,7 @@ def _draw_usage_row(
     fnt = _font(13, bold=True)
     _bb = draw.textbbox((0, 0), label, font=fnt)
     _LW = _bb[2] - _bb[0]
+    color = _usage_color(pct)
     draw.text((x, y), label, font=fnt, fill=FG)
     pct_x = x + _LW + _G
     if pct is None:
@@ -223,7 +224,7 @@ def _draw_usage_row(
     else:
         _RW = 0
     _BW = max(10, row_w - (_LW + _G + _PW + _G) - _RW)
-    _draw_progress_bar(draw, bar_x, bar_y, _BW, _BH, pct)
+    _draw_progress_bar(draw, bar_x, bar_y, _BW, _BH, pct, fill=color)
     if reset_text:
         draw.text((bar_x + _BW + _G, y), reset_text, font=fnt, fill=FG)
 
