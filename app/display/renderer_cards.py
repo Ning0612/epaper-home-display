@@ -201,6 +201,7 @@ def _draw_usage_row(
     pct: float | None,
     reset_text: str | None,
     row_w: int = 190,
+    fixed_reset_w: int | None = None,
 ) -> None:
     _G, _PW, _BH = 4, 36, 11
     fnt = _font(13, bold=True)
@@ -214,7 +215,9 @@ def _draw_usage_row(
     draw.text((pct_x, y), f"{min(100, max(0, int(pct * 100)))}%", font=fnt, fill=FG)
     bar_x = pct_x + _PW + _G
     bar_y = y + (16 - _BH) // 2
-    if reset_text:
+    if fixed_reset_w is not None:
+        _RW = fixed_reset_w
+    elif reset_text:
         _rb = draw.textbbox((0, 0), reset_text, font=fnt)
         _RW = _rb[2] - _rb[0] + _G
     else:
@@ -238,13 +241,27 @@ def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     content_h = 99
     sy = iy + max(0, (ih - content_h) // 2)
 
+    # Pre-compute widest reset text so all four bars share the same length
+    _fnt = _font(13, bold=True)
+    _gap = 4
+    _all_resets = [
+        state.claude_5h_reset or "--:--",
+        state.claude_7d_reset or "--:--",
+        state.codex_5h_reset  or "--:--",
+        state.codex_7d_reset  or "--:--",
+    ]
+    _max_rw = max(
+        draw.textbbox((0, 0), t, font=_fnt)[2] - draw.textbbox((0, 0), t, font=_fnt)[0]
+        for t in _all_resets
+    ) + _gap
+
     _cx_text(draw, "Claude", ix, iw, sy, _font(13, bold=True))
-    _draw_usage_row(draw, ix, sy + 16, "5h", state.claude_usage_5h, state.claude_5h_reset, iw)
-    _draw_usage_row(draw, ix, sy + 32, "7d", state.claude_usage_week, state.claude_7d_reset, iw)
+    _draw_usage_row(draw, ix, sy + 16, "5h", state.claude_usage_5h, state.claude_5h_reset, iw, _max_rw)
+    _draw_usage_row(draw, ix, sy + 32, "7d", state.claude_usage_week, state.claude_7d_reset, iw, _max_rw)
 
     sep_y = sy + 49
     draw.line([(ix, sep_y), (ix + iw - 1, sep_y)], fill=FG, width=1)
 
     _cx_text(draw, "Codex", ix, iw, sep_y + 3, _font(13, bold=True))
-    _draw_usage_row(draw, ix, sep_y + 19, "5h", state.codex_usage_5h, state.codex_5h_reset, iw)
-    _draw_usage_row(draw, ix, sep_y + 35, "7d", state.codex_usage_week, state.codex_7d_reset, iw)
+    _draw_usage_row(draw, ix, sep_y + 19, "5h", state.codex_usage_5h, state.codex_5h_reset, iw, _max_rw)
+    _draw_usage_row(draw, ix, sep_y + 35, "7d", state.codex_usage_week, state.codex_7d_reset, iw, _max_rw)
