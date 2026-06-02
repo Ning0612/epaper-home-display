@@ -48,14 +48,14 @@ epaper-home-display/
 │   ├── config.py            # 配置系統（YAML + 環境變數）
 │   ├── state.py             # 全局狀態（AgentState dataclass）
 │   ├── display/
-│   │   ├── epaper.py        # Waveshare 7.5" 驅動包裝（Real + Mock）
-│   │   ├── renderer.py      # 主渲染入口（800×480 Pillow 圖像）
+│   │   ├── epaper.py        # e-Paper 驅動包裝（importlib 動態載入 waveshare_epd.{model}；Real + Mock）
+│   │   ├── renderer.py      # 主渲染入口（800×480 Pillow RGB 圖像）
 │   │   ├── renderer_cards.py   # 各卡片繪製函數（儀表板）
 │   │   ├── renderer_alert.py   # 告警頁面渲染（安全事件 + 快照）
 │   │   ├── renderer_apmode.py  # WiFi AP 熱點引導頁面渲染
-│   │   ├── renderer_constants.py  # 解析度、顏色、版面常數
+│   │   ├── renderer_constants.py  # 解析度、顏色（RGB）、版面常數
 │   │   ├── renderer_utils.py    # 天氣圖示、進度條等工具函數
-│   │   └── image_processor.py  # 圖片裁切、旋轉/翻轉、Floyd-Steinberg dithering
+│   │   └── image_processor.py  # 圖片裁切、旋轉/翻轉、Floyd-Steinberg dithering（六色量化）
 │   ├── logic/
 │   │   ├── presence.py      # 占用偵測（純函數，光線 → OCCUPIED/UNOCCUPIED）
 │   │   ├── alarm_decision.py  # 安全告警決策引擎（純函數）
@@ -72,12 +72,16 @@ epaper-home-display/
 │   │   ├── discord.py       # Discord Webhook 通知
 │   │   ├── notification_manager.py  # 通知協調（裝置上線、時段結束、每日摘要）
 │   │   ├── snapshot_client.py  # 外部攝影機快照擷取（aiohttp，共享 session）
+│   │   ├── claude_usage.py  # Claude OAuth API 客戶端（token 刷新、使用量解析）
+│   │   ├── codex_usage.py   # Codex OAuth API 客戶端（token 刷新、使用量解析）
 │   │   └── wifi_monitor.py  # WiFi 狀態監測（client/ap/unknown，讀 /tmp/epaper-ap-mode.json）
 │   ├── loops/               # asyncio 協程（由 main.py 以 gather 並行執行）
 │   │   ├── sensor.py        # 感測器讀取循環（30 秒）
 │   │   ├── presence.py      # 占用計分循環（60 秒）
 │   │   ├── display.py       # 顯示更新循環（牆鐘 :57）
 │   │   ├── weather.py       # 天氣更新循環（600 秒）
+│   │   ├── claude_usage.py  # Claude 使用量輪詢循環（600 秒，OAuth API 直接拉取）
+│   │   ├── codex_usage.py   # Codex 使用量輪詢循環（600 秒，OAuth API 直接拉取）
 │   │   ├── notification.py  # 通知排程循環
 │   │   └── button.py        # 按鈕事件處理
 │   ├── storage/
@@ -99,14 +103,14 @@ epaper-home-display/
 │           ├── settings.py  # 設定 PUT 端點
 │           ├── wifi.py      # AP 熱點入口（/wifi portal、/api/wifi/scan、/api/wifi/connect，不需認證）
 │           ├── desk.py      # 桌面工作時段 REST API
-│           ├── ai_usage.py  # AI 使用量接收端點
 │           └── images.py    # 圖片上傳/裁切/確認/輪播管理
 ├── tests/                   # pytest 單元測試（mock 硬體）
 ├── scripts/                 # Pi 硬體獨立測試腳本
-├── lib/waveshare_epd/       # Waveshare 驅動（需手動下載）
+├── lib/waveshare_epd/       # Waveshare 驅動（已內建：epd7in3e.py + epdconfig.py）
 ├── systemd/                 # systemd 服務單元
 ├── tools/
-│   └── ai-usage-collector/  # AI 使用量採集工具（Node.js/TypeScript）
+│   ├── claude_auth.py       # Claude OAuth 初次授權工具（在筆電執行）
+│   └── codex_auth.py        # Codex OAuth 初次授權工具（在筆電執行）
 ├── docs/                    # 文件
 ├── assets/                  # 字體、音效、圖片資源
 ├── data/                    # SQLite 資料庫與圖片（git ignored）
@@ -147,7 +151,7 @@ MQTT 告警事件（立即） ────────────► display_qu
 
 ## asyncio 協程架構
 
-`app/main.py` 中以 `asyncio.gather()` 並行執行七個協程：
+`app/main.py` 中以 `asyncio.gather()` 並行執行九個協程：
 
 | 協程 | 觸發週期 | 職責 |
 |------|---------|------|
@@ -155,6 +159,8 @@ MQTT 告警事件（立即） ────────────► display_qu
 | `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 桌面時段管理 + 告警決策；偵測到回家時立即喚醒 display_queue |
 | `_display_loop()` | 牆鐘 :57 秒 | 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖；告警頁面快照刷新 |
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
+| `_claude_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 Anthropic API 拉取 Claude 5h/7d 使用量；token 過期時自動刷新 |
+| `_codex_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 OpenAI WHAM API 拉取 Codex 5h/7d 使用量；token 過期時自動刷新 |
 | `_notification_loop()` | 依排程 | Discord 每日統計摘要等定時通知 |
 | `_wifi_monitor_loop()` | 每 10 秒 | 讀取 `/tmp/epaper-ap-mode.json`；AP 模式時設定 `display_page = "ap_mode"`；AP 結束後自動切回儀表板 |
 | `server.serve()` | 持續 | FastAPI WebUI（埠 8000） |
@@ -169,13 +175,15 @@ MQTT 告警事件（立即） ────────────► display_qu
 
 電子紙刷新很慢，絕不可阻擋 MQTT 回調或 WebUI 處理程式：
 
-| 更新類型 | 觸發 | 耗時 | 說明 |
-|---------|------|------|------|
-| 快速更新（`init_fast`）| 牆鐘 :57（僅 OCCUPIED）| ~1 秒 | 部分刷新，每 N 次中有 N-1 次 |
-| 完整更新（`init`）| 每 N 次快速後 | ~3 秒 | 完整刷新，清除鬼影（N = full_refresh_every）|
-| 告警立即更新 | MQTT 告警事件 | ~1 秒 | 透過 display_queue |
-| 回家立即更新 | 光線變暗（UNOCCUPIED→OCCUPIED）| ~1 秒 | _presence_loop 偵測到後立即觸發 |
-| 人不在時 | — | — | display_loop 暫停，不做任何更新 |
+| 更新類型 | 觸發 | 說明 |
+|---------|------|------|
+| 一般更新 | 牆鐘 :57（僅 OCCUPIED）| `epaper.py` 嘗試 `init_fast()`；7.3" E 驅動（epd7in3e）無此方法，自動 fallback 至 `init()`（完整刷新）|
+| 完整更新（`init`）| 每 `full_refresh_every` 次更新 | 驅動有 `init_fast()` 時才有意義；7.3" E 驅動（epd7in3e）每次均為完整刷新 |
+| 告警立即更新 | MQTT 告警事件 | 透過 display_queue |
+| 回家立即更新 | 光線變暗（UNOCCUPIED→OCCUPIED）| `_presence_loop` 偵測到後立即觸發 |
+| 人不在時 | — | `display_loop` 暫停，不做任何更新 |
+
+> **注意**：`epd7in3e` 驅動無 `init_fast()` 方法，`epaper.py` 的 AttributeError fallback 會使每次更新均執行完整初始化。`full_refresh_every` 設定目前對 epd7in3e 面板效果等同於每次全刷新。
 
 **牆鐘對齊原理**：在每分鐘第 57 秒觸發渲染，延遲補償自動計算為 `60 - dashboard_trigger_second`（預設 57 → 補償 3 秒），確保面板在整點 :00 顯示正確的分鐘數。
 
@@ -257,9 +265,10 @@ else                                                    →  INVESTIGATE
 | `claude_usage_week` | float \| None | Claude 週使用率（0.0–1.0）|
 | `codex_usage_5h` | float \| None | Codex 5h 使用率（0.0–1.0）|
 | `codex_usage_week` | float \| None | Codex 週使用率（0.0–1.0）|
-| `codex_5h_reset` | str \| None | Codex 5h 重置時間 |
-| `codex_weekly_reset` | str \| None | Codex 週重置時間 |
-| `claude_5h_reset` | str \| None | Claude 5h 重置時間 |
+| `claude_5h_reset` | str \| None | Claude 5h 重置時間（HH:MM 格式）|
+| `claude_7d_reset` | str \| None | Claude 7d 剩餘時間（如 `"2d 3h"`）|
+| `codex_5h_reset` | str \| None | Codex 5h 重置時間（HH:MM 格式）|
+| `codex_7d_reset` | str \| None | Codex 7d 剩餘時間（如 `"2d 3h"`）|
 | `display_page` | Literal["dashboard", "alert", "ap_mode"] | 目前顯示頁面 |
 | `last_snapshot_image` | Any（PIL Image \| None）| 最後擷取的快照（型別標注為 Any，實際為 PIL Image，僅記憶體，不序列化）|
 | `alert_page_started_at` | datetime \| None | 告警頁面首次進入時間（由 MQTT callback 設定，僅在非 alert 狀態時更新）|
@@ -308,7 +317,6 @@ SQLite（WAL 模式）位於 `data/epaper-home-display.db`：
 | `alarm_decisions` | 告警決策紀錄 |
 | `system_events` | 系統級事件（info / warning / error）|
 | `weather_logs` | 天氣資料快取 |
-| `ai_usage_logs` | AI 使用量日誌 |
 | `desk_sessions` | 桌面工作時段記錄（start/end/duration）|
 | `images` | 圖片元數據與路徑（tmp_path / display_path）|
 | `notification_queue` | 通知發送佇列（含 attempts、next_retry_ts、sent，支援重試）|
@@ -388,12 +396,6 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | GET | `/api/desk/stats` | 今日統計（在場狀態、總時長、時段數）|
 | GET | `/api/desk/history` | 近 24 小時時間軸 + 近 30 天每日統計 |
 | GET | `/api/desk/sessions` | 最近 N 筆時段記錄（預設 20 筆）|
-
-**資料接收（POST）**
-
-| 路徑 | 說明 |
-|------|------|
-| `/ai_usage` | 接收 ai-usage-collector 推送的 AI 使用量資料 |
 
 所有 PUT /settings/* 端點變更會原子化寫入 `config.local.yaml`，並同時更新記憶體中的設定物件。**天氣、顯示器、在場偵測、語音、Discord 通知、時區、密碼**等設定立即生效（下次排程執行時採用新值）。**MQTT** 設定雖寫入 YAML，但現有連線不會自動重建，需重啟服務才生效。
 

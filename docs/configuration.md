@@ -87,16 +87,17 @@ sensors:
 
 ```yaml
 display:
-  model: "epd7in5_V2"   # Waveshare 型號，對應 lib/waveshare_epd/ 的驅動檔名
-  use_mock: false         # true = 不寫入 e-Paper，渲染結果儲存為 debug_frame.png
+  model: "epd7in3e"       # Waveshare 型號，對應 lib/waveshare_epd/ 的驅動檔名
+                           # 預設 epd7in3e = 7.3" 六色（黑/白/紅/黃/藍/綠）
+  use_mock: false          # true = 不寫入 e-Paper，渲染結果儲存為 debug_frame.png
   dashboard_trigger_second: 57   # 在每分鐘第幾秒觸發渲染，用來補償電子紙刷新延遲
                                   # 延遲補償自動計算 = 60 - 此值（預設 57 → 補償 3 秒）
-  full_refresh_every: 10          # 每 N 次更新做一次全刷新（清除鬼影），其餘為快速部分刷新
+  full_refresh_every: 10          # 每 N 次更新強制完整刷新（清除鬼影）；epd7in3e 無 init_fast，每次均完整刷新
 ```
 
 **dashboard_trigger_second 說明**：e-Paper 刷新需要時間，設定在某秒觸發渲染，面板完成刷新時恰好顯示正確分鐘數。延遲補償（秒）= 60 − 觸發秒，由系統自動計算，無需手動設定。
 
-**full_refresh_every 說明**：每 N 次顯示更新執行一次完整刷新（init，清除鬼影），其餘 N-1 次使用快速部分刷新（init_fast）。設定值範圍 1–100，設為 1 代表每次都全刷新。
+**full_refresh_every 說明**：每 N 次顯示更新強制執行一次完整刷新（init，清除鬼影）。設定值範圍 1–100。注意：`epd7in3e` 驅動無 `init_fast()` 方法，即使設為較大的 N，服務仍會在每次更新時 fallback 至完整刷新（init）。
 
 ---
 
@@ -227,6 +228,36 @@ wifi:
 
 ---
 
+## AI 使用量
+
+AI 使用量由服務內建的兩個輪詢循環自動從 API 拉取，無需外部工具。
+
+### Claude 使用量
+
+```yaml
+claude_usage:
+  creds_path: "data/claude_creds.json"   # OAuth token 儲存路徑（.gitignored）
+  poll_interval_seconds: 600              # 每 10 分鐘向 Anthropic API 拉取一次用量
+```
+
+**初次授權**：在筆電執行 `python tools/claude_auth.py`，授權後將 `data/claude_creds.json` scp 到 Pi。
+支援 Claude Code 原生格式（`claudeAiOauth` 嵌套格式）與標準 snake_case 格式。
+Token 過期時自動透過 refresh_token 刷新，不需重新授權。
+
+### Codex 使用量
+
+```yaml
+codex_usage:
+  creds_path: "data/codex_creds.json"    # OAuth token 儲存路徑（.gitignored）
+  poll_interval_seconds: 600              # 每 10 分鐘向 OpenAI WHAM API 拉取一次用量
+```
+
+**初次授權**：在筆電執行 `python tools/codex_auth.py`，授權後將 `data/codex_creds.json` scp 到 Pi。
+Access token 約 1 小時後過期，服務會自動透過 refresh_token 更新，無需手動介入。
+僅在 refresh_token 失效或 Pi log 出現 `re-run tools/codex_auth.py` 警告時，才需重新執行 `codex_auth.py` 並重新 scp。
+
+---
+
 ## 圖片輪播
 
 ```yaml
@@ -298,7 +329,7 @@ sensors:
     use_mock: false
 
 display:
-  model: "epd7in5_V2"
+  model: "epd7in3e"
   use_mock: false
   dashboard_trigger_second: 57
   full_refresh_every: 10
@@ -347,4 +378,12 @@ wifi:
   ap_password: "epaper123"
   connect_timeout: 30
   monitor_interval: 10
+
+claude_usage:
+  creds_path: "data/claude_creds.json"
+  poll_interval_seconds: 600
+
+codex_usage:
+  creds_path: "data/codex_creds.json"
+  poll_interval_seconds: 600
 ```

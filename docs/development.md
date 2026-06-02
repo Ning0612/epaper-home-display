@@ -114,7 +114,8 @@ display:
 | `test_renderer.py` | `app/display/renderer.py` | 圖像渲染（Pillow mock）|
 | `test_state.py` | `app/state.py` | 狀態初始化與更新 |
 | `test_desk_session.py` | `app/logic/desk_session.py` | 桌面工作時段狀態機 |
-| `test_image_processor.py` | `app/display/image_processor.py` | 圖片裁切與 dithering |
+| `test_image_processor.py` | `app/display/image_processor.py` | 圖片裁切與 dithering（六色量化）|
+| `test_carousel.py` | `app/loops/display.py`（輪播邏輯）| 圖片輪播換圖行為 |
 | `test_weather_service.py` | `app/services/weather.py` | API 回應解析（aiohttp mock）|
 
 > **注意**：`tests/conftest.py` 為全域測試前置設定，強制設定 `RPI_MOCK=1` 環境變數，確保所有測試均使用 mock 硬體，不需也不應在 Pi 以外的環境安裝 GPIO 套件。
@@ -191,12 +192,12 @@ def compute_something():
 
 ### 修改顯示佈局
 
-渲染邏輯拆分於 `app/display/` 下的多個模組，顯示器解析度為 800×480 像素（灰階 `"L"` 模式）。
+渲染邏輯拆分於 `app/display/` 下的多個模組，顯示器解析度為 800×480 像素（`"RGB"` 模式，對應 7.3" 六色面板）。
 
 ```python
 # app/display/renderer.py - 主入口
 def render_dashboard(state: AgentState, settings: Settings, now: datetime | None = None) -> Image.Image:
-    img = Image.new("L", (800, 480), 255)  # 白色背景，灰階模式
+    img = Image.new("RGB", (800, 480), (255, 255, 255))  # 白色背景，RGB 模式（6 色面板）
     draw = ImageDraw.Draw(img)
     # 各卡片繪製函數在 renderer_cards.py
     return img

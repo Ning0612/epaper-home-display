@@ -53,9 +53,9 @@ ssh pi@epaper-display.local
 
 | 欄位 | 說明 |
 |------|------|
-| **型號** | Waveshare 驅動型號，對應 `lib/waveshare_epd/` 中的驅動檔 |
+| **型號** | Waveshare 驅動型號，對應 `lib/waveshare_epd/` 中的驅動檔。目前 repo 內建驅動：`epd7in3e`（7.3" 六色）。選擇不存在的型號時，服務會自動降級為 Mock（面板不更新）。|
 | **觸發秒** | 每分鐘第幾秒觸發渲染（預設 57；延遲補償自動計算 = 60 − 此值，使面板在整分 :00 顯示正確時間）|
-| **全刷新間隔** | 每 N 次更新做一次完整刷新（清除鬼影，預設 10）|
+| **全刷新間隔** | 每 N 次更新做一次完整刷新（清除鬼影，預設 10）。注意：`epd7in3e` 驅動無快速部分刷新，每次均為完整刷新。|
 
 ### 占用度設定
 
@@ -89,11 +89,25 @@ ssh pi@epaper-display.local
 |------|------|
 | **時區** | 顯示時間與日誌時間戳的時區（如 `Asia/Taipei`）|
 
+### AI 使用量設定（僅 YAML）
+
+Claude / Codex 使用量透過服務內建的 OAuth pull 循環自動更新，**WebUI 中無對應設定頁**。相關設定（`claude_usage` / `codex_usage`）只能透過 `config.yaml` 或 `config.local.yaml` 調整。初次授權流程：
+
+```bash
+# 在筆電執行（產生 credentials 後 scp 到 Pi）
+python tools/claude_auth.py   # 產生 data/claude_creds.json
+python tools/codex_auth.py    # 產生 data/codex_creds.json
+scp data/claude_creds.json pi@epaper-display.local:~/epaper-home-display/data/
+scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
+```
+
+詳見 [docs/configuration.md](configuration.md#ai-使用量)。
+
 ---
 
 ## REST API 參考
 
-以下為完整的 REST API 端點。以下端點**不需認證**（公開存取）：`/health`、`/login`、`/logout`、`/ai_usage`、`/wifi`、`/api/wifi/scan`、`/api/wifi/connect`。其餘端點均需 Session cookie（含 `/api/preview/alert`）。
+以下為完整的 REST API 端點。以下端點**不需認證**（公開存取）：`/health`、`/login`、`/logout`、`/wifi`、`/api/wifi/scan`、`/api/wifi/connect`。其餘端點均需 Session cookie（含 `/api/preview/alert`）。
 
 ### 認證端點
 
@@ -150,15 +164,16 @@ GET /state
   "claude_usage_5h": 0.42,
   "claude_usage_week": 0.0,
   "claude_5h_reset": "18:40",
+  "claude_7d_reset": "2d 3h",
   "codex_usage_5h": 0.18,
   "codex_usage_week": 0.25,
   "codex_5h_reset": "21:58",
-  "codex_weekly_reset": "17:38 Jun 1",
+  "codex_7d_reset": "1d 22h",
   "started_at": "2026-05-29T08:00:00"
 }
 ```
 
-> **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。`claude_usage_week` 目前未從 ai-usage-collector 接收，常態為 `0.0`。`display_page` 值為 `"dashboard"`、`"alert"` 或 `"ap_mode"`。
+> **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。重置時間欄位：5h 為 `HH:MM` 格式，7d 為 `"Xd Xh"` 剩餘時間字串（API 未回傳時為 `"--:--"`）。`display_page` 值為 `"dashboard"`、`"alert"` 或 `"ap_mode"`。
 
 ---
 
@@ -227,7 +242,7 @@ GET /settings/config
 {
   "mqtt": {"broker_host": "192.168.1.100", "broker_port": 1883, "client_id": "epaper-home-display"},
   "weather": {"api_key_set": true, "lat": 25.05, "lon": 121.53, "units": "metric", "fetch_interval_seconds": 600},
-  "display": {"model": "epd7in5_V2", "dashboard_trigger_second": 57, "full_refresh_every": 10},
+  "display": {"model": "epd7in3e", "dashboard_trigger_second": 57, "full_refresh_every": 10},
   "sensors": {"light": {"bright_threshold": 500}, ...},
   "discord": {"webhook_set": false},
   "webui": {"host": "0.0.0.0", "port": 8000},
@@ -360,7 +375,7 @@ PUT /settings/display
 Content-Type: application/json
 
 {
-  "model": "epd7in5_V2",
+  "model": "epd7in3e",
   "dashboard_trigger_second": 57,
   "full_refresh_every": 10
 }
@@ -452,35 +467,6 @@ Content-Type: application/json
 ```
 
 有效時區值請參考 [IANA 時區資料庫](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)。
-
----
-
-### 接收 AI 使用量資料
-
-```
-POST /ai_usage
-Content-Type: application/json
-
-{
-  "claude_5h_pct": 42,
-  "claude_5h_reset": "18:40",
-  "codex_5h_pct": 18,
-  "codex_5h_reset": "21:58",
-  "codex_weekly_pct": 25,
-  "codex_weekly_reset": "17:38 Jun 1"
-}
-```
-
-此端點由 `tools/ai-usage-collector` 工具自動呼叫，資料會更新 `AgentState` 並記錄至 `ai_usage_logs` 資料表，顯示於 e-Paper 面板底部。
-
-> **注意**：`claude_weekly_pct` 欄位目前不被處理（`claude_usage_week` 狀態維持 0.0）。
-
-**回應：**
-```json
-{"ok": true, "updated_at": "2026-05-29T14:30:00.123456"}
-```
-
----
 
 ---
 

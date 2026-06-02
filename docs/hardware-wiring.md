@@ -1,7 +1,7 @@
 # 硬體接線指南
 
 目標板：Raspberry Pi Zero 2W  
-顯示器：Waveshare 7.5" e-Paper (V2)
+顯示器：Waveshare 7.3" e-Paper (E)（六色：黑、白、紅、黃、藍、綠）
 
 ---
 
@@ -29,7 +29,7 @@
 
 ---
 
-## 1. Waveshare 7.5" e-Paper (V2)
+## 1. Waveshare 7.3" e-Paper (E)
 
 ### 1-1. 實體組裝
 
@@ -40,18 +40,7 @@
 3. e-Paper Adapter 接到 Driver HAT 的排線插座
 4. Driver HAT 直接插上 Pi Zero 2W 的 40-pin 排針
 
-### 1-2. Driver HAT 撥碼開關設定
-
-Driver HAT (Rev2.3) 上有兩組撥碼開關，**必須在上電前設定正確**：
-
-| 開關 | 設定值 | 說明 |
-|------|--------|------|
-| **Display Config** | **B (0.47R)** | 7.5" 面板使用 B；A (3R) 僅用於小尺寸黑白款 |
-| **Interface Config** | **0 (4-line SPI)** | 程式碼預設 4-line；撥到 1 為 3-line SPI |
-
-> 開關位置標示在 PCB 板面上，數字 0 和 1 對應撥桿方向。
-
-### 1-3. GPIO 腳位對應
+### 1-2. GPIO 腳位對應
 
 Driver HAT 透過排針佔用以下 GPIO，**這些腳位不可給其他元件使用**：
 
@@ -66,7 +55,7 @@ Driver HAT 透過排針佔用以下 GPIO，**這些腳位不可給其他元件�
 | **RST** | **Pin 11** | **GPIO 17 ← 按鈕不可用此腳** |
 | BUSY | Pin 18 | GPIO 24 |
 
-### 1-4. 啟用 SPI
+### 1-3. 啟用 SPI
 
 ```bash
 ssh pi@epaper-display.local 'ls /dev/spi*'
@@ -80,20 +69,11 @@ ssh pi@epaper-display.local 'sudo raspi-config'
 # Interface Options → SPI → Enable → 重開機
 ```
 
-### 1-5. 安裝 Waveshare 驅動
+### 1-4. 驅動說明
 
-驅動檔案未包含在 repo，需手動下載到 Pi：
+驅動已內建於 repo 的 `lib/waveshare_epd/` 目錄中（`epd7in3e.py` 與 `epdconfig.py`），**無需手動下載**。`epaper.py` 以 `importlib` 動態載入對應驅動（依 `config.yaml` 中的 `display.model`）。
 
-```bash
-ssh pi@epaper-display.local '
-cd ~/epaper-home-display/lib/waveshare_epd &&
-wget -q https://raw.githubusercontent.com/waveshare/e-Paper/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epd7in5_V2.py &&
-wget -q https://raw.githubusercontent.com/waveshare/e-Paper/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epdconfig.py &&
-echo "驅動下載完成"
-'
-```
-
-### 1-6. Pi OS Trixie / Bookworm：lgpio 設定
+### 1-5. Pi OS Trixie / Bookworm：lgpio 設定
 
 Pi OS Trixie（Debian 13）與 Bookworm 的 GPIO 後端改為 lgpio，需額外設定：
 
@@ -109,7 +89,7 @@ echo "lgpio 路徑設定完成"
 '
 ```
 
-### 1-7. 測試電子紙
+### 1-6. 測試電子紙
 
 ```bash
 ssh pi@epaper-display.local '
@@ -120,7 +100,7 @@ GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_epaper
 
 預期輸出：
 ```
-Initialising e-Paper 7.5" V2 ...
+Initialising e-Paper 7.3" (E) ...
   init OK
 Clearing display ...
   clear OK
@@ -130,7 +110,7 @@ Drawing test image ...
 PASS
 ```
 
-畫面顯示：黑色矩形外框 + 中央文字 `ePaper Home Display Test OK`。
+畫面顯示：六色測試圖案（黑/白/紅/黃/藍/綠色塊）+ 中央文字 `ePaper Home Display Test OK`。
 
 ---
 

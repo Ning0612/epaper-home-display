@@ -110,10 +110,7 @@ _SETTINGS_CONTENT = r"""
         <div class="f">
           <label>e-Paper 型號</label>
           <select id="d-model">
-            <option value="epd7in3e">Waveshare 7.3" E (6-color)</option>
-            <option value="epd7in5_V2">Waveshare 7.5" V2</option>
-            <option value="epd7in5">Waveshare 7.5" V1</option>
-            <option value="epd5in83_V2">Waveshare 5.83" V2</option>
+            <option value="epd7in3e">Waveshare 7.3" E (6-color, epd7in3e)</option>
             <option value="mock">Mock（測試用）</option>
           </select>
         </div>
