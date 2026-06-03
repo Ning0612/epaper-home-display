@@ -46,12 +46,22 @@ _ENV_CONTENT = r"""
     <div class="stat">
       <div class="stat-label">今日最高溫</div>
       <div class="stat-value hi-val" id="s-temp-max">—</div>
-      <div class="stat-sub" id="s-temp-avg"></div>
+      <div class="stat-sub">℃</div>
     </div>
     <div class="stat">
       <div class="stat-label">今日最低溫</div>
       <div class="stat-value lo-val" id="s-temp-min">—</div>
-      <div class="stat-sub" id="s-hum-avg"></div>
+      <div class="stat-sub">℃</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">今日均溫</div>
+      <div class="stat-value temp-val" id="s-temp-avg">—</div>
+      <div class="stat-sub">℃</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">今日均濕</div>
+      <div class="stat-value hum-val" id="s-hum-avg">—</div>
+      <div class="stat-sub">%</div>
     </div>
   </div>
 
@@ -264,8 +274,8 @@ async function loadCurrent(){
     var t=d.today||{};
     document.getElementById('s-temp-max').textContent = t.temp_max!=null ? t.temp_max.toFixed(1) : '—';
     document.getElementById('s-temp-min').textContent = t.temp_min!=null ? t.temp_min.toFixed(1) : '—';
-    document.getElementById('s-temp-avg').textContent = t.temp_avg!=null ? '今日均 '+t.temp_avg.toFixed(1)+'°C' : '';
-    document.getElementById('s-hum-avg').textContent  = t.hum_avg!=null  ? '今日均濕 '+t.hum_avg.toFixed(1)+'%' : '';
+    document.getElementById('s-temp-avg').textContent = t.temp_avg!=null ? t.temp_avg.toFixed(1) : '—';
+    document.getElementById('s-hum-avg').textContent  = t.hum_avg!=null  ? t.hum_avg.toFixed(1)  : '—';
   }catch(e){console.error('current',e);}
 }
 
