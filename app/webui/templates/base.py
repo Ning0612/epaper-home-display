@@ -134,6 +134,10 @@ _SHELL = r"""<!DOCTYPE html>
         <span class="nav-ic">📊</span>
         <span class="nav-lbl">書桌前分析</span>
       </a>
+      <a href="/environment" class="nav-a__ENV_A__" title="溫溼度分析">
+        <span class="nav-ic">🌡️</span>
+        <span class="nav-lbl">溫溼度分析</span>
+      </a>
       <div class="sb-section">管理</div>
       <a href="/images" class="nav-a__IMAGES_A__" title="圖片輪播">
         <span class="nav-ic">🖼️</span>
@@ -189,15 +193,17 @@ function closeSidebar(){
 
 
 def _make_shell(page_id: str, title: str, content: str, extra_head: str = "") -> str:
-    desk_a     = " active" if page_id == "desk"     else ""
-    images_a   = " active" if page_id == "images"   else ""
-    settings_a = " active" if page_id == "settings" else ""
+    desk_a     = " active" if page_id == "desk"        else ""
+    env_a      = " active" if page_id == "environment" else ""
+    images_a   = " active" if page_id == "images"      else ""
+    settings_a = " active" if page_id == "settings"    else ""
     return (
         _SHELL
         .replace("__TITLE__", title)
         .replace("__EXTRA_HEAD__", extra_head)
         .replace("__CONTENT__", content)
         .replace("__DESK_A__", desk_a)
+        .replace("__ENV_A__", env_a)
         .replace("__IMAGES_A__", images_a)
         .replace("__SETTINGS_A__", settings_a)
     )

@@ -39,6 +39,13 @@ from app.storage._log_images import (
     get_oldest_confirmed_image,
     get_unconfirmed_images,
 )
+from app.storage._log_env_analytics import (
+    get_env_daily,
+    get_env_monthly,
+    get_env_yearly,
+    get_env_today_extremes,
+    get_available_years,
+)
 
 __all__ = [
     "_now",
@@ -73,4 +80,9 @@ __all__ = [
     "count_confirmed_images",
     "get_oldest_confirmed_image",
     "get_unconfirmed_images",
+    "get_env_daily",
+    "get_env_monthly",
+    "get_env_yearly",
+    "get_env_today_extremes",
+    "get_available_years",
 ]
