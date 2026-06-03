@@ -55,6 +55,9 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         wu = d.get("webui", {})
         wu.pop("password_hash", None)
         wu.pop("session_secret", None)
+        m = d.get("mqtt", {})
+        mqtt_pw = m.pop("password", "")
+        m["password_set"] = bool(mqtt_pw)
         return JSONResponse(d)
 
     @router.get("/settings/wifi")
@@ -138,6 +141,10 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
             raise HTTPException(400, detail="broker_host must not be empty")
         if "broker_port" in patch and not (1 <= patch["broker_port"] <= 65535):
             raise HTTPException(400, detail="broker_port must be 1–65535")
+        if "username" in patch:
+            patch["username"] = patch["username"].strip()
+            if not patch["username"]:
+                patch["password"] = ""
         if not patch:
             return {"ok": True}
 
@@ -149,7 +156,7 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
 
         for k, v in patch.items():
             setattr(settings.mqtt, k, v)
-        return {"ok": True}
+        return {"ok": True, "restart_required": True}
 
     @router.put("/settings/display")
     async def set_display(body: _DisplayBody):

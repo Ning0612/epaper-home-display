@@ -20,6 +20,8 @@ class _MQTTBody(BaseModel):
     broker_host: str | None = None
     broker_port: int | None = None
     client_id: str | None = None
+    username: str | None = None
+    password: str | None = None
 
 
 class _DisplayBody(BaseModel):

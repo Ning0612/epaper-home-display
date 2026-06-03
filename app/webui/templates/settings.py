@@ -95,6 +95,17 @@ _SETTINGS_CONTENT = r"""
             <input type="text" id="m-client" placeholder="epaper-home-display">
           </div>
         </div>
+        <hr>
+        <div class="row2">
+          <div class="f">
+            <label>使用者名稱 <span class="hint">（無驗證可留空）</span></label>
+            <input type="text" id="m-user" placeholder="mqttuser">
+          </div>
+          <div class="f">
+            <label>密碼</label>
+            <input type="password" id="m-pass" placeholder="輸入密碼">
+          </div>
+        </div>
         <div class="btn-row"><button class="btn-p" onclick="saveMQTT()">儲存</button></div>
       </div>
     </div>
@@ -412,6 +423,8 @@ async function loadCfg(){
     document.getElementById('m-host').value=m.broker_host||'';
     document.getElementById('m-port').value=m.broker_port??1883;
     document.getElementById('m-client').value=m.client_id||'';
+    document.getElementById('m-user').value=m.username||'';
+    document.getElementById('m-pass').placeholder=m.password_set?'（已設定，重新輸入以更新）':'輸入密碼';
     var d=c.display||{};
     document.getElementById('d-model').value=d.model||'epd7in3e';
     document.getElementById('d-trigger').value=d.dashboard_trigger_second??57;
@@ -476,12 +489,20 @@ async function saveWeather(){
 }
 async function saveMQTT(){
   try{
-    await put('/settings/mqtt',{
+    var body={
       broker_host:document.getElementById('m-host').value.trim(),
       broker_port:+document.getElementById('m-port').value,
-      client_id:document.getElementById('m-client').value.trim()
-    });
-    toast('✓ MQTT 已儲存',true);
+      client_id:document.getElementById('m-client').value.trim(),
+      username:document.getElementById('m-user').value.trim()
+    };
+    var pw=document.getElementById('m-pass').value;
+    if(pw) body.password=pw;
+    await put('/settings/mqtt',body);
+    if(pw){
+      document.getElementById('m-pass').value='';
+      document.getElementById('m-pass').placeholder='（已設定，重新輸入以更新）';
+    }
+    toast('✓ MQTT 已儲存（需重啟服務生效）',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
 async function saveDisplay(){

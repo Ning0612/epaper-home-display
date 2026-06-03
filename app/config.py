@@ -13,6 +13,8 @@ class MQTTConfig:
     broker_host: str = "localhost"
     broker_port: int = 1883
     client_id: str = "epaper-home-display"
+    username: str = ""
+    password: str = ""
 
 
 @dataclass

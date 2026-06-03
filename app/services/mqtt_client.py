@@ -42,6 +42,8 @@ class MQTTService:
         self._loop: asyncio.AbstractEventLoop | None = None
 
         self._client = mqtt.Client(client_id=config.client_id)
+        if config.username:
+            self._client.username_pw_set(config.username, config.password)
         self._client.on_connect = self._on_connect
         self._client.on_message = self._on_message
         self._client.on_disconnect = self._on_disconnect
