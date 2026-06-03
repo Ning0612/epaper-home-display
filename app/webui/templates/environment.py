@@ -12,16 +12,16 @@ _ENV_CONTENT = r"""
   .hi-val{color:#FBBF24}
   .lo-val{color:#7dd3fc}
   .chart-wrap{overflow-x:auto;margin-top:.5rem}
-  .tab-bar{display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+  .tab-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
   .tab-btn{padding:.35rem .9rem;border:1px solid var(--border);border-radius:6px;font-size:.8rem;font-weight:600;background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s;font-family:inherit}
   .tab-btn.active{background:var(--primary);color:#060A14;border-color:var(--primary)}
   .tab-btn:hover:not(.active){background:#1C2940;color:var(--text)}
   input[type=date],input[type=month]{width:auto;padding:.3rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.8rem;color:var(--text);background:var(--bg);outline:none;font-family:'JetBrains Mono',monospace}
   input[type=date]:focus,input[type=month]:focus{border-color:var(--primary)}
   select.ref-year{width:auto;padding:.3rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.8rem;color:var(--text);background:var(--bg);outline:none;font-family:'JetBrains Mono',monospace}
-  .stats-row{display:flex;gap:2rem;flex-wrap:wrap;font-size:.82rem;margin-top:.8rem}
-  .stats-row span{white-space:nowrap}
-  .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.3rem}
+  .mini-stats{display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.8rem;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)}
+  .mini-stats span{white-space:nowrap}
+  .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.4rem}
   .stat-table-wrap{overflow-x:auto;margin-top:.5rem}
   table{width:100%;border-collapse:collapse;font-size:.82rem}
   th{text-align:left;padding:.5rem .7rem;font-size:.72rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
@@ -55,8 +55,8 @@ _ENV_CONTENT = r"""
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">趨勢圖</div>
+  <!-- 共用 tab 控制列 -->
+  <div class="card" style="padding:.9rem 1.3rem;margin-bottom:1.2rem">
     <div class="tab-bar">
       <button class="tab-btn active" data-scale="day"   onclick="setScale('day')">日</button>
       <button class="tab-btn"        data-scale="month" onclick="setScale('month')">月</button>
@@ -65,24 +65,40 @@ _ENV_CONTENT = r"""
       <input  type="month" id="ref-month" style="display:none" onchange="loadChart()">
       <select id="ref-year" class="ref-year" style="display:none" onchange="loadChart()"></select>
     </div>
-    <div class="chart-wrap" id="chart-wrap">
+  </div>
+
+  <!-- 溫度趨勢 -->
+  <div class="card">
+    <div class="card-title">🌡️ 溫度趨勢 (°C)</div>
+    <div class="chart-wrap" id="chart-temp">
       <div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>
     </div>
-    <div class="stats-row" id="chart-stats" style="display:none">
-      <span>溫度均值：<b id="st-tavg" class="temp-val">—</b></span>
-      <span>溫度最高：<b id="st-tmax" class="hi-val">—</b></span>
-      <span>溫度最低：<b id="st-tmin" class="lo-val">—</b></span>
-      <span style="border-left:1px solid var(--border);padding-left:2rem">濕度均值：<b id="st-havg" class="hum-val">—</b></span>
-      <span>濕度最高：<b id="st-hmax" class="hi-val">—</b></span>
-      <span>濕度最低：<b id="st-hmin" class="lo-val">—</b></span>
+    <div class="mini-stats" id="stats-temp" style="display:none">
+      <span>均值：<b id="tt-avg" class="temp-val">—</b></span>
+      <span>最高：<b id="tt-max" class="hi-val">—</b></span>
+      <span>最低：<b id="tt-min" class="lo-val">—</b></span>
+    </div>
+  </div>
+
+  <!-- 濕度趨勢 -->
+  <div class="card">
+    <div class="card-title">💧 濕度趨勢 (%)</div>
+    <div class="chart-wrap" id="chart-hum">
+      <div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>
+    </div>
+    <div class="mini-stats" id="stats-hum" style="display:none">
+      <span>均值：<b id="th-avg" class="hum-val">—</b></span>
+      <span>最高：<b id="th-max" class="hi-val">—</b></span>
+      <span>最低：<b id="th-min" class="lo-val">—</b></span>
     </div>
     <div class="refresh-ts" id="chart-refresh"></div>
   </div>
 
+  <!-- 統計資訊 -->
   <div class="card">
     <div class="card-title">統計資訊</div>
     <div class="stat-table-wrap">
-      <table id="stats-table">
+      <table>
         <thead>
           <tr>
             <th>項目</th>
@@ -99,8 +115,8 @@ _ENV_CONTENT = r"""
 </div>
 
 <script>
-var W=800, CH=160, SVG_H=200;
-var PAD={top:12,right:64,bottom:32,left:52};
+var W=800, CH=150, SVG_H=188;
+var PAD={top:12,right:16,bottom:30,left:52};
 var PLOT_W=W-PAD.left-PAD.right;
 var PLOT_H=CH-PAD.top-PAD.bottom;
 
@@ -132,16 +148,14 @@ function buildBand(pts,xScale,yFn,minKey,maxKey,color){
   return '<polygon points="'+top+' '+bot+'" fill="'+color+'" opacity="0.12"/>';
 }
 
-function buildYGrid(min,max,side){
+function buildYGrid(min,max){
   if(min===max){min-=1;max+=1;}
   var out='';
   for(var i=0;i<=4;i++){
     var v=min+(max-min)*i/4;
     var y=PAD.top+(1-i/4)*PLOT_H;
     out+='<line x1="'+PAD.left+'" y1="'+y+'" x2="'+(W-PAD.right)+'" y2="'+y+'" stroke="#1B2842" stroke-width="1"/>';
-    var anchor=side==='left'?'end':'start';
-    var x=side==='left'?PAD.left-5:W-PAD.right+5;
-    out+='<text x="'+x+'" y="'+(y+4)+'" text-anchor="'+anchor+'" font-size="9" fill="#4E647A">'+v.toFixed(1)+'</text>';
+    out+='<text x="'+(PAD.left-5)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="#4E647A">'+v.toFixed(1)+'</text>';
   }
   return out;
 }
@@ -157,97 +171,86 @@ function buildXLabels(pts,xScale){
   return out;
 }
 
-function renderChart(data){
-  var pts=data.points||[];
+function renderSingleChart(pts, valKey, minKey, maxKey, color, emptyLabel){
+  var xScale=function(i){return PAD.left+(pts.length>1?i/(pts.length-1)*PLOT_W:PLOT_W/2);};
+
   if(!pts.length){
     return '<svg viewBox="0 0 '+W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:280px">'
       +'<rect width="'+W+'" height="'+SVG_H+'" rx="4" fill="#0C1225"/>'
       +'<text x="'+W/2+'" y="'+SVG_H/2+'" text-anchor="middle" font-size="13" fill="#4E647A">此時段無資料</text></svg>';
   }
 
-  var temps=pts.map(function(p){return p.temp;}).filter(function(v){return v!=null;});
-  var hums=pts.map(function(p){return p.hum;}).filter(function(v){return v!=null;});
-  var tmins=pts.map(function(p){return p.temp_min;}).filter(function(v){return v!=null;});
-  var tmaxs=pts.map(function(p){return p.temp_max;}).filter(function(v){return v!=null;});
-  var hmins=pts.map(function(p){return p.hum_min;}).filter(function(v){return v!=null;});
-  var hmaxs=pts.map(function(p){return p.hum_max;}).filter(function(v){return v!=null;});
+  var vals=pts.map(function(p){return p[valKey];}).filter(function(v){return v!=null;});
+  var mins=pts.map(function(p){return p[minKey];}).filter(function(v){return v!=null;});
+  var maxs=pts.map(function(p){return p[maxKey];}).filter(function(v){return v!=null;});
+  var all=vals.concat(mins,maxs);
+  var vMin=Math.min.apply(null,all.length?all:[0]);
+  var vMax=Math.max.apply(null,all.length?all:[1]);
+  var range=Math.max(vMax-vMin,0.5);
+  vMin-=range*0.08; vMax+=range*0.08;
 
-  var allT=temps.concat(tmins,tmaxs);
-  var allH=hums.concat(hmins,hmaxs);
-  var tMin=Math.min.apply(null,allT.length?allT:[0]);
-  var tMax=Math.max.apply(null,allT.length?allT:[1]);
-  var hMin=Math.min.apply(null,allH.length?allH:[0]);
-  var hMax=Math.max.apply(null,allH.length?allH:[1]);
-
-  var tRange=Math.max(tMax-tMin,0.5);
-  var hRange=Math.max(hMax-hMin,0.5);
-  tMin-=tRange*0.08; tMax+=tRange*0.08;
-  hMin-=hRange*0.08; hMax+=hRange*0.08;
-
-  var xScale=function(i){return PAD.left+(pts.length>1?i/(pts.length-1)*PLOT_W:PLOT_W/2);};
-  var yT=function(v){return PAD.top+(1-(v-tMin)/(tMax-tMin))*PLOT_H;};
-  var yH=function(v){return PAD.top+(1-(v-hMin)/(hMax-hMin))*PLOT_H;};
-
-  var tempLine=pts.map(function(p,i){return p.temp!=null?xScale(i)+','+yT(p.temp):null;}).filter(Boolean).join(' ');
-  var humLine=pts.map(function(p,i){return p.hum!=null?xScale(i)+','+yH(p.hum):null;}).filter(Boolean).join(' ');
-
-  var tempBand=buildBand(pts,xScale,yT,'temp_min','temp_max','#38BDF8');
-  var humBand=buildBand(pts,xScale,yH,'hum_min','hum_max','#34D399');
-  var tempGrid=buildYGrid(tMin,tMax,'left');
-  var humGrid=buildYGrid(hMin,hMax,'right');
+  var yFn=function(v){return PAD.top+(1-(v-vMin)/(vMax-vMin))*PLOT_H;};
+  var line=pts.map(function(p,i){return p[valKey]!=null?xScale(i)+','+yFn(p[valKey]):null;}).filter(Boolean).join(' ');
+  var band=buildBand(pts,xScale,yFn,minKey,maxKey,color);
+  var grid=buildYGrid(vMin,vMax);
   var labels=buildXLabels(pts,xScale);
 
   return '<svg viewBox="0 0 '+W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:280px">'
     +'<rect width="'+W+'" height="'+SVG_H+'" rx="4" fill="#0C1225"/>'
-    +tempGrid+humGrid
-    +tempBand+humBand
-    +(tempLine?'<polyline points="'+tempLine+'" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'  :'')
-    +(humLine ?'<polyline points="'+humLine+'"  fill="none" stroke="#34D399" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' :'')
-    +labels
-    +'<rect x="'+(W-130)+'" y="10" width="10" height="10" rx="2" fill="#38BDF8"/>'
-    +'<text x="'+(W-115)+'" y="19" font-size="10" fill="#DDE6F0">溫度 °C</text>'
-    +'<rect x="'+(W-130)+'" y="26" width="10" height="10" rx="2" fill="#34D399"/>'
-    +'<text x="'+(W-115)+'" y="35" font-size="10" fill="#DDE6F0">濕度 %</text>'
-    +'</svg>';
+    +grid+band
+    +(line?'<polyline points="'+line+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>':'')
+    +labels+'</svg>';
 }
 
 function renderStats(stats){
-  if(!stats){document.getElementById('chart-stats').style.display='none';return;}
-  document.getElementById('chart-stats').style.display='';
-  document.getElementById('st-tavg').textContent=fmtVal(stats.temp_avg,'°C');
-  document.getElementById('st-tmax').textContent=fmtVal(stats.temp_max,'°C');
-  document.getElementById('st-tmin').textContent=fmtVal(stats.temp_min,'°C');
-  document.getElementById('st-havg').textContent=fmtVal(stats.hum_avg,'%');
-  document.getElementById('st-hmax').textContent=fmtVal(stats.hum_max,'%');
-  document.getElementById('st-hmin').textContent=fmtVal(stats.hum_min,'%');
-
   var tbody=document.getElementById('stats-tbody');
-  if(!stats.sample_count){
+  if(!stats||!stats.sample_count){
+    document.getElementById('stats-temp').style.display='none';
+    document.getElementById('stats-hum').style.display='none';
     tbody.innerHTML='<tr><td colspan="3" style="color:var(--muted)">無資料</td></tr>';
     return;
   }
+  document.getElementById('stats-temp').style.display='';
+  document.getElementById('stats-hum').style.display='';
+  document.getElementById('tt-avg').textContent=fmtVal(stats.temp_avg,'°C');
+  document.getElementById('tt-max').textContent=fmtVal(stats.temp_max,'°C');
+  document.getElementById('tt-min').textContent=fmtVal(stats.temp_min,'°C');
+  document.getElementById('th-avg').textContent=fmtVal(stats.hum_avg,'%');
+  document.getElementById('th-max').textContent=fmtVal(stats.hum_max,'%');
+  document.getElementById('th-min').textContent=fmtVal(stats.hum_min,'%');
   tbody.innerHTML=[
     ['均值', fmtVal(stats.temp_avg,'°C'), fmtVal(stats.hum_avg,'%')],
     ['最高', fmtVal(stats.temp_max,'°C'), fmtVal(stats.hum_max,'%')],
     ['最低', fmtVal(stats.temp_min,'°C'), fmtVal(stats.hum_min,'%')],
     ['樣本數', stats.sample_count+'筆', stats.sample_count+'筆'],
   ].map(function(r){
-    return '<tr><td>'+r[0]+'</td><td style="color:#38BDF8;font-family:\'JetBrains Mono\',monospace">'+r[1]+'</td><td style="color:#34D399;font-family:\'JetBrains Mono\',monospace">'+r[2]+'</td></tr>';
+    return '<tr><td>'+r[0]+'</td>'
+      +'<td style="color:#38BDF8;font-family:\'JetBrains Mono\',monospace">'+r[1]+'</td>'
+      +'<td style="color:#34D399;font-family:\'JetBrains Mono\',monospace">'+r[2]+'</td></tr>';
   }).join('');
 }
 
 async function loadChart(){
   var ref=getRef();
   var url='/api/env/chart?scale='+currentScale+(ref?'&ref='+encodeURIComponent(ref):'');
-  document.getElementById('chart-wrap').innerHTML='<div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>';
+  var loading='<div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>';
+  document.getElementById('chart-temp').innerHTML=loading;
+  document.getElementById('chart-hum').innerHTML=loading;
   try{
     var r=await fetch(url);
     var d=await r.json();
-    document.getElementById('chart-wrap').innerHTML=renderChart(d);
+    var pts=d.points||[];
+    document.getElementById('chart-temp').innerHTML=renderSingleChart(pts,'temp','temp_min','temp_max','#38BDF8');
+    document.getElementById('chart-hum').innerHTML=renderSingleChart(pts,'hum','hum_min','hum_max','#34D399');
     renderStats(d.stats||null);
     document.getElementById('chart-refresh').textContent='最後更新：'+new Date().toLocaleTimeString('zh-TW',{hour12:false});
   }catch(e){
-    document.getElementById('chart-wrap').innerHTML='<div style="color:var(--red);font-size:.85rem;padding:.5rem 0">資料載入失敗</div>';
+    var err='<div style="color:var(--red);font-size:.85rem;padding:.5rem 0">資料載入失敗</div>';
+    document.getElementById('chart-temp').innerHTML=err;
+    document.getElementById('chart-hum').innerHTML=err;
+    document.getElementById('stats-temp').style.display='none';
+    document.getElementById('stats-hum').style.display='none';
+    document.getElementById('stats-tbody').innerHTML='<tr><td colspan="3" style="color:var(--muted)">資料載入失敗</td></tr>';
     console.error('chart',e);
   }
 }
@@ -262,7 +265,7 @@ async function loadCurrent(){
     document.getElementById('s-temp-max').textContent = t.temp_max!=null ? t.temp_max.toFixed(1) : '—';
     document.getElementById('s-temp-min').textContent = t.temp_min!=null ? t.temp_min.toFixed(1) : '—';
     document.getElementById('s-temp-avg').textContent = t.temp_avg!=null ? '今日均 '+t.temp_avg.toFixed(1)+'°C' : '';
-    document.getElementById('s-hum-avg').textContent  = t.hum_avg!=null  ? '今日均濕 '+t.hum_avg.toFixed(1)+'%'  : '';
+    document.getElementById('s-hum-avg').textContent  = t.hum_avg!=null  ? '今日均濕 '+t.hum_avg.toFixed(1)+'%' : '';
   }catch(e){console.error('current',e);}
 }
 
@@ -280,7 +283,6 @@ async function initYears(){
   }catch(e){console.error('years',e);}
 }
 
-// 初始化
 document.getElementById('ref-date').value=new Date().toISOString().slice(0,10);
 (function(){
   var now=new Date();
