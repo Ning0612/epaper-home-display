@@ -17,6 +17,18 @@ logger = logging.getLogger(__name__)
 
 _tx_log_lock = threading.Lock()
 
+_UNKNOWN_SENTINELS = frozenset({"unknown", "no_face", ""})
+
+
+def _coerce_known(raw: object, identity: str) -> bool:
+    if raw is not None:
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, str):
+            return raw.lower() not in ("false", "0", "no", "")
+        return bool(raw)
+    return identity.lower() not in _UNKNOWN_SENTINELS
+
 _SUBSCRIBE_TOPICS = [
     "home/security/door",
     "home/security/face",
@@ -107,15 +119,16 @@ class MQTTService:
         state.mqtt_rx_log = [rx_entry] + state.mqtt_rx_log[:49]
 
         if topic == "home/security/door":
-            door_state = str(payload.get("state", ""))[:64]
-            state.last_door_event = payload
+            door_state = str(payload.get("door_state") or payload.get("state") or "")[:64]
+            state.last_door_event = {**payload, "state": door_state, "door_state": door_state}
             await log_door_event(door_state, payload)
             logger.info("Door: %s", door_state)
 
         elif topic == "home/security/face":
-            identity = str(payload.get("identity", "unknown"))[:64]
-            known = bool(payload.get("known", False))
-            state.last_face_event = payload
+            raw_identity = payload.get("user_name") or payload.get("identity") or ""
+            identity = str(raw_identity).strip()[:64] or "unknown"
+            known = _coerce_known(payload.get("known"), identity)
+            state.last_face_event = {**payload, "identity": identity, "user_name": identity, "known": known}
             await log_face_event(identity, known, payload)
             logger.info("Face: %s known=%s", identity, known)
 
