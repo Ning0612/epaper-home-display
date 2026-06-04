@@ -109,7 +109,7 @@ async def _handle_btn_trigger_alarm(
 
     Only activates when already on the alert page (entered via MQTT alert).
     Does NOT switch pages or push to the display queue; only publishes to
-    home/home_state/alarm_decision and plays the voice alert.
+    home/home_state/alarm_command and plays the voice alert.
     Also updates alert_last_triggered_at to extend the alert page timeout.
     Repeated presses within _SAME_PAGE_COOLDOWN_SECS are ignored to
     prevent MQTT and voice spam.
@@ -129,9 +129,8 @@ async def _handle_btn_trigger_alarm(
     state.alert_last_triggered_at = now  # extends alert page timeout
     if mqtt_service is not None:
         try:
-            mqtt_service.publish("home/home_state/alarm_decision", {
-                "decision": "manual_trigger",
-                "source": "button",
+            mqtt_service.publish("home/home_state/alarm_command", {
+                "alarm_decision": "TRIGGER_ALARM",
             })
         except Exception as exc:
             logger.error("Button 3: MQTT publish failed: %s", exc)
@@ -145,7 +144,7 @@ async def _handle_btn_cancel_alarm(mqtt_service) -> None:
 
     Only activates when already on the alert page.
     Does NOT switch pages or clear state; only publishes
-    home/home_state/alarm_decision with decision=cancel.
+    home/home_state/alarm_command with alarm_decision=CANCEL_ALARM.
     """
     if _in_ap_mode(4):
         return
@@ -154,9 +153,8 @@ async def _handle_btn_cancel_alarm(mqtt_service) -> None:
         return
     if mqtt_service is not None:
         try:
-            mqtt_service.publish("home/home_state/alarm_decision", {
-                "decision": "cancel",
-                "source": "button",
+            mqtt_service.publish("home/home_state/alarm_command", {
+                "alarm_decision": "CANCEL_ALARM",
             })
         except Exception as exc:
             logger.error("Button 4: MQTT publish failed: %s", exc)

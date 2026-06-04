@@ -87,7 +87,7 @@ async def _presence_loop(
                 if alert is not _last_processed_alert or (decision, reason) != _last_published_decision:
                     try:
                         mqtt_service.publish("home/home_state/alarm_decision", {
-                            "decision": decision,
+                            "alarm_decision": decision,
                             "reason": reason,
                             "score": score,
                         })

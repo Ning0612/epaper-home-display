@@ -82,7 +82,7 @@ class MQTTService:
 
     def publish(self, topic: str, payload: dict) -> None:
         # agent/timestamp placed last to be authoritative; caller cannot override them
-        out = {**payload, "agent": "epaper-home-display", "timestamp": datetime.now().isoformat()}
+        out = {**payload, "agent": self._config.client_id, "timestamp": datetime.now().isoformat()}
         self._client.publish(topic, json.dumps(out), qos=1)
         entry = {"topic": topic, "payload": out, "sent_at": out["timestamp"]}
         with _tx_log_lock:
@@ -136,6 +136,11 @@ class MQTTService:
             img.load()
             state.last_snapshot_image = img.convert("RGB")
             state.last_camera_frame_at = datetime.now()
+            if state.display_page == "alert":
+                try:
+                    self._display_queue.put_nowait("alert")
+                except asyncio.QueueFull:
+                    pass  # display busy; latest frame will be shown when it finishes
         except Exception as exc:
             logger.warning("Camera frame decode failed: %s", exc)
 

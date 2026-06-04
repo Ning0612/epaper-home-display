@@ -1,9 +1,9 @@
 from app.logic.alarm_decision import compute_alarm_decision
 
 
-def test_no_alert_returns_ignore():
+def test_no_alert_returns_cancel():
     decision, reason = compute_alarm_decision("UNKNOWN", 0.0, None, None)
-    assert decision == "IGNORE"
+    assert decision == "CANCEL_ALARM"
     assert reason
 
 
@@ -11,41 +11,41 @@ def test_unoccupied_unknown_face_triggers_alarm():
     decision, reason = compute_alarm_decision(
         "UNOCCUPIED", 0.0, {"type": "motion"}, None
     )
-    assert decision == "ALARM"
+    assert decision == "TRIGGER_ALARM"
     assert "unoccupied" in reason.lower() or "unexpected" in reason.lower()
 
 
-def test_unoccupied_with_known_face_investigates():
+def test_unoccupied_with_known_face_no_action():
     decision, _ = compute_alarm_decision(
         "UNOCCUPIED", 0.0,
         {"type": "face_detected"},
         {"identity": "lance", "known": True},
     )
-    assert decision == "INVESTIGATE"
+    assert decision == "NO_ACTION"
 
 
-def test_occupied_known_face_returns_ignore():
+def test_occupied_known_face_returns_cancel():
     decision, _ = compute_alarm_decision(
         "OCCUPIED", 3.0,
         {"type": "door_open"},
         {"identity": "lance", "known": True},
     )
-    assert decision == "IGNORE"
+    assert decision == "CANCEL_ALARM"
 
 
-def test_unknown_presence_returns_investigate():
+def test_unknown_presence_triggers_alarm():
     decision, _ = compute_alarm_decision(
         "UNKNOWN", 1.0,
         {"type": "sensor_trigger"},
         None,
     )
-    assert decision == "ALARM"  # UNKNOWN + no known face → treat as UNOCCUPIED path
+    assert decision == "TRIGGER_ALARM"  # UNKNOWN + no known face → treat as UNOCCUPIED path
 
 
-def test_occupied_no_known_face_investigates():
+def test_occupied_no_known_face_no_action():
     decision, _ = compute_alarm_decision(
         "OCCUPIED", 2.0,
         {"type": "motion"},
         None,
     )
-    assert decision == "INVESTIGATE"
+    assert decision == "NO_ACTION"

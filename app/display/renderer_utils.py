@@ -178,9 +178,9 @@ def _cx_text(
 
 _DOOR_PREFIX = "DOOR_"
 _DECISION_COLOR_LABEL: dict[str, str] = {
-    "ALARM": "RED",
-    "INVESTIGATE": "WARN",
-    "IGNORE": "GREEN",
+    "TRIGGER_ALARM": "RED",
+    "NO_ACTION":     "WARN",
+    "CANCEL_ALARM":  "GREEN",
 }
 _UNKNOWN_FACE_IDS = frozenset({"unknown", "no_face", ""})
 
@@ -207,7 +207,7 @@ def fmt_face(event: dict | None) -> str:
 
 
 def fmt_alarm(decision: str | None) -> str:
-    """ALARM → RED, INVESTIGATE → WARN, IGNORE → GREEN, None → NONE."""
+    """TRIGGER_ALARM → RED, NO_ACTION → WARN, CANCEL_ALARM → GREEN, None → NONE."""
     if decision is None:
         return "NONE"
     return _DECISION_COLOR_LABEL.get(decision, decision[:5])
