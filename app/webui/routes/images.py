@@ -248,11 +248,6 @@ def create_images_router(
         # Reset advance timer so new image stays visible for at least one interval
         state.carousel_last_advance = datetime.now()
 
-        # Trigger immediate display refresh
-        if display_queue is not None:
-            with contextlib.suppress(Exception):
-                display_queue.put_nowait("image_confirmed")
-
         return {"ok": True, "id": id}
 
     # ------------------------------------------------------------------ delete
