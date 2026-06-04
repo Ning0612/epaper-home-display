@@ -3,7 +3,7 @@ from app.webui.templates.base import _make_shell
 _DESK_CONTENT = r"""
 <style>
   .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem;margin-bottom:1.2rem}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh)}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh);text-align:center}
   .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
   .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:'JetBrains Mono',monospace}
   .stat-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}

@@ -2,11 +2,12 @@ from app.webui.templates.base import _make_shell
 
 _ENV_CONTENT = r"""
 <style>
-  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem;margin-bottom:1.2rem}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh)}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.6rem;margin-bottom:1.2rem}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.7rem .9rem;box-shadow:var(--sh);text-align:center}
   .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
+  .stat-value-row{display:flex;align-items:baseline;justify-content:center;gap:2px}
   .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:'JetBrains Mono',monospace}
-  .stat-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+  .stat-unit{font-size:.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace;font-weight:400}
   .temp-val{color:#38BDF8}
   .hum-val{color:#34D399}
   .hi-val{color:#FBBF24}
@@ -35,33 +36,27 @@ _ENV_CONTENT = r"""
   <div class="stats-grid">
     <div class="stat">
       <div class="stat-label">目前溫度</div>
-      <div class="stat-value temp-val" id="s-temp">—</div>
-      <div class="stat-sub">℃</div>
+      <div class="stat-value-row"><span class="stat-value temp-val" id="s-temp">—</span><span class="stat-unit">℃</span></div>
     </div>
     <div class="stat">
       <div class="stat-label">目前濕度</div>
-      <div class="stat-value hum-val" id="s-hum">—</div>
-      <div class="stat-sub">%</div>
+      <div class="stat-value-row"><span class="stat-value hum-val" id="s-hum">—</span><span class="stat-unit">%</span></div>
     </div>
     <div class="stat">
       <div class="stat-label">今日最高溫</div>
-      <div class="stat-value hi-val" id="s-temp-max">—</div>
-      <div class="stat-sub">℃</div>
+      <div class="stat-value-row"><span class="stat-value hi-val" id="s-temp-max">—</span><span class="stat-unit">℃</span></div>
     </div>
     <div class="stat">
       <div class="stat-label">今日最低溫</div>
-      <div class="stat-value lo-val" id="s-temp-min">—</div>
-      <div class="stat-sub">℃</div>
+      <div class="stat-value-row"><span class="stat-value lo-val" id="s-temp-min">—</span><span class="stat-unit">℃</span></div>
     </div>
     <div class="stat">
       <div class="stat-label">今日均溫</div>
-      <div class="stat-value temp-val" id="s-temp-avg">—</div>
-      <div class="stat-sub">℃</div>
+      <div class="stat-value-row"><span class="stat-value temp-val" id="s-temp-avg">—</span><span class="stat-unit">℃</span></div>
     </div>
     <div class="stat">
       <div class="stat-label">今日均濕</div>
-      <div class="stat-value hum-val" id="s-hum-avg">—</div>
-      <div class="stat-sub">%</div>
+      <div class="stat-value-row"><span class="stat-value hum-val" id="s-hum-avg">—</span><span class="stat-unit">%</span></div>
     </div>
   </div>
 
