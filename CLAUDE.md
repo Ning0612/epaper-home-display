@@ -126,18 +126,20 @@ light_raw ≥ bright_threshold → UNOCCUPIED (score = 0.0)
 
 The display is slow — never block MQTT callbacks or WebUI handlers for it:
 
-- Normal dashboard: wall-clock aligned — triggered at `:dashboard_trigger_second` each minute (default :57) so the panel shows the correct minute at :00
+- Normal dashboard: wall-clock aligned to `dashboard_interval_minutes` boundaries (default every 5 min). Trigger second is auto-derived per model: `epd7in3e`→40 (full refresh ~20s), `epd7in5_V2`→57 (fast refresh ~0.3s). Not user-configurable.
 - Weather/environment: every 10 minutes
-- Security alert: immediately via display_queue
-- Refresh cadence: every 10th successful write is a full refresh (init, clears ghosting); the other 9 use init_fast (partial)
+- Security alert: immediately via display_queue; MQTT camera frames also trigger immediate re-render while on alert page
+- Refresh cadence: every `full_refresh_every` (default 10) successful writes is a full refresh (init, clears ghosting); others use init_fast (partial). Note: `epd7in3e` has no init_fast — every write is a full refresh.
 
 ### MQTT Topics
 
-Subscribes to: `home/security/door`, `home/security/face`, `home/security/alert`, `home/security/status`
+Subscribes to (JSON, QoS 1): `home/security/door`, `home/security/face`, `home/security/alert`, `home/security/status`
 
-Publishes to: `home/home_state/presence`, `home/home_state/alarm_decision`, `home/display/status`
+Subscribes to (raw binary, QoS 0): `home/security/camera` (JPEG frames, max 1 MB — NOT JSON, NOT logged to mqtt_rx_log)
 
-All payloads are JSON and must include `agent` and `timestamp` fields.
+Publishes to: `home/home_state/presence`, `home/home_state/alarm_decision`, `home/home_state/alarm_command`, `home/display/status`
+
+All JSON payloads must include `agent` and `timestamp` fields. `home/home_state/alarm_command` is published by Button 3 (TRIGGER_ALARM) and Button 4 (CANCEL_ALARM) via payload key `alarm_decision`.
 
 ### Mock Pattern for Local Testing
 

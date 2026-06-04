@@ -50,6 +50,7 @@
 ```json
 {
   "identity": "lance",
+  "user_name": "lance",
   "known": true,
   "timestamp": "2026-05-29T10:30:00",
   "agent": "agent-1"
@@ -58,8 +59,8 @@
 
 | 欄位 | 類型 | 說明 |
 |------|------|------|
-| `identity` | string | 辨識出的身份（已知人員名稱，或 `"unknown"`）|
-| `known` | bool | `true` = 已知人員；`false` = 陌生人 |
+| `user_name` 或 `identity` | string | 辨識出的身份（已知人員名稱，或 `"unknown"`）；`user_name` 優先於 `identity` |
+| `known` | bool | `true` = 已知人員；`false` = 陌生人（若省略，根據 identity 是否為 "unknown"/"no_face" 推導）|
 | `timestamp` | string | ISO 8601 格式 |
 | `agent` | string | 發送方識別碼 |
 
@@ -92,11 +93,12 @@
 | `agent` | string | 發送方識別碼 |
 
 **效果**：
-- 更新 `state.last_alert`、`state.alert_last_triggered_at`
+- 更新 `state.last_alert`、`state.alert_last_triggered_at`、`state.alert_face_event`（快照當前人臉事件）
 - 設定 `state.display_page = "alert"` 並立即觸發 `display_queue.put_nowait("alert")`
-- 渲染條件：僅在 `outdoor_agent.alert_page_enabled: true` **且** `outdoor_agent.snapshot_url` 非空時，display loop 實際渲染告警頁面；否則 `_check_alert_timeout()` 立即重置 `display_page = "dashboard"`
+- 渲染條件：僅在 `outdoor_agent.alert_page_enabled: true` 時渲染告警頁面；否則 `_check_alert_timeout()` 立即重置 `display_page = "dashboard"`
 - 播放 `alert.wav` 音效（USB 喇叭，需 `voice.enabled: true` 且 `assets/sounds/alert.wav` 存在）
 - Discord 告警通知由 **Agent 1** 負責發送，本服務不發送
+- **冷卻機制**：若告警頁面剛被關閉（`alert_dismissed_at` 記錄），180 秒內收到新告警會靜默忽略（防止快速循環觸發）
 
 ---
 
@@ -118,9 +120,29 @@ Agent 1 的系統狀態心跳。
 
 ---
 
+### `home/security/camera` — 即時攝影機畫面
+
+來自外部攝影機的即時 JPEG 影像串流（**raw binary，非 JSON**）。
+
+| 屬性 | 值 | 說明 |
+|------|-----|------|
+| QoS | 0 | 儘力送達，可能遺失，不重傳 |
+| 酬載格式 | raw JPEG bytes | 必須以 `\xff\xd8`（JPEG SOI marker）開頭 |
+| 大小限制 | 最大 1 MB | 超過則靜默丟棄 |
+
+**效果**：
+- 解碼 JPEG → 轉換為 RGB PIL Image → 更新 `state.last_snapshot_image`
+- 更新 `state.last_camera_frame_at`（時間戳，用於判斷影像新鮮度）
+- 若目前頁面為 `alert`，立即將 `"alert"` 送入 `display_queue` 以觸發畫面更新
+- **不記錄**到 `state.mqtt_rx_log` / `state.mqtt_last_rx_by_topic`（binary 幀不走 JSON dispatch）
+
+> **與 HTTP snapshot 的關係**：告警頁面優先使用 MQTT 攝影機畫面（`last_camera_frame_at` 在 5 秒內視為新鮮）；若 MQTT 無新鮮畫面且 `outdoor_agent.snapshot_url` 有設定，仍會以 HTTP GET 擷取快照作為備援。
+
+---
+
 ## 發布主題（出站）
 
-> **實作狀態**：三個出站主題均已啟用。`home/home_state/presence` 每 60 秒發布；`home/home_state/alarm_decision` 在新告警到達或相同告警下決策改變時發布；`home/display/status` 在每次 e-Paper 成功更新後發布。
+> **實作狀態**：四個出站主題均已啟用。`home/home_state/presence` 每 60 秒發布；`home/home_state/alarm_decision` 在新告警到達或相同告警下決策改變時發布；`home/display/status` 在每次 e-Paper 成功更新後發布；`home/home_state/alarm_command` 由 Button 3/4 觸發時發布。
 
 本服務發布以下主題，供 **Agent 1** 或其他訂閱者使用：
 
@@ -205,6 +227,30 @@ Agent 1 的系統狀態心跳。
 
 ---
 
+### `home/home_state/alarm_command` — 按鈕告警指令
+
+由按鈕 3（GPIO 27）或按鈕 4（GPIO 22）觸發，僅在目前頁面為 `alert` 時發送。
+
+```json
+{
+  "alarm_decision": "TRIGGER_ALARM",
+  "agent": "epaper-home-display",
+  "timestamp": "2026-05-29T10:30:00.123456"
+}
+```
+
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| `alarm_decision` | string | `"TRIGGER_ALARM"`（按鈕 3：重新觸發告警）或 `"CANCEL_ALARM"`（按鈕 4：取消告警）|
+
+**觸發條件**：
+- 按鈕 3（TRIGGER_ALARM）：目前頁面為 `alert`，且距上次發送超過 180 秒（冷卻保護）；同步播放 `alert.wav`
+- 按鈕 4（CANCEL_ALARM）：目前頁面為 `alert`，不重複觸發限制
+
+> 此主題不切換頁面、不清除 alert state，純粹通知 Agent 1 採取對應行動。
+
+---
+
 ## 訊息格式規範
 
 所有訊息遵循以下規範：
@@ -220,12 +266,14 @@ Agent 1 的系統狀態心跳。
 
 | 方向 | 主題 | 說明 |
 |------|------|------|
-| 訂閱 | `home/security/door` | 門狀態事件 |
-| 訂閱 | `home/security/face` | 人臉辨識事件 |
-| 訂閱 | `home/security/alert` | 安全告警（立即顯示）|
-| 訂閱 | `home/security/status` | Agent 1 狀態心跳 |
+| 訂閱 | `home/security/door` | 門狀態事件（JSON, QoS 1）|
+| 訂閱 | `home/security/face` | 人臉辨識事件（JSON, QoS 1）|
+| 訂閱 | `home/security/alert` | 安全告警（立即顯示，JSON, QoS 1）|
+| 訂閱 | `home/security/status` | Agent 1 狀態心跳（JSON, QoS 1）|
+| 訂閱 | `home/security/camera` | 即時攝影機 JPEG 畫面（raw binary, QoS 0, max 1 MB）|
 | 發布 | `home/home_state/presence` | 占用狀態更新 |
 | 發布 | `home/home_state/alarm_decision` | 告警決策結果 |
+| 發布 | `home/home_state/alarm_command` | 按鈕觸發告警指令（TRIGGER_ALARM / CANCEL_ALARM）|
 | 發布 | `home/display/status` | 顯示器狀態回報 |
 
 ---

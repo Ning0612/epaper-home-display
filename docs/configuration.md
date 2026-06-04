@@ -78,8 +78,11 @@ sensors:
 ```yaml
 sensors:
   button:
-    gpio_pin: 27    # BCM 腳位號碼，預設 GPIO 27（Pin 13）
-                    # 注意：GPIO 17（Pin 11）已被 e-Paper RST 佔用，不可用
+    gpio_pins: [5, 6, 27, 22]  # [B1 dashboard, B2 alert-page, B3 trigger-alarm, B4 cancel-alarm]
+                                # B1=GPIO 5（強制 OCCUPIED + 切換 Dashboard）
+                                # B2=GPIO 6（切換 Alert 頁面）
+                                # B3=GPIO 27（重新觸發告警：MQTT publish + 音效）
+                                # B4=GPIO 22（取消告警：MQTT publish CANCEL_ALARM）
     use_mock: false
 ```
 
@@ -89,15 +92,21 @@ sensors:
 
 ```yaml
 display:
-  model: "epd7in3e"       # Waveshare 型號，對應 lib/waveshare_epd/ 的驅動檔名
-                           # 預設 epd7in3e = 7.3" 六色（黑/白/紅/黃/藍/綠）
-  use_mock: false          # true = 不寫入 e-Paper，渲染結果儲存為 debug_frame.png
-  dashboard_trigger_second: 57   # 在每分鐘第幾秒觸發渲染，用來補償電子紙刷新延遲
-                                  # 延遲補償自動計算 = 60 - 此值（預設 57 → 補償 3 秒）
+  model: "epd7in3e"              # Waveshare 型號，對應 lib/waveshare_epd/ 的驅動檔名
+                                  # 支援型號：
+                                  #   epd7in3e   = 7.3" 七色（黑/白/紅/黃/藍/綠/橙）
+                                  #   epd7in5_V2 = 7.5" 黑白，支援快速局部刷新
+                                  #   mock       = 不寫入硬體，渲染結果儲存為 debug_frame.png
+  use_mock: false
+  dashboard_interval_minutes: 5  # Dashboard 刷新間隔（分鐘），必須是 60 的因數（1/2/3/4/5/6/10/12/15/20/30/60）
   full_refresh_every: 10          # 每 N 次更新強制完整刷新（清除鬼影）；epd7in3e 無 init_fast，每次均完整刷新
+  # dashboard_trigger_second 不可設定，由 model 自動推導：
+  #   epd7in3e   → 40（全刷新 ~20s，在整點前 20s 觸發）
+  #   epd7in5_V2 → 57（快速刷新 ~0.3s，在整點前 3s 觸發）
+  #   mock       → 57
 ```
 
-**dashboard_trigger_second 說明**：e-Paper 刷新需要時間，設定在某秒觸發渲染，面板完成刷新時恰好顯示正確分鐘數。延遲補償（秒）= 60 − 觸發秒，由系統自動計算，無需手動設定。
+**dashboard_interval_minutes 說明**：Dashboard 每 N 分鐘更新一次（預設 5 分鐘）。系統在每個 N 分鐘邊界前提早觸發渲染，使面板完成刷新時剛好顯示正確時間。觸發秒數由 `model` 自動推導，無需手動設定。
 
 **full_refresh_every 說明**：每 N 次顯示更新強制執行一次完整刷新（init，清除鬼影）。設定值範圍 1–100。注意：`epd7in3e` 驅動無 `init_fast()` 方法，即使設為較大的 N，服務仍會在每次更新時 fallback 至完整刷新（init）。
 
@@ -263,13 +272,13 @@ Access token 約 1 小時後過期，服務會自動透過 refresh_token 更新�
 
 ```yaml
 images:
-  storage_dir: "data/images"       # 圖片存放目錄（含 display PNG 與 tmp 上傳）
-  max_count: 50                    # 最多保留已確認圖片數，超過自動刪除最舊的
-  max_upload_bytes: 15728640       # 上傳大小上限（bytes，預設 15 MB）
-  max_pixels: 25000000             # 圖片像素數上限（預設 2500 萬像素；Pi Zero 2W 記憶體限制）
-  carousel_enabled: false          # 是否啟用輪播
-  carousel_interval_minutes: 30    # 輪播換圖間隔（分鐘）
-  carousel_mode: "sequential"      # 換圖模式：sequential（順序）/ random（隨機）
+  storage_dir: "data/images"           # 圖片存放目錄（含 display PNG 與 tmp 上傳）
+  max_count: 50                         # 最多保留已確認圖片數，超過自動刪除最舊的
+  max_upload_bytes: 15728640            # 上傳大小上限（bytes，預設 15 MB）
+  max_pixels: 25000000                  # 圖片像素數上限（預設 2500 萬像素；Pi Zero 2W 記憶體限制）
+  carousel_enabled: false               # 是否啟用輪播
+  carousel_interval_refreshes: 10       # 每 N 次 Dashboard 刷新切換一張圖片（不是分鐘數）
+  carousel_mode: "sequential"           # 換圖模式：sequential（順序）/ random（隨機）
   # allowed_formats 可選，預設允許 JPEG、PNG、WebP、GIF、BMP
   # 若需加入 TIFF 等格式，明確列出：
   # allowed_formats: ["JPEG", "PNG", "WEBP", "GIF", "BMP", "TIFF"]
@@ -328,13 +337,14 @@ sensors:
     bright_threshold: 500
     use_mock: false
   button:
-    gpio_pin: 27
+    gpio_pins: [5, 6, 27, 22]  # [B1 dashboard, B2 alert-page, B3 trigger-alarm, B4 cancel-alarm]
     use_mock: false
 
 display:
   model: "epd7in3e"
   use_mock: false
-  dashboard_trigger_second: 57
+  # dashboard_trigger_second 由 model 自動推導，不需設定
+  dashboard_interval_minutes: 5  # 必須是 60 的因數（1/2/3/4/5/6/10/12/15/20/30/60）
   full_refresh_every: 10
 
 voice:
@@ -366,7 +376,7 @@ images:
   max_upload_bytes: 15728640
   max_pixels: 25000000
   carousel_enabled: false
-  carousel_interval_minutes: 30
+  carousel_interval_refreshes: 10   # 每 N 次 dashboard 刷新換圖
   carousel_mode: "sequential"
 
 outdoor_agent:

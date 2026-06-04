@@ -55,8 +55,8 @@ ssh pi@epaper-display.local
 
 | 欄位 | 說明 |
 |------|------|
-| **型號** | Waveshare 驅動型號，對應 `lib/waveshare_epd/` 中的驅動檔。目前 repo 內建驅動：`epd7in3e`（7.3" 六色）。選擇不存在的型號時，服務會自動降級為 Mock（面板不更新）。|
-| **觸發秒** | 每分鐘第幾秒觸發渲染（預設 57；延遲補償自動計算 = 60 − 此值，使面板在整分 :00 顯示正確時間）|
+| **型號** | Waveshare 驅動型號，對應 `lib/waveshare_epd/` 中的驅動檔。支援：`epd7in3e`（7.3" 七色）、`epd7in5_V2`（7.5" 黑白，支援快速刷新）、`mock`（不寫入硬體）。選擇不存在的型號時，服務啟動時會報錯。|
+| **刷新間隔** | Dashboard 每 N 分鐘刷新一次（`dashboard_interval_minutes`，預設 5，必須是 60 的因數）。觸發秒數由型號自動推導（epd7in3e=40, epd7in5_V2=57），不需手動設定。|
 | **全刷新間隔** | 每 N 次更新做一次完整刷新（清除鬼影，預設 10）。注意：`epd7in3e` 驅動無快速部分刷新，每次均為完整刷新。|
 
 ### 占用度設定
@@ -250,7 +250,7 @@ GET /settings/config
 {
   "mqtt": {"broker_host": "192.168.1.100", "broker_port": 1883, "client_id": "epaper-home-display", "username": "myuser", "password_set": true},
   "weather": {"api_key_set": true, "lat": 25.05, "lon": 121.53, "units": "metric", "fetch_interval_seconds": 600},
-  "display": {"model": "epd7in3e", "dashboard_trigger_second": 57, "full_refresh_every": 10},
+  "display": {"model": "epd7in3e", "dashboard_interval_minutes": 5, "full_refresh_every": 10},
   "sensors": {"light": {"bright_threshold": 500}, ...},
   "discord": {"webhook_set": false},
   "webui": {"host": "0.0.0.0", "port": 8000},
@@ -395,14 +395,15 @@ Content-Type: application/json
 
 {
   "model": "epd7in3e",
-  "dashboard_trigger_second": 57,
+  "dashboard_interval_minutes": 5,
   "full_refresh_every": 10
 }
 ```
 
 | 欄位 | 類型 | 範圍 | 說明 |
 |------|------|------|------|
-| `dashboard_trigger_second` | int | 0–59 | 每分鐘觸發渲染的秒數；延遲補償自動計算 = 60 − 此值 |
+| `model` | string | `epd7in3e`, `epd7in5_V2`, `mock` | Waveshare 驅動型號 |
+| `dashboard_interval_minutes` | int | 60 的因數（1/2/3/4/5/6/10/12/15/20/30/60）| Dashboard 刷新間隔（分鐘）；觸發秒數由型號自動推導，不可單獨設定 |
 | `full_refresh_every` | int | 1–100 | 每 N 次更新做一次全刷新（清除鬼影）|
 
 ---

@@ -64,7 +64,7 @@ epaper-home-display/
 │   ├── sensors/
 │   │   ├── dht22.py         # DHT22 溫濕度（Real + Mock）
 │   │   ├── light_sensor.py  # MCP3008 ADC + 光敏電阻（Real + Mock）
-│   │   └── button.py        # GPIO 按鈕（gpiozero）（Real + Mock）
+│   │   └── button.py        # 4 鍵 GPIO 按鈕（gpiozero MultiButton / MockButton）
 │   ├── services/
 │   │   ├── mqtt_client.py   # Paho MQTT Pub/Sub
 │   │   ├── weather.py       # OpenWeatherMap API（aiohttp）
@@ -134,19 +134,24 @@ DHT22 ────────────────────────�
 ### MQTT 入站 → 邏輯 → 出站
 
 ```
-Agent1 發布：
-  home/security/door   ──┐
-  home/security/face   ──┼──► mqtt_client.py ──► state.py ──► logic/ ──► 發布：
-  home/security/alert  ──┤                                              home/home_state/presence      ✅ 已啟用（每 60 秒）
-  home/security/status ──┘                                              home/home_state/alarm_decision ✅ 已啟用（有活躍告警時，決策改變才發布）
+Agent1 / 攝影機發布：
+  home/security/door    ──┐
+  home/security/face    ──┤
+  home/security/alert   ──┼──► mqtt_client.py ──► state.py ──► logic/ ──► 發布：
+  home/security/status  ──┤                                              home/home_state/presence       每 60 秒
+  home/security/camera  ──┘ (raw JPEG, binary)  → state.last_snapshot_image  home/home_state/alarm_decision 決策改變時
+                                                                         home/home_state/alarm_command  Button 3/4 按下時
+                                                                         home/display/status            每次 e-Paper 成功更新後
 ```
 
 ### 顯示更新觸發條件
 
 ```
-牆鐘對齊（每分鐘 :57 秒）──────────────────────────────────────┐
-MQTT 告警事件（立即） ────────────► display_queue ──► _display_loop ──► renderer ──► epaper
-按鈕按下（立即） ─────────────────────────────────────────────┘
+牆鐘對齊（每 N 分鐘邊界，預設 5 分鐘）─────────────────────────┐
+MQTT 告警事件（立即） ───────────────────────────────────────────┤
+MQTT camera frame（立即，僅告警頁面）────────────────────────────┼──► display_queue ──► _display_loop ──► renderer ──► epaper
+按鈕按下（立即） ───────────────────────────────────────────────┤
+wifi_connected 事件（AP 結束後） ───────────────────────────────┘
 ```
 
 ---
@@ -159,17 +164,19 @@ MQTT 告警事件（立即） ────────────► display_qu
 |------|---------|------|
 | `_sensor_loop()` | 每 30 秒 | 讀 DHT22 + 光線感測器，更新 state |
 | `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 桌面時段管理 + 告警決策；偵測到回家時立即喚醒 display_queue |
-| `_display_loop()` | 牆鐘 :57 秒 | 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖；告警頁面快照刷新 |
+| `_display_loop()` | 牆鐘對齊（N 分鐘邊界，由 `dashboard_interval_minutes` 控制，預設每 5 分鐘）| 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖（每 `carousel_interval_refreshes` 次刷新換圖）；告警頁面快照刷新 |
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
 | `_claude_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 Anthropic API 拉取 Claude 5h/7d 使用量；token 過期時自動刷新 |
 | `_codex_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 OpenAI WHAM API 拉取 Codex 5h/7d 使用量；token 過期時自動刷新 |
 | `_notification_loop()` | 依排程 | Discord 每日統計摘要等定時通知 |
-| `_wifi_monitor_loop()` | 每 10 秒 | 讀取 `/tmp/epaper-ap-mode.json`；AP 模式時設定 `display_page = "ap_mode"`；AP 結束後自動切回儀表板 |
+| `_wifi_monitor_loop()` | 每 10 秒 | 讀取 `/tmp/epaper-ap-mode.json`；AP 模式時設定 `display_page = "ap_mode"`；AP 結束後送 `"wifi_connected"` 事件繞過在場偵測門禁，自動切回儀表板 |
 | `server.serve()` | 持續 | FastAPI WebUI（埠 8000） |
 
 **ThreadPoolExecutor**（3 個工作執行緒）用於阻擋性硬體 I/O（DHT22 感測、SPI 傳輸、e-Paper 驅動）。
 
-**MQTT 執行緒安全**：Paho MQTT 在背景執行緒執行 `loop_start()`，回調透過 `asyncio.run_coroutine_threadsafe()` 安全轉至主 asyncio 循環。
+**MQTT 執行緒安全**：Paho MQTT 在背景執行緒執行 `loop_start()`，回調透過 `asyncio.run_coroutine_threadsafe()` 安全轉至主 asyncio 循環。MQTT 不是 `asyncio.gather()` 中的協程，而是由 `MQTTService.start()` 啟動的獨立執行緒。
+
+**按鈕**：gpiozero 按鈕回調在背景執行緒觸發，透過 `asyncio.run_coroutine_threadsafe()` 呼叫四個 async handler（`_handle_btn_dashboard` / `_handle_btn_alert_page` / `_handle_btn_trigger_alarm` / `_handle_btn_cancel_alarm`）。按鈕不是獨立的 asyncio 協程。
 
 ---
 
@@ -179,15 +186,16 @@ MQTT 告警事件（立即） ────────────► display_qu
 
 | 更新類型 | 觸發 | 說明 |
 |---------|------|------|
-| 一般更新 | 牆鐘 :57（僅 OCCUPIED）| `epaper.py` 嘗試 `init_fast()`；7.3" E 驅動（epd7in3e）無此方法，自動 fallback 至 `init()`（完整刷新）|
-| 完整更新（`init`）| 每 `full_refresh_every` 次更新 | 驅動有 `init_fast()` 時才有意義；7.3" E 驅動（epd7in3e）每次均為完整刷新 |
-| 告警立即更新 | MQTT 告警事件 | 透過 display_queue |
+| 一般更新 | 牆鐘 N 分鐘邊界（僅 OCCUPIED）| 在邊界前 `(60 - trigger_second)` 秒觸發；trigger_second 由 model 推導（epd7in3e→40, epd7in5_V2→57）|
+| 完整更新（`init`）| 每 `full_refresh_every` 次更新 | 驅動有 `init_fast()` 時才有意義；`epd7in3e` 驅動每次均為完整刷新 |
+| 告警立即更新 | MQTT 告警事件或 MQTT camera frame | 透過 display_queue |
 | 回家立即更新 | 光線變暗（UNOCCUPIED→OCCUPIED）| `_presence_loop` 偵測到後立即觸發 |
-| 人不在時 | — | `display_loop` 暫停，不做任何更新 |
+| AP 模式頁面 | 每 30 秒 | 靜態資訊頁，定期刷新時間戳 |
+| 人不在時 | — | `display_loop` 暫停，不做任何更新（wifi_connected 事件可繞過此限制）|
 
 > **注意**：`epd7in3e` 驅動無 `init_fast()` 方法，`epaper.py` 的 AttributeError fallback 會使每次更新均執行完整初始化。`full_refresh_every` 設定目前對 epd7in3e 面板效果等同於每次全刷新。
 
-**牆鐘對齊原理**：在每分鐘第 57 秒觸發渲染，延遲補償自動計算為 `60 - dashboard_trigger_second`（預設 57 → 補償 3 秒），確保面板在整點 :00 顯示正確的分鐘數。
+**牆鐘對齊原理**：`dashboard_interval_minutes`（預設 5）決定多久刷新一次，`dashboard_trigger_second` 由 model 推導（不可手動設定）。系統在每個 N 分鐘邊界前提早 `(60 - trigger_second)` 秒觸發，讓面板完成刷新時剛好顯示正確時間。例如：epd7in3e 在 :40 觸發，全刷新約 20 秒，面板在 :00 顯示正確分鐘數。
 
 ---
 
@@ -256,13 +264,19 @@ else                                                    →  INVESTIGATE
 | `last_door_event` | dict \| None | 最近門事件 |
 | `last_face_event` | dict \| None | 最近人臉事件 |
 | `last_alert` | dict \| None | 最近安全告警 |
-| `security_status` | dict \| None | Agent 1 狀態心跳 |
+| `last_alarm_decision` | str \| None | 最近告警決策字串（`"ALARM"` / `"INVESTIGATE"` / `"IGNORE"`）|
+| `alert_face_event` | dict \| None | 告警觸發當下的人臉事件快照（與 `last_face_event` 解耦，避免後續人臉更新影響告警頁面）|
+| `security_status` | dict \| None | Agent 1 狀態心跳（`home/security/status` payload）|
+| `mqtt_connected` | bool | Paho MQTT 連線狀態（`on_connect` / `on_disconnect` 回調更新）|
+| `mqtt_last_rx_by_topic` | dict | 各 JSON 訂閱主題最後收到的訊息（key=topic）；camera binary 不計入 |
+| `mqtt_rx_log` | list | 最近 50 筆收到的 JSON MQTT 訊息（newest first）；camera binary 不計入 |
+| `mqtt_tx_log` | list | 最近 20 筆發出的 MQTT 訊息（newest first）|
 | `display_busy` | bool | e-Paper 忙碌標誌 |
 | `active_reminder` | str \| None | 當前提醒文本 |
 | `custom_image_path` | str \| None | 當前顯示的圖片路徑 |
 | `image_playlist` | list[str] | 已確認圖片的完整路徑清單 |
 | `carousel_index` | int | 輪播當前索引 |
-| `carousel_last_advance` | datetime \| None | 上次輪播換圖時間 |
+| `carousel_refresh_count` | int | 距上次換圖的 dashboard 刷新計數（達到 `carousel_interval_refreshes` 時換圖）|
 | `claude_usage_5h` | float \| None | Claude 5h 使用率（0.0–1.0）|
 | `claude_usage_week` | float \| None | Claude 週使用率（0.0–1.0）|
 | `codex_usage_5h` | float \| None | Codex 5h 使用率（0.0–1.0）|
@@ -272,9 +286,11 @@ else                                                    →  INVESTIGATE
 | `codex_5h_reset` | str \| None | Codex 5h 重置時間（HH:MM 格式）|
 | `codex_7d_reset` | str \| None | Codex 7d 剩餘時間（如 `"2d 3h"`）|
 | `display_page` | Literal["dashboard", "alert", "ap_mode"] | 目前顯示頁面 |
-| `last_snapshot_image` | Any（PIL Image \| None）| 最後擷取的快照（型別標注為 Any，實際為 PIL Image，僅記憶體，不序列化）|
+| `last_snapshot_image` | Any（PIL Image \| None）| 最後取得的攝影機影像（MQTT camera feed 或 HTTP snapshot；型別標注為 Any，實際為 PIL Image，僅記憶體，不序列化）|
+| `last_camera_frame_at` | datetime \| None | 最後一次收到 MQTT camera frame 的時間戳（用於判斷影像新鮮度：5 秒內視為新鮮，優先於 HTTP snapshot）|
 | `alert_page_started_at` | datetime \| None | 告警頁面首次進入時間（由 MQTT callback 設定，僅在非 alert 狀態時更新）|
 | `alert_last_triggered_at` | datetime \| None | 最後一次告警觸發時間（**用於超時計算**：超過 `alert_page_timeout_sec` 後切回儀表板）|
+| `alert_dismissed_at` | datetime \| None | 最後一次告警頁面關閉時間（用於 180 秒冷卻計算，防止快速重複觸發）|
 | `wifi_mode` | Literal["client", "ap", "unknown"] | WiFi 模式 |
 | `ap_ssid` | str | AP 熱點 SSID（AP 模式下顯示）|
 | `ap_password` | str | AP 熱點密碼（AP 模式下顯示）|
@@ -415,4 +431,4 @@ config.local.yaml > config.yaml > 程式碼預設值
 
 `config.local.yaml` 用於本機開發覆蓋，不需要完整列出所有選項，只寫需要覆蓋的部分即可。
 
-> **注意**：唯一支援的環境變數覆蓋是 `RPI_MOCK=1`（強制 mock 所有硬體）。其他設定項目不支援環境變數覆蓋。
+> **注意**：唯一支援的環境變數覆蓋是 `RPI_MOCK=1`（強制 mock 所有硬體）。其他設定項目不支援環境變數覆蓋。`display.dashboard_trigger_second` 不可手動設定，由 `display.model` 自動推導（epd7in3e→40, epd7in5_V2→57, mock→57）。
