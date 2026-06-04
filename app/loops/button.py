@@ -105,7 +105,7 @@ async def _handle_btn_trigger_alarm(
     voice_service,
     mqtt_service,
 ) -> None:
-    """Button 3 (GPIO 22) — re-send alarm signal while on the alert page.
+    """Button 3 (GPIO 27) — re-send alarm signal while on the alert page.
 
     Only activates when already on the alert page (entered via MQTT alert).
     Does NOT switch pages or push to the display queue; only publishes to
@@ -140,7 +140,7 @@ async def _handle_btn_trigger_alarm(
 
 
 async def _handle_btn_cancel_alarm(mqtt_service) -> None:
-    """Button 4 (GPIO 27) — send cancel signal while on the alert page.
+    """Button 4 (GPIO 22) — send cancel signal while on the alert page.
 
     Only activates when already on the alert page.
     Does NOT switch pages or clear state; only publishes

@@ -184,13 +184,15 @@ function buildRxRows(log) {
   if (!log || !log.length) return '<tr><td colspan="4" class="empty-log">尚無接收紀錄</td></tr>';
   return log.map(function(e) {
     var agent = escHtml((e.payload && e.payload.agent) ? e.payload.agent : '—');
-    var preview = escHtml(payloadOneLine(e.payload));
-    if (preview.length > 80) preview = preview.slice(0, 80) + '…';
+    var raw = payloadOneLine(e.payload);
+    var truncated = raw.length > 80 ? raw.slice(0, 80) + '…' : raw;
+    var preview = escHtml(truncated);
+    var full = escHtml(raw);
     return '<tr>'
       + '<td class="td-ts">'+fmtTime(e.received_at)+'</td>'
       + '<td class="td-topic">'+escHtml(e.topic)+'</td>'
       + '<td style="font-size:.7rem;color:var(--muted)">'+agent+'</td>'
-      + '<td class="td-payload" title="'+preview+'">'+preview+'</td>'
+      + '<td class="td-payload" title="'+full+'">'+preview+'</td>'
       + '</tr>';
   }).join('');
 }
@@ -198,12 +200,14 @@ function buildRxRows(log) {
 function buildTxRows(log) {
   if (!log || !log.length) return '<tr><td colspan="3" class="empty-log">尚無發送紀錄</td></tr>';
   return log.map(function(e) {
-    var preview = escHtml(payloadOneLine(e.payload));
-    if (preview.length > 100) preview = preview.slice(0, 100) + '…';
+    var raw = payloadOneLine(e.payload);
+    var truncated = raw.length > 100 ? raw.slice(0, 100) + '…' : raw;
+    var preview = escHtml(truncated);
+    var full = escHtml(raw);
     return '<tr>'
       + '<td class="td-ts">'+fmtTime(e.sent_at)+'</td>'
       + '<td class="td-topic">'+escHtml(e.topic)+'</td>'
-      + '<td class="td-payload">'+preview+'</td>'
+      + '<td class="td-payload" title="'+full+'">'+preview+'</td>'
       + '</tr>';
   }).join('');
 }
