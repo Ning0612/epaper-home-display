@@ -82,6 +82,7 @@ async def _presence_loop(
                 decision, reason = compute_alarm_decision(
                     presence, score, alert, state.last_face_event
                 )
+                state.last_alarm_decision = decision
                 await log_alarm_decision(decision, reason, score)
                 if alert is not _last_processed_alert or (decision, reason) != _last_published_decision:
                     try:

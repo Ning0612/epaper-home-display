@@ -95,13 +95,13 @@ async def main() -> None:
 
     def _on_btn_2():
         f = asyncio.run_coroutine_threadsafe(
-            _handle_btn_trigger_alarm(display_queue, voice_service, mqtt_service), loop
+            _handle_btn_trigger_alarm(voice_service, mqtt_service), loop
         )
         f.add_done_callback(make_done_callback("Button 3"))
 
     def _on_btn_3():
         f = asyncio.run_coroutine_threadsafe(
-            _handle_btn_cancel_alarm(display_queue, mqtt_service), loop
+            _handle_btn_cancel_alarm(mqtt_service), loop
         )
         f.add_done_callback(make_done_callback("Button 4"))
 
