@@ -65,8 +65,20 @@ class SensorsConfig:
 class DisplayConfig:
     model: str = "epd7in3e"
     use_mock: bool = False
-    dashboard_trigger_second: int = 57   # trigger at :SS each minute; display_lag = 60 - this value
+    dashboard_trigger_second: int = 30   # trigger at :SS within the last minute of each interval; lag = 60 - this value (epd7in3e full refresh ~30s)
+    dashboard_interval_minutes: int = 5  # dashboard refresh interval; must be a divisor of 60
     full_refresh_every: int = 10          # full refresh every N updates; partial refresh otherwise
+
+    def __post_init__(self) -> None:
+        if not (0 <= self.dashboard_trigger_second <= 59):
+            raise ValueError(
+                f"display.dashboard_trigger_second must be 0..59, got: {self.dashboard_trigger_second}"
+            )
+        if self.dashboard_interval_minutes < 1 or 60 % self.dashboard_interval_minutes != 0:
+            raise ValueError(
+                f"display.dashboard_interval_minutes must be a divisor of 60 "
+                f"(1,2,3,4,5,6,10,12,15,20,30,60), got: {self.dashboard_interval_minutes}"
+            )
 
 
 @dataclass

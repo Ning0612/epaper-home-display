@@ -163,6 +163,10 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         patch = body.model_dump(exclude_none=True)
         if "dashboard_trigger_second" in patch and not (0 <= patch["dashboard_trigger_second"] <= 59):
             raise HTTPException(400, detail="dashboard_trigger_second must be 0–59")
+        if "dashboard_interval_minutes" in patch:
+            iv = patch["dashboard_interval_minutes"]
+            if iv < 1 or 60 % iv != 0:
+                raise HTTPException(400, detail="dashboard_interval_minutes must be a divisor of 60 (1,2,3,4,5,6,10,12,15,20,30,60)")
         if "full_refresh_every" in patch and not (1 <= patch["full_refresh_every"] <= 100):
             raise HTTPException(400, detail="full_refresh_every must be 1–100")
         if not patch:

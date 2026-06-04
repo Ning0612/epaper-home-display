@@ -29,7 +29,8 @@ sensors:
 display:
   model: "epd7in3e"
   use_mock: false
-  dashboard_trigger_second: 57   # 在每分鐘第幾秒觸發渲染，用來補償電子紙刷新延遲（延遲補償自動計算 = 60 - 此值）
+  dashboard_trigger_second: 30   # 在每個間隔的最後一分鐘第幾秒觸發渲染，補償電子紙刷新延遲（延遲 = 60 - 此值；epd7in3e 全刷新約 30 秒）
+  dashboard_interval_minutes: 5  # Dashboard 刷新間隔（分鐘），必須是 60 的因數（1/2/3/4/5/6/10/12/15/20/30/60）
   full_refresh_every: 10         # 每 N 次更新做一次全刷新（清除鬼影），其餘為快速部分刷新
 
 voice:

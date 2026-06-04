@@ -19,6 +19,20 @@ logger = logging.getLogger(__name__)
 _AP_MODE_REFRESH_INTERVAL = 30.0
 
 
+def _seconds_until_dashboard_tick(now: _DateTime, trigger_second: int, interval_minutes: int) -> float:
+    """Seconds until the next N-minute wall-clock boundary trigger.
+
+    Fires (60 - trigger_second) seconds before each N-minute mark so the panel
+    finishes updating right as the clock rolls over.  interval_minutes must be a
+    divisor of 60 (validated at config load time).
+    """
+    interval_sec = interval_minutes * 60
+    lag = 60 - trigger_second           # seconds the panel takes to update
+    target_pos = interval_sec - lag     # position within cycle to fire
+    pos = (now.minute * 60 + now.second) % interval_sec
+    return float((target_pos - pos) % interval_sec or interval_sec)
+
+
 def _is_alert_active(settings) -> bool:
     """True when alert page should be shown: enabled, URL configured, and page is alert."""
     return (
@@ -137,11 +151,14 @@ async def _display_loop(
             except asyncio.TimeoutError:
                 pass
         else:
-            # Align to wall-clock: trigger at :dashboard_trigger_second each minute.
+            # Align to N-minute wall-clock boundary (configurable via dashboard_interval_minutes).
             # Any display_queue event (button, MQTT alert, presence_return) fires immediately.
             now = _DateTime.now()
-            target = settings.display.dashboard_trigger_second
-            delay = (target - now.second) % 60 or 60  # `or 60` avoids re-triggering immediately
+            delay = _seconds_until_dashboard_tick(
+                now,
+                settings.display.dashboard_trigger_second,
+                settings.display.dashboard_interval_minutes,
+            )
             try:
                 event = await asyncio.wait_for(display_queue.get(), timeout=delay)
             except asyncio.TimeoutError:

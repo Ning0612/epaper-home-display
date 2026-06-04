@@ -120,15 +120,34 @@ _SETTINGS_CONTENT = r"""
       <div class="card">
         <div class="f">
           <label>e-Paper 型號</label>
-          <select id="d-model">
-            <option value="epd7in3e">Waveshare 7.3" E (6-color, epd7in3e)</option>
+          <select id="d-model" onchange="applyModelPreset(this.value)">
+            <option value="epd7in3e">Waveshare 7.3" 7-color (epd7in3e)</option>
             <option value="mock">Mock（測試用）</option>
           </select>
         </div>
         <hr>
-        <div class="f">
-          <label>刷新觸發秒 <span class="hint">（0–59，用來補償電子紙刷新延遲）</span></label>
-          <input type="number" id="d-trigger" min="0" max="59">
+        <div class="row2">
+          <div class="f">
+            <label>刷新觸發秒 <span class="hint">（0–59，延遲補償 = 60 - 此值）</span></label>
+            <input type="number" id="d-trigger" min="0" max="59">
+          </div>
+          <div class="f">
+            <label>刷新間隔 <span class="hint">（分鐘，須為 60 的因數）</span></label>
+            <select id="d-interval">
+              <option value="1">1 分鐘</option>
+              <option value="2">2 分鐘</option>
+              <option value="3">3 分鐘</option>
+              <option value="4">4 分鐘</option>
+              <option value="5">5 分鐘</option>
+              <option value="6">6 分鐘</option>
+              <option value="10">10 分鐘</option>
+              <option value="12">12 分鐘</option>
+              <option value="15">15 分鐘</option>
+              <option value="20">20 分鐘</option>
+              <option value="30">30 分鐘</option>
+              <option value="60">60 分鐘</option>
+            </select>
+          </div>
         </div>
         <div class="f" style="margin-top:.9rem">
           <label>全刷新間隔 <span class="hint">（次數，1–100；每 N 次做一次全刷新清除鬼影）</span></label>
@@ -311,6 +330,17 @@ var mapLat=__LAT__, mapLon=__LON__;
 var lmap=null, lmk=null;
 var _presTimer=null;
 
+var MODEL_PRESETS={
+  'epd7in3e':{trigger:30,interval:5},
+  'mock':     {trigger:30,interval:5}
+};
+function applyModelPreset(model){
+  var p=MODEL_PRESETS[model];
+  if(!p) return;
+  document.getElementById('d-trigger').value=p.trigger;
+  document.getElementById('d-interval').value=String(p.interval);
+}
+
 function toggle(name){
   var item=document.getElementById('acc-'+name);
   var wasOpen=item.classList.contains('open');
@@ -427,7 +457,8 @@ async function loadCfg(){
     document.getElementById('m-pass').placeholder=m.password_set?'（已設定，重新輸入以更新）':'輸入密碼';
     var d=c.display||{};
     document.getElementById('d-model').value=d.model||'epd7in3e';
-    document.getElementById('d-trigger').value=d.dashboard_trigger_second??57;
+    document.getElementById('d-trigger').value=d.dashboard_trigger_second??30;
+    document.getElementById('d-interval').value=String(d.dashboard_interval_minutes??5);
     document.getElementById('d-fre').value=d.full_refresh_every??10;
     var sl=(c.sensors||{}).light||{};
     document.getElementById('p-bright').value=sl.bright_threshold??500;
@@ -510,6 +541,7 @@ async function saveDisplay(){
     await put('/settings/display',{
       model:document.getElementById('d-model').value,
       dashboard_trigger_second:+document.getElementById('d-trigger').value,
+      dashboard_interval_minutes:+document.getElementById('d-interval').value,
       full_refresh_every:+document.getElementById('d-fre').value
     });
     toast('✓ 顯示器設定已儲存',true);
