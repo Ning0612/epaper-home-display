@@ -134,6 +134,7 @@ class MQTTService:
 
         elif topic == "home/security/alert":
             state.last_alert = payload
+            state.alert_face_event = state.last_face_event
             now_dt = datetime.now()
             is_new_alert = state.display_page != "alert"
             if is_new_alert:

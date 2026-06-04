@@ -24,6 +24,8 @@ class AgentState:
     last_door_event: dict | None = None
     last_face_event: dict | None = None
     last_alert: dict | None = None
+    last_alarm_decision: str | None = None
+    alert_face_event: dict | None = None
     security_status: dict | None = None
 
     mqtt_connected: bool = False

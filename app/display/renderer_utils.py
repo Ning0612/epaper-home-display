@@ -174,3 +174,40 @@ def _cx_text(
     bb = draw.textbbox((0, 0), text, font=font)
     tw = bb[2] - bb[0]
     draw.text((col_x + (col_w - tw) // 2, y), text, font=font, fill=fill)
+
+
+_DOOR_PREFIX = "DOOR_"
+_DECISION_COLOR_LABEL: dict[str, str] = {
+    "ALARM": "RED",
+    "INVESTIGATE": "WARN",
+    "IGNORE": "GREEN",
+}
+_UNKNOWN_FACE_IDS = frozenset({"unknown", "no_face", ""})
+
+
+def fmt_door(event: dict | None) -> str:
+    """DOOR_OPEN → OPEN, DOOR_CLOSED → CLOSED, None → N/A."""
+    if not event:
+        return "N/A"
+    raw = str(event.get("state") or event.get("door_state") or "?")
+    return (raw[len(_DOOR_PREFIX):] if raw.startswith(_DOOR_PREFIX) else raw)[:8]
+
+
+def fmt_face(event: dict | None) -> str:
+    """Known name, Unknown (detected/unrecognized), or NONE (no event)."""
+    if not event:
+        return "NONE"
+    identity = str(event.get("identity") or "").strip()
+    known = event.get("known")
+    if known is False:
+        return "Unknown"
+    if not identity or identity.lower() in _UNKNOWN_FACE_IDS:
+        return "Unknown"
+    return identity[:8]
+
+
+def fmt_alarm(decision: str | None) -> str:
+    """ALARM → RED, INVESTIGATE → WARN, IGNORE → GREEN, None → NONE."""
+    if decision is None:
+        return "NONE"
+    return _DECISION_COLOR_LABEL.get(decision, decision[:5])

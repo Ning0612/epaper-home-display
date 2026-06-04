@@ -18,6 +18,7 @@ from app.display.renderer_constants import (
 from app.display.renderer_utils import (
     _font, _cx_text, _paste_icon, _draw_progress_bar,
     _pick_daily_forecast, _weather_item, _temp_color, _usage_color,
+    fmt_door, fmt_face, fmt_alarm,
 )
 
 if TYPE_CHECKING:
@@ -174,12 +175,9 @@ def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     iw = AGENT1_W - 2 * PAD
     ih = AGENT1_H - 2 * PAD
 
-    door_st = (state.last_door_event.get("state", "?") if state.last_door_event else "N/A")[:10]
-    face_id = ((state.last_face_event.get("identity") or "NO_FACE") if state.last_face_event else "N/A")[:10]
-    alert_lvl = (
-        (state.last_alert.get("level") or state.last_alert.get("type") or "?")
-        if state.last_alert else "NONE"
-    )[:8]
+    door_st = fmt_door(state.last_door_event)
+    face_id = fmt_face(state.last_face_event)
+    alarm_st = fmt_alarm(state.last_alarm_decision)
     mode_map = {"OCCUPIED": "HOME", "UNOCCUPIED": "AWAY", "UNKNOWN": "?"}
     mode_str = mode_map.get(state.presence, state.presence[:6])
 
@@ -188,10 +186,10 @@ def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     sy = iy + max(0, (ih - content_h) // 2)
 
     _cx_text(draw, "Agent 1", ix, iw, sy, _font(14, bold=True))
-    _cx_text(draw, f"D {door_st}", ix, iw, sy + 20, _font(14, bold=True))
-    _cx_text(draw, f"F {face_id}", ix, iw, sy + 20 + line_h, _font(14, bold=True))
-    _cx_text(draw, f"A {alert_lvl}", ix, iw, sy + 20 + 2 * line_h, _font(14, bold=True))
-    _cx_text(draw, f"M {mode_str}", ix, iw, sy + 20 + 3 * line_h, _font(14, bold=True))
+    _cx_text(draw, f"D:{door_st}", ix, iw, sy + 20, _font(14, bold=True))
+    _cx_text(draw, f"F:{face_id}", ix, iw, sy + 20 + line_h, _font(14, bold=True))
+    _cx_text(draw, f"A:{alarm_st}", ix, iw, sy + 20 + 2 * line_h, _font(14, bold=True))
+    _cx_text(draw, f"M:{mode_str}", ix, iw, sy + 20 + 3 * line_h, _font(14, bold=True))
 
 
 def _draw_usage_row(

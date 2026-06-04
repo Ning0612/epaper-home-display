@@ -7,7 +7,7 @@ from typing import Any
 from PIL import Image, ImageDraw
 
 from app.display.renderer_constants import BG, DISPLAY_H, DISPLAY_W, FG, PAD
-from app.display.renderer_utils import _cx_text, _font
+from app.display.renderer_utils import _cx_text, _font, fmt_door, fmt_face, fmt_alarm
 
 logger = logging.getLogger(__name__)
 
@@ -68,16 +68,11 @@ def _draw_info_panel(draw: ImageDraw.ImageDraw, state: Any, now: datetime) -> No
     y += PAD + 2
 
     # Security state rows
-    door = (state.last_door_event.get("state", "?") if state.last_door_event else "N/A")[:8]
-    face = (
-        (state.last_face_event.get("identity") or "?") if state.last_face_event else "N/A"
-    )[:8]
-    if state.last_alert:
-        alert_t = (state.last_alert.get("type") or state.last_alert.get("level") or "?")[:8]
-    else:
-        alert_t = "NONE"
+    door = fmt_door(state.last_door_event)
+    face = fmt_face(getattr(state, "alert_face_event", None))
+    alarm = fmt_alarm(getattr(state, "last_alarm_decision", None))
 
-    for label, val in [("D", door), ("F", face), ("A", alert_t)]:
+    for label, val in [("D", door), ("F", face), ("A", alarm)]:
         _cx_text(draw, f"{label}:{val}", ix, iw, y, _font(14, bold=True))
         y += 24
 

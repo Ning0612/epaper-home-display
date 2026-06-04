@@ -97,6 +97,9 @@ async def _handle_btn_cancel_alarm(display_queue: asyncio.Queue, mqtt_service) -
     state.last_snapshot_image = None
     state.alert_last_triggered_at = None
     state.alert_page_started_at = None
+    state.last_alarm_decision = None
+    state.last_alert = None
+    state.alert_face_event = None
     try:
         display_queue.put_nowait("dashboard")
     except asyncio.QueueFull:

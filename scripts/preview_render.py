@@ -57,10 +57,12 @@ def _make_state() -> AgentState:
         for i in range(4)
     ]
 
-    # Agent1 events
-    st.last_door_event = {"state": "CLOSED"}
-    st.last_face_event = {"identity": "lance"}
-    st.last_alert = {"level": "NONE"}
+    # Agent1 events (normalized format after mqtt_client processing)
+    st.last_door_event = {"state": "CLOSED", "door_state": "CLOSED"}
+    st.last_face_event = {"identity": "lance", "user_name": "lance", "known": True}
+    st.last_alert = {"agent": "agent1", "type": "motion"}
+    st.last_alarm_decision = "IGNORE"
+    st.alert_face_event = {"identity": "lance", "user_name": "lance", "known": True}
 
     return st
 

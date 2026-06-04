@@ -75,23 +75,25 @@ def _check_alert_timeout(settings) -> bool:
     if state.display_page != "alert":
         return False
 
-    # Normalise disabled / unconfigured alert state immediately
-    if not settings.outdoor_agent.alert_page_enabled or not settings.outdoor_agent.snapshot_url:
+    def _dismiss() -> bool:
         state.display_page = "dashboard"
         state.last_snapshot_image = None
+        state.last_alarm_decision = None
+        state.last_alert = None
+        state.alert_face_event = None
         return True
 
+    # Normalise disabled / unconfigured alert state immediately
+    if not settings.outdoor_agent.alert_page_enabled or not settings.outdoor_agent.snapshot_url:
+        return _dismiss()
+
     if state.alert_last_triggered_at is None:
-        state.display_page = "dashboard"
-        state.last_snapshot_image = None
-        return True
+        return _dismiss()
 
     elapsed = (_DateTime.now() - state.alert_last_triggered_at).total_seconds()
     if elapsed > settings.outdoor_agent.alert_page_timeout_sec:
         logger.info("Alert page timeout (%.0fs), returning to dashboard", elapsed)
-        state.display_page = "dashboard"
-        state.last_snapshot_image = None
-        return True
+        return _dismiss()
 
     return False
 
