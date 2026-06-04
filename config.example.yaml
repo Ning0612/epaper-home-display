@@ -23,7 +23,7 @@ sensors:
     bright_threshold: 500  # MCP3008 10-bit (0–1023)
     use_mock: false
   button:
-    gpio_pin: 27           # GPIO 17 conflicts with e-Paper RST; use GPIO 27
+    gpio_pins: [5, 6, 27, 22]  # [B1 dashboard, B2 alert-page, B3 trigger-alarm, B4 cancel-alarm]
     use_mock: false
 
 display:

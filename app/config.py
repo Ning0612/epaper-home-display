@@ -43,8 +43,15 @@ class LightConfig:
 
 @dataclass
 class ButtonConfig:
-    gpio_pin: int = 27           # GPIO 17 conflicts with e-Paper RST
+    gpio_pins: list[int] = field(default_factory=lambda: [5, 6, 27, 22])
     use_mock: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.gpio_pins, list) or len(self.gpio_pins) < 4:
+            raise ValueError(
+                f"sensors.button.gpio_pins must be a list of at least 4 integers, got: {self.gpio_pins!r}"
+            )
+        self.gpio_pins = [int(p) for p in self.gpio_pins]
 
 
 @dataclass
@@ -178,7 +185,7 @@ def _apply_env_overrides(settings: Settings) -> None:
     if os.environ.get("RPI_MOCK") == "1":
         settings.sensors.dht22.use_mock = True
         settings.sensors.light.use_mock = True
-        settings.sensors.button.use_mock = True
+        settings.sensors.button.use_mock = True  # gpio_pins remain as-is; mock bypasses GPIO
         settings.display.use_mock = True
 
 

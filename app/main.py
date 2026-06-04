@@ -12,7 +12,12 @@ import uvicorn
 
 from app.config import load_settings
 from app.display.epaper import create_epaper
-from app.loops.button import _handle_button
+from app.loops.button import (
+    _handle_btn_dashboard,
+    _handle_btn_alert_page,
+    _handle_btn_trigger_alarm,
+    _handle_btn_cancel_alarm,
+)
 from app.loops.claude_usage import _claude_usage_loop
 from app.loops.codex_usage import _codex_usage_loop
 from app.loops.display import _display_loop
@@ -80,11 +85,30 @@ async def main() -> None:
     mqtt_service = MQTTService(settings.mqtt, display_queue, voice_service)
     mqtt_service.start(loop)
 
-    def _on_button():
-        future = asyncio.run_coroutine_threadsafe(_handle_button(display_queue), loop)
-        future.add_done_callback(make_done_callback("Button callback"))
+    def _on_btn_0():
+        f = asyncio.run_coroutine_threadsafe(_handle_btn_dashboard(display_queue), loop)
+        f.add_done_callback(make_done_callback("Button 1"))
 
-    button.register_callback(_on_button)
+    def _on_btn_1():
+        f = asyncio.run_coroutine_threadsafe(_handle_btn_alert_page(display_queue), loop)
+        f.add_done_callback(make_done_callback("Button 2"))
+
+    def _on_btn_2():
+        f = asyncio.run_coroutine_threadsafe(
+            _handle_btn_trigger_alarm(display_queue, voice_service, mqtt_service), loop
+        )
+        f.add_done_callback(make_done_callback("Button 3"))
+
+    def _on_btn_3():
+        f = asyncio.run_coroutine_threadsafe(
+            _handle_btn_cancel_alarm(display_queue, mqtt_service), loop
+        )
+        f.add_done_callback(make_done_callback("Button 4"))
+
+    button.register_callback(0, _on_btn_0)
+    button.register_callback(1, _on_btn_1)
+    button.register_callback(2, _on_btn_2)
+    button.register_callback(3, _on_btn_3)
 
     uvicorn_config = uvicorn.Config(
         create_app(settings, weather_service, display_queue),

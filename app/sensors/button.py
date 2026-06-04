@@ -9,45 +9,41 @@ logger = logging.getLogger(__name__)
 
 
 class ButtonSensor(Protocol):
-    def is_pressed(self) -> bool: ...
-    def register_callback(self, fn: Callable[[], None]) -> None: ...
+    def register_callback(self, index: int, fn: Callable[[], None]) -> None: ...
 
 
-class RealButton:
+class MultiButton:
+    """Wraps multiple gpiozero.Button instances, one per GPIO pin."""
+
     def __init__(self, config: ButtonConfig) -> None:
-        # gpiozero uses lgpio backend on Bookworm/Trixie and avoids the
-        # RPi.GPIO add_event_detect incompatibility on newer Pi OS versions.
         from gpiozero import Button as _GZButton  # type: ignore[import]
-        self._btn = _GZButton(config.gpio_pin, pull_up=True, bounce_time=0.2)
+        self._buttons = [
+            _GZButton(pin, pull_up=True, bounce_time=0.2)
+            for pin in config.gpio_pins
+        ]
+        logger.info("Buttons: %d physical buttons on GPIO %s", len(self._buttons), config.gpio_pins)
 
-    def is_pressed(self) -> bool:
-        return bool(self._btn.is_pressed)
-
-    def register_callback(self, fn: Callable[[], None]) -> None:
-        self._btn.when_pressed = fn
+    def register_callback(self, index: int, fn: Callable[[], None]) -> None:
+        self._buttons[index].when_pressed = fn
 
 
 class MockButton:
-    def __init__(self) -> None:
-        self._pressed = False
-        self._callback: Callable[[], None] | None = None
+    def __init__(self, count: int = 4) -> None:
+        self._callbacks: list[Callable[[], None] | None] = [None] * count
 
-    def is_pressed(self) -> bool:
-        return self._pressed
+    def register_callback(self, index: int, fn: Callable[[], None]) -> None:
+        self._callbacks[index] = fn
 
-    def register_callback(self, fn: Callable[[], None]) -> None:
-        self._callback = fn
-
-    def simulate_press(self) -> None:
-        self._pressed = True
-        if self._callback:
-            self._callback()
-        self._pressed = False
+    def simulate_press(self, index: int = 0) -> None:
+        if not (0 <= index < len(self._callbacks)):
+            return
+        cb = self._callbacks[index]
+        if cb is not None:
+            cb()
 
 
 def create_button(config: ButtonConfig) -> ButtonSensor:
     if config.use_mock:
-        logger.info("Button: mock mode")
-        return MockButton()
-    logger.info("Button: GPIO pin %d", config.gpio_pin)
-    return RealButton(config)
+        logger.info("Button: mock mode (%d buttons)", len(config.gpio_pins))
+        return MockButton(count=len(config.gpio_pins))
+    return MultiButton(config)
