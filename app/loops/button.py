@@ -63,6 +63,7 @@ async def _handle_btn_dashboard(display_queue: asyncio.Queue) -> None:
         state.alert_face_event = None
         state.alert_last_triggered_at = None
         state.alert_page_started_at = None
+        state.alert_dismissed_at = now
     state.presence = "OCCUPIED"
     state.display_page = "dashboard"
     _btn_last_accepted[1] = now

@@ -54,6 +54,7 @@ class AgentState:
     last_camera_frame_at: datetime | None = None  # timestamp of last MQTT camera frame
     alert_page_started_at: datetime | None = None
     alert_last_triggered_at: datetime | None = None
+    alert_dismissed_at: datetime | None = None
 
     wifi_mode: Literal["client", "ap", "unknown"] = "unknown"
     ap_ssid: str = ""

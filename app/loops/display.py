@@ -85,6 +85,7 @@ def _check_alert_timeout(settings) -> bool:
         state.alert_face_event = None
         state.alert_last_triggered_at = None
         state.alert_page_started_at = None
+        state.alert_dismissed_at = _DateTime.now()
         return True
 
     # Normalise disabled alert state immediately

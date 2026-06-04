@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 _tx_log_lock = threading.Lock()
 
 _UNKNOWN_SENTINELS = frozenset({"unknown", "no_face", ""})
+_ALERT_COOLDOWN_SEC = 180.0  # 3 minutes: suppress re-trigger after recent dismissal
 
 
 def _coerce_known(raw: object, identity: str) -> bool:
@@ -162,6 +163,18 @@ class MQTTService:
             state.last_alert = payload
             state.alert_face_event = state.last_face_event
             now_dt = datetime.now()
+
+            # Cooldown: if alert page was recently dismissed and we're back on dashboard,
+            # don't re-trigger within _ALERT_COOLDOWN_SEC (prevents rapid alert→dismiss→alert cycling).
+            if state.display_page != "alert" and state.alert_dismissed_at is not None:
+                elapsed = (now_dt - state.alert_dismissed_at).total_seconds()
+                if elapsed < _ALERT_COOLDOWN_SEC:
+                    logger.info(
+                        "Alert suppressed within cooldown (%.0fs/%.0fs, agent=%s)",
+                        elapsed, _ALERT_COOLDOWN_SEC, payload.get("agent", "?"),
+                    )
+                    return
+
             is_new_alert = state.display_page != "alert"
             if is_new_alert:
                 state.alert_page_started_at = now_dt
