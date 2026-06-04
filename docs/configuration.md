@@ -193,7 +193,6 @@ outdoor_agent:
   snapshot_timeout_sec: 2.5  # 擷取超時秒數，網路慢時可適度放寬
   alert_page_enabled: true   # 是否啟用告警頁面（false = 仍顯示一般儀表板）
   alert_page_timeout_sec: 120   # 告警頁面顯示秒數，超時後自動回到儀表板
-  alert_refresh_interval_sec: 3.0  # 告警頁面快照自動刷新間隔（秒）
 ```
 
 **行為說明**：
@@ -375,7 +374,6 @@ outdoor_agent:
   snapshot_timeout_sec: 2.5
   alert_page_enabled: true
   alert_page_timeout_sec: 120
-  alert_refresh_interval_sec: 3.0
 
 wifi:
   ap_ssid: "EpaperSetup"

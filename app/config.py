@@ -148,7 +148,6 @@ class OutdoorAgentConfig:
     snapshot_timeout_sec: float = 2.5
     alert_page_enabled: bool = True
     alert_page_timeout_sec: int = 120        # return to dashboard after N seconds with no new alert
-    alert_refresh_interval_sec: float = 3.0
 
 
 _AP_STATUS_FILE = "/tmp/epaper-ap-mode.json"        # shared constant with wifi_manager.sh

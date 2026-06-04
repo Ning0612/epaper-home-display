@@ -150,6 +150,7 @@ async def _display_loop(
     # Every full_refresh_every-th update is a full refresh (clears ghosting); others use
     # init_fast() for a faster partial update. max(1,...) guards against zero in YAML.
     refresh_count = 0
+    last_rendered_page: str | None = None
     loop = asyncio.get_event_loop()
     # startup_wait_done: True once _wait_for_startup_data() has returned.
     #   Prevents re-calling it (with a fresh 180s timeout) on subsequent iterations.
@@ -162,7 +163,7 @@ async def _display_loop(
         # Wait strategy:
         #   not startup_wait_done → wait for essential data (up to 3 min), then fall through
         #   startup_pending (data ready, render not yet done) → fall through immediately
-        #   alert → fixed short interval; ap_mode → 30s; dashboard → wall-clock aligned.
+        #   alert → wall-clock aligned, capped at alert timeout; ap_mode → 30s; dashboard → wall-clock aligned.
         # event value is preserved so callers downstream can react to specific signals
         # (e.g. "wifi_connected" bypasses the presence-check gate).
         event: str | None = None
@@ -173,9 +174,21 @@ async def _display_loop(
         elif startup_pending:
             pass  # data ready, first render not yet done — fall through immediately
         elif _is_alert_active(settings):
-            interval = settings.outdoor_agent.alert_refresh_interval_sec
+            now = _DateTime.now()
+            delay = _seconds_until_dashboard_tick(
+                now,
+                settings.display.dashboard_trigger_second,
+                settings.display.dashboard_interval_minutes,
+            )
+            # Cap wait at alert timeout so _check_alert_timeout fires on schedule
+            if state.alert_last_triggered_at is not None:
+                elapsed = (now - state.alert_last_triggered_at).total_seconds()
+                timeout_remaining = max(0.1, settings.outdoor_agent.alert_page_timeout_sec - elapsed)
+                delay = min(delay, timeout_remaining)
+            else:
+                delay = 0.1  # no trigger time recorded → let _check_alert_timeout transition immediately
             try:
-                event = await asyncio.wait_for(display_queue.get(), timeout=interval)
+                event = await asyncio.wait_for(display_queue.get(), timeout=delay)
             except asyncio.TimeoutError:
                 pass
         elif _is_ap_mode_active():
@@ -234,6 +247,10 @@ async def _display_loop(
         # not a potentially mutated state (MQTT can change display_page mid-executor-wait).
         rendered_page = state.display_page
 
+        # Force full refresh on any alert→other transition (handles button cancel in addition to timeout).
+        if last_rendered_page == "alert" and rendered_page != "alert":
+            refresh_count = 0
+
         state.display_busy = True
         try:
             now = _DateTime.now()
@@ -247,13 +264,11 @@ async def _display_loop(
                 if snap is not None:
                     state.last_snapshot_image = snap
                 image = render_alert_page(state, settings, now)
-                # Alert page always uses fast refresh to meet 3s cadence
-                actual_full_refresh = False
+                actual_full_refresh = (refresh_count % max(1, settings.display.full_refresh_every) == 0)
                 await loop.run_in_executor(
                     executor, functools.partial(epaper.display, image, actual_full_refresh)
                 )
-                # Do not increment refresh_count — alert uses fast refresh exclusively;
-                # dashboard resumes from its previous cadence position when we return.
+                refresh_count += 1
             elif state.display_page == "ap_mode":
                 actual_full_refresh = (refresh_count % max(1, settings.display.full_refresh_every) == 0)
                 image = render_ap_mode_page(state, settings, now)
@@ -273,6 +288,7 @@ async def _display_loop(
                 refresh_count += 1  # only advance cadence on successful panel write
 
             startup_pending = False  # first render succeeded — clear boot gate
+            last_rendered_page = rendered_page
 
             if mqtt_service is not None:
                 try:

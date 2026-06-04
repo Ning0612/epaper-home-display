@@ -72,7 +72,6 @@ outdoor_agent:
   snapshot_timeout_sec: 2.5             # HTTP 請求逾時（秒）
   alert_page_enabled: true              # 是否啟用警示頁面
   alert_page_timeout_sec: 120           # 無新告警超過此秒數後自動返回 Dashboard
-  alert_refresh_interval_sec: 3.0      # 警示頁面刷新間隔（秒）
 
 wifi:
   ap_ssid: "EpaperSetup"               # AP 熱點名稱（建議改為不易猜測的名稱）
