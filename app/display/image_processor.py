@@ -32,6 +32,19 @@ def quantize_to_epaper_palette(img: Image.Image) -> Image.Image:
     pal.putpalette(_EPAPER_PALETTE_RGB)
     return img.convert("RGB").quantize(palette=pal).convert("RGB")
 
+
+_BW_PALETTE_RGB: tuple[int, ...] = (
+    0,   0,   0,    # 0 Black
+    255, 255, 255,  # 1 White
+) + (0, 0, 0) * 254
+
+
+def quantize_to_bw_palette(img: Image.Image) -> Image.Image:
+    """Quantize an RGB image to black-and-white with Floyd-Steinberg dithering."""
+    pal = Image.new("P", (1, 1))
+    pal.putpalette(_BW_PALETTE_RGB)
+    return img.convert("RGB").quantize(palette=pal).convert("RGB")
+
 _ALLOWED_FORMATS = frozenset({"JPEG", "PNG", "WEBP", "GIF", "BMP", "TIFF"})
 _UPLOAD_CHUNK = 65_536  # 64 KB
 
@@ -107,14 +120,15 @@ def make_preview_bytes(
     source_path: str,
     crop: dict | None = None,
     transform: dict | None = None,
+    panel_type: str = "color",
 ) -> bytes:
-    """Return six-color dithered display image as PNG bytes for HTTP preview response.
+    """Return dithered display image as PNG bytes for HTTP preview response.
 
-    Applies the same palette quantization as the hardware driver's getbuffer(),
-    so the preview matches what the e-paper panel will actually show.
+    panel_type="color": 6-color e-paper palette (epd7in3e)
+    panel_type="bw":    black-and-white palette (epd7in5_V2)
     """
     result = make_display_image(source_path, crop, transform)
-    result = quantize_to_epaper_palette(result)
+    result = quantize_to_bw_palette(result) if panel_type == "bw" else quantize_to_epaper_palette(result)
     buf = io.BytesIO()
     result.save(buf, format="PNG")
     return buf.getvalue()

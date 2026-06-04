@@ -158,11 +158,13 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
             setattr(settings.mqtt, k, v)
         return {"ok": True, "restart_required": True}
 
+    _ALLOWED_DISPLAY_MODELS = frozenset({"epd7in3e", "epd7in5_V2", "mock"})
+
     @router.put("/settings/display")
     async def set_display(body: _DisplayBody):
         patch = body.model_dump(exclude_none=True)
-        if "dashboard_trigger_second" in patch and not (0 <= patch["dashboard_trigger_second"] <= 59):
-            raise HTTPException(400, detail="dashboard_trigger_second must be 0–59")
+        if "model" in patch and patch["model"] not in _ALLOWED_DISPLAY_MODELS:
+            raise HTTPException(400, detail=f"model must be one of: {', '.join(sorted(_ALLOWED_DISPLAY_MODELS))}")
         if "dashboard_interval_minutes" in patch:
             iv = patch["dashboard_interval_minutes"]
             if iv < 1 or 60 % iv != 0:

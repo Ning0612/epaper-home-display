@@ -61,24 +61,41 @@ class SensorsConfig:
     button: ButtonConfig = field(default_factory=ButtonConfig)
 
 
+_COLOR_MODELS: frozenset[str] = frozenset({"epd7in3e"})
+_SUPPORTED_DISPLAY_MODELS: frozenset[str] = frozenset({"epd7in3e", "epd7in5_V2", "mock"})
+# Trigger fires this many seconds before each N-minute boundary; lag = 60 - trigger_second.
+_MODEL_TRIGGER_SECOND: dict[str, int] = {
+    "epd7in3e":   40,   # ACeP 7-color, full refresh ~20s
+    "epd7in5_V2": 57,   # B&W, fast refresh ~0.3s (full ~2s)
+    "mock":       57,
+}
+
+
 @dataclass
 class DisplayConfig:
     model: str = "epd7in3e"
     use_mock: bool = False
-    dashboard_trigger_second: int = 30   # trigger at :SS within the last minute of each interval; lag = 60 - this value (epd7in3e full refresh ~30s)
     dashboard_interval_minutes: int = 5  # dashboard refresh interval; must be a divisor of 60
     full_refresh_every: int = 10          # full refresh every N updates; partial refresh otherwise
 
     def __post_init__(self) -> None:
-        if not (0 <= self.dashboard_trigger_second <= 59):
+        if self.model not in _SUPPORTED_DISPLAY_MODELS:
             raise ValueError(
-                f"display.dashboard_trigger_second must be 0..59, got: {self.dashboard_trigger_second}"
+                f"display.model must be one of {sorted(_SUPPORTED_DISPLAY_MODELS)}, got: {self.model!r}"
             )
         if self.dashboard_interval_minutes < 1 or 60 % self.dashboard_interval_minutes != 0:
             raise ValueError(
                 f"display.dashboard_interval_minutes must be a divisor of 60 "
                 f"(1,2,3,4,5,6,10,12,15,20,30,60), got: {self.dashboard_interval_minutes}"
             )
+
+    @property
+    def dashboard_trigger_second(self) -> int:
+        return _MODEL_TRIGGER_SECOND.get(self.model, 57)
+
+    @property
+    def is_color(self) -> bool:
+        return self.model in _COLOR_MODELS
 
 
 @dataclass

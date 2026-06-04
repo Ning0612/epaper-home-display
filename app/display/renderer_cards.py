@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 
 def _draw_card_weather(
-    img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentState", now: datetime
+    img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentState", now: datetime,
+    *, color: bool = True,
 ) -> None:
     draw.rectangle(
         [(WEATHER_X, WEATHER_Y), (WEATHER_X + WEATHER_W - 1, WEATHER_Y + WEATHER_H - 1)],
@@ -73,7 +74,7 @@ def _draw_card_weather(
         _cx_text(draw, now_main[:4], now_x, now_w, fc_y0 + ICO + 10, _font(14, bold=True))
 
     now_temp_str = f"{now_temp:.0f}°" if isinstance(now_temp, (int, float)) else "--"
-    _cx_text(draw, now_temp_str, now_x, now_w, fc_y0 + TMP, _font(18, bold=True), fill=_temp_color(now_temp))
+    _cx_text(draw, now_temp_str, now_x, now_w, fc_y0 + TMP, _font(18, bold=True), fill=_temp_color(now_temp, color))
 
     sep_x = ix + now_w + fc_gap // 2
     fc_bottom = WEATHER_Y + WEATHER_H - PAD
@@ -102,7 +103,7 @@ def _draw_card_weather(
 
         fc_temp = entry.get("main", {}).get("temp")
         fc_temp_str = f"{fc_temp:.0f}°" if isinstance(fc_temp, (int, float)) else "--"
-        _cx_text(draw, fc_temp_str, col_x, daily_w, fc_y0 + TMP, _font(18, bold=True), fill=_temp_color(fc_temp))
+        _cx_text(draw, fc_temp_str, col_x, daily_w, fc_y0 + TMP, _font(18, bold=True), fill=_temp_color(fc_temp, color))
 
         pop = entry.get("pop") or 0
         try:
@@ -144,7 +145,7 @@ def _draw_card_image(img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentS
         draw.text((ix + 4, iy + 4), "Image Error", font=_font(16, bold=True), fill=FG)
 
 
-def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
+def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState", *, color: bool = True) -> None:
     draw.rectangle(
         [(INDOOR_X, INDOOR_Y), (INDOOR_X + INDOOR_W - 1, INDOOR_Y + INDOOR_H - 1)],
         outline=FG, width=1,
@@ -160,7 +161,7 @@ def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     sy = iy + max(0, (ih - content_h) // 2)
 
     _cx_text(draw, "Indoor", ix, iw, sy, _font(14, bold=True))
-    _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17, bold=True), fill=_temp_color(state.temperature))
+    _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17, bold=True), fill=_temp_color(state.temperature, color))
     _cx_text(draw, hum_str, ix, iw, sy + 41, _font(17, bold=True))
 
 
@@ -202,12 +203,14 @@ def _draw_usage_row(
     reset_text: str | None,
     row_w: int = 190,
     fixed_reset_w: int | None = None,
+    *,
+    color: bool = True,
 ) -> None:
     _G, _PW, _BH = 4, 36, 11
     fnt = _font(13, bold=True)
     _bb = draw.textbbox((0, 0), label, font=fnt)
     _LW = _bb[2] - _bb[0]
-    color = _usage_color(pct)
+    bar_color = _usage_color(pct, color)
     draw.text((x, y), label, font=fnt, fill=FG)
     pct_x = x + _LW + _G
     if pct is None:
@@ -224,12 +227,12 @@ def _draw_usage_row(
     else:
         _RW = 0
     _BW = max(10, row_w - (_LW + _G + _PW + _G) - _RW)
-    _draw_progress_bar(draw, bar_x, bar_y, _BW, _BH, pct, fill=color)
+    _draw_progress_bar(draw, bar_x, bar_y, _BW, _BH, pct, fill=bar_color)
     if reset_text:
         draw.text((bar_x + _BW + _G, y), reset_text, font=fnt, fill=FG)
 
 
-def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
+def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState", *, color: bool = True) -> None:
     draw.rectangle(
         [(USAGE_X, USAGE_Y), (USAGE_X + USAGE_W - 1, USAGE_Y + USAGE_H - 1)],
         outline=FG, width=1,
@@ -257,12 +260,12 @@ def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     ) + _gap
 
     _cx_text(draw, "Claude", ix, iw, sy, _font(13, bold=True))
-    _draw_usage_row(draw, ix, sy + 16, "5h", state.claude_usage_5h, state.claude_5h_reset, iw, _max_rw)
-    _draw_usage_row(draw, ix, sy + 32, "7d", state.claude_usage_week, state.claude_7d_reset, iw, _max_rw)
+    _draw_usage_row(draw, ix, sy + 16, "5h", state.claude_usage_5h, state.claude_5h_reset, iw, _max_rw, color=color)
+    _draw_usage_row(draw, ix, sy + 32, "7d", state.claude_usage_week, state.claude_7d_reset, iw, _max_rw, color=color)
 
     sep_y = sy + 49
     draw.line([(ix, sep_y), (ix + iw - 1, sep_y)], fill=FG, width=1)
 
     _cx_text(draw, "Codex", ix, iw, sep_y + 3, _font(13, bold=True))
-    _draw_usage_row(draw, ix, sep_y + 19, "5h", state.codex_usage_5h, state.codex_5h_reset, iw, _max_rw)
-    _draw_usage_row(draw, ix, sep_y + 35, "7d", state.codex_usage_week, state.codex_7d_reset, iw, _max_rw)
+    _draw_usage_row(draw, ix, sep_y + 19, "5h", state.codex_usage_5h, state.codex_5h_reset, iw, _max_rw, color=color)
+    _draw_usage_row(draw, ix, sep_y + 35, "7d", state.codex_usage_week, state.codex_7d_reset, iw, _max_rw, color=color)

@@ -161,7 +161,8 @@ def create_images_router(
         tf = body.transform.model_dump()
         try:
             from app.display.image_processor import make_preview_bytes
-            png_bytes = await asyncio.to_thread(make_preview_bytes, src, crop, tf)
+            panel_type = "bw" if settings.display.model == "epd7in5_V2" else "color"
+            png_bytes = await asyncio.to_thread(make_preview_bytes, src, crop, tf, panel_type)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except Exception as exc:

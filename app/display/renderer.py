@@ -30,10 +30,11 @@ def render_dashboard(
     if now is None:
         now = datetime.now()
 
-    _draw_card_weather(img, draw, state, now)
+    color = settings.display.is_color
+    _draw_card_weather(img, draw, state, now, color=color)
     _draw_card_image(img, draw, state)
-    _draw_card_indoor(draw, state)
+    _draw_card_indoor(draw, state, color=color)
     _draw_card_agent1(draw, state)
-    _draw_card_usage(draw, state)
+    _draw_card_usage(draw, state, color=color)
 
     return img

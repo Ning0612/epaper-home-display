@@ -139,9 +139,9 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
     return result
 
 
-def _usage_color(pct: float | None) -> tuple[int, int, int]:
+def _usage_color(pct: float | None, color: bool = True) -> tuple[int, int, int]:
     """Return display color for a usage progress bar: green <60%, orange 60-80%, red >=80%."""
-    if pct is None:
+    if not color or pct is None:
         return FG
     if pct >= 0.80:
         return COLOR_RED
@@ -150,9 +150,9 @@ def _usage_color(pct: float | None) -> tuple[int, int, int]:
     return COLOR_GREEN
 
 
-def _temp_color(temp: float | None) -> tuple[int, int, int]:
+def _temp_color(temp: float | None, color: bool = True) -> tuple[int, int, int]:
     """Return display color for a temperature value."""
-    if temp is None:
+    if not color or temp is None:
         return FG
     if temp >= 30:
         return COLOR_RED

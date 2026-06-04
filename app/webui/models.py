@@ -26,7 +26,6 @@ class _MQTTBody(BaseModel):
 
 class _DisplayBody(BaseModel):
     model: str | None = None
-    dashboard_trigger_second: int | None = None
     dashboard_interval_minutes: int | None = None
     full_refresh_every: int | None = None
 

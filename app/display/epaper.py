@@ -33,18 +33,27 @@ class RealEpaper:
     def display(self, image: Image.Image, full_refresh: bool = False) -> None:
         # sleep() calls module_exit() which closes the SPI fd, so both paths
         # must call an init variant to reopen it before writing.
+        use_fast = not full_refresh
         if full_refresh:
             self._epd.init()
         else:
             try:
                 self._epd.init_fast()
             except AttributeError:
-                # Older driver versions may not have init_fast(); fall back to
-                # full init so the panel still updates correctly.
+                # Driver has no init_fast() — fall back to full init.
+                # display_fast() is also unavailable in this case.
                 logger.warning("init_fast() not available, falling back to init()")
                 self._epd.init()
+                use_fast = False
         buf = self._epd.getbuffer(image)
-        self._epd.display(buf)
+        if use_fast:
+            try:
+                self._epd.display_fast(buf)
+            except AttributeError:
+                # Driver has init_fast() but no display_fast() — use display().
+                self._epd.display(buf)
+        else:
+            self._epd.display(buf)
         self._epd.sleep()
 
     def sleep(self) -> None:

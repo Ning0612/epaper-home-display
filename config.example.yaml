@@ -27,11 +27,13 @@ sensors:
     use_mock: false
 
 display:
-  model: "epd7in3e"
+  model: "epd7in3e"              # 可選：epd7in3e（7 色彩色）/ epd7in5_V2（黑白）/ mock
   use_mock: false
-  dashboard_trigger_second: 30   # 在每個間隔的最後一分鐘第幾秒觸發渲染，補償電子紙刷新延遲（延遲 = 60 - 此值；epd7in3e 全刷新約 30 秒）
+  # dashboard_trigger_second 從型號自動推導，不需設定：
+  #   epd7in3e → 40（全刷新 ~20s，lag=20s）
+  #   epd7in5_V2 → 57（快速刷新 ~0.3s，lag=3s）
   dashboard_interval_minutes: 5  # Dashboard 刷新間隔（分鐘），必須是 60 的因數（1/2/3/4/5/6/10/12/15/20/30/60）
-  full_refresh_every: 10         # 每 N 次更新做一次全刷新（清除鬼影），其餘為快速部分刷新
+  full_refresh_every: 10         # 每 N 次更新做一次全刷新（黑白面板有意義；彩色面板每次都是全刷新）
 
 voice:
   enabled: true
