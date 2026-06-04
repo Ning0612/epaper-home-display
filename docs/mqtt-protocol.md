@@ -4,10 +4,14 @@
 
 | 參數 | 預設值 | 說明 |
 |------|--------|------|
-| Broker Host | `192.168.1.100` | 在 `config.yaml` 中設定 |
+| Broker Host | `192.168.1.100`（範例） | 在 `config.yaml` 中設定；程式碼預設為 `localhost` |
 | Port | `1883` | 標準 MQTT 埠 |
 | Client ID | `epaper-home-display` | 識別本服務的客戶端 ID |
 | QoS | `1` | 所有發布訊息使用 QoS 1（至少送達一次）|
+| Username | `""` | 可選：Broker 帳號（`config.yaml` 的 `mqtt.username`）|
+| Password | `""` | 可選：Broker 密碼（`config.yaml` 的 `mqtt.password`）|
+
+**認證**：`mqtt.username` 非空時，服務會以 `client.username_pw_set()` 傳遞帳密給 Broker。Mosquitto 啟用 `password_file` 時必須設定此欄位；未啟用認證的 Broker 保持空字串即可。
 
 ---
 

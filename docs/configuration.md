@@ -29,6 +29,8 @@ mqtt:
   broker_host: "192.168.1.100"   # 必填：MQTT Broker IP 或 hostname
   broker_port: 1883               # 可選，預設 1883
   client_id: "epaper-home-display" # 可選，MQTT 客戶端識別碼
+  username: ""                    # 可選：Broker 帳號（空字串表示不使用認證）
+  password: ""                    # 可選：Broker 密碼
 ```
 
 ---
@@ -265,7 +267,7 @@ images:
   storage_dir: "data/images"       # 圖片存放目錄（含 display PNG 與 tmp 上傳）
   max_count: 50                    # 最多保留已確認圖片數，超過自動刪除最舊的
   max_upload_bytes: 15728640       # 上傳大小上限（bytes，預設 15 MB）
-  max_pixels: 100000000            # 圖片像素數上限（預設 1 億像素）
+  max_pixels: 25000000             # 圖片像素數上限（預設 2500 萬像素；Pi Zero 2W 記憶體限制）
   carousel_enabled: false          # 是否啟用輪播
   carousel_interval_minutes: 30    # 輪播換圖間隔（分鐘）
   carousel_mode: "sequential"      # 換圖模式：sequential（順序）/ random（隨機）
@@ -306,6 +308,8 @@ mqtt:
   broker_host: "192.168.1.100"
   broker_port: 1883
   client_id: "epaper-home-display"
+  # username: ""
+  # password: ""
 
 weather:
   api_key: "your_openweathermap_api_key"
@@ -361,7 +365,7 @@ images:
   storage_dir: "data/images"
   max_count: 50
   max_upload_bytes: 15728640
-  max_pixels: 100000000
+  max_pixels: 25000000
   carousel_enabled: false
   carousel_interval_minutes: 30
   carousel_mode: "sequential"

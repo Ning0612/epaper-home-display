@@ -48,6 +48,8 @@ ssh pi@epaper-display.local
 | **Broker Host** | MQTT Broker IP 或 hostname |
 | **Port** | MQTT 埠號（預設 1883）|
 | **Client ID** | 本服務的 MQTT 客戶端識別碼 |
+| **Username** | Broker 帳號（留空表示不使用認證）|
+| **Password** | Broker 密碼 |
 
 ### 顯示器設定
 
@@ -88,6 +90,12 @@ ssh pi@epaper-display.local
 | 欄位 | 說明 |
 |------|------|
 | **時區** | 顯示時間與日誌時間戳的時區（如 `Asia/Taipei`）|
+
+### 環境溫濕度分析
+
+訪問 `/environment` 可查看室內溫濕度的歷史趨勢圖表。支援日（5 分鐘槽平均）、月（每日聚合）、年（每月聚合）三種時間尺度，頁面頂端顯示今日即時讀值與當日極值（min/max/avg）。
+
+---
 
 ### AI 使用量設定（僅 YAML）
 
@@ -240,7 +248,7 @@ GET /settings/config
 **回應範例：**
 ```json
 {
-  "mqtt": {"broker_host": "192.168.1.100", "broker_port": 1883, "client_id": "epaper-home-display"},
+  "mqtt": {"broker_host": "192.168.1.100", "broker_port": 1883, "client_id": "epaper-home-display", "username": "myuser", "password_set": true},
   "weather": {"api_key_set": true, "lat": 25.05, "lon": 121.53, "units": "metric", "fetch_interval_seconds": 600},
   "display": {"model": "epd7in3e", "dashboard_trigger_second": 57, "full_refresh_every": 10},
   "sensors": {"light": {"bright_threshold": 500}, ...},
@@ -250,7 +258,7 @@ GET /settings/config
 }
 ```
 
-> **遮罩規則**：`weather.api_key` 替換為 `api_key_set`（boolean）；`discord.webhook_url` 替換為 `webhook_set`（boolean）；`webui.password_hash` 與 `webui.session_secret` 直接移除，不出現於回應中。
+> **遮罩規則**：`weather.api_key` 替換為 `api_key_set`（boolean）；`discord.webhook_url` 替換為 `webhook_set`（boolean）；`mqtt.password` 替換為 `password_set`（boolean，表示目前是否已設密碼）；`webui.password_hash` 與 `webui.session_secret` 直接移除，不出現於回應中。
 
 ---
 
@@ -315,7 +323,7 @@ GET /api/preview/alert
 
 ---
 
-> **所有 PUT 端點的回應格式**：成功時回傳 `{"ok": true}`（位置更新額外附上 `lat`/`lon`）；Pydantic 驗證失敗回傳 HTTP 422；持久化失敗回傳 HTTP 500。
+> **所有 PUT 端點的回應格式**：成功時回傳 `{"ok": true}`（位置更新額外附上 `lat`/`lon`；MQTT 設定額外附上 `"restart_required": true`）；Pydantic 驗證失敗回傳 HTTP 422；持久化失敗回傳 HTTP 500。
 
 ### 更新天氣位置
 
@@ -362,9 +370,20 @@ Content-Type: application/json
 {
   "broker_host": "192.168.1.100",
   "broker_port": 1883,
-  "client_id": "epaper-home-display"
+  "client_id": "epaper-home-display",
+  "username": "myuser",
+  "password": "mypassword"
 }
 ```
+
+所有欄位均可選，僅更新提供的欄位。`username` 設為空字串時，`password` 會同步清空。
+
+**回應：**
+```json
+{"ok": true, "restart_required": true}
+```
+
+> MQTT 設定寫入後需重啟服務才生效：`sudo systemctl restart epaper-home-display`。
 
 ---
 
@@ -467,6 +486,86 @@ Content-Type: application/json
 ```
 
 有效時區值請參考 [IANA 時區資料庫](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)。
+
+---
+
+---
+
+## 環境溫濕度分析 API
+
+### 目前讀值與今日極值
+
+```
+GET /api/env/current
+```
+
+**回應：**
+```json
+{
+  "temperature": 26.5,
+  "humidity": 61.0,
+  "today": {
+    "temp_min": 24.1, "temp_max": 28.3, "temp_avg": 26.2,
+    "hum_min": 55.0,  "hum_max": 68.0,  "hum_avg": 61.4,
+    "sample_count": 48
+  }
+}
+```
+
+`today` 中若當日無資料，各欄位為 `null`，`sample_count` 為 `0`。
+
+> **時區注意**：`/api/env/current` 與 `/api/env/chart` 的「今天」判斷使用 Pi **系統時區**（`datetime.now()`），而非 `config.yaml` 的 `timezone` 設定。若兩者不同，日期邊界可能與 WebUI 顯示時間不一致。建議將 Pi 系統時區設定為與 `config.yaml` 一致：`sudo timedatectl set-timezone Asia/Taipei`。
+
+---
+
+### 環境歷史圖表資料
+
+```
+GET /api/env/chart?scale=<day|month|year>[&ref=<ref>]
+```
+
+| 參數 | 值 | 說明 |
+|------|-----|------|
+| `scale` | `day` | 日視圖：5 分鐘槽平均，x 軸為 `HH:MM` |
+| `scale` | `month` | 月視圖：每日聚合，x 軸為 `MM-DD` |
+| `scale` | `year` | 年視圖：每月聚合，x 軸為月份 `MM` |
+| `ref` | `YYYY-MM-DD`（day）| 指定日期（省略則用今天）|
+| `ref` | `YYYY-MM`（month）| 指定月份（省略則用本月）|
+| `ref` | `YYYY`（year）| 指定年份（省略則用今年）|
+
+`ref` 格式不符時回傳 HTTP 422。
+
+**回應：**
+```json
+{
+  "scale": "day",
+  "ref": "2026-06-04",
+  "points": [
+    {"label": "08:00", "temp": 25.3, "temp_min": 24.8, "temp_max": 25.9,
+     "hum": 60.1, "hum_min": 58.5, "hum_max": 61.8}
+  ],
+  "stats": {
+    "temp_min": 24.1, "temp_max": 28.3, "temp_avg": 26.2,
+    "hum_min": 55.0,  "hum_max": 68.0,  "hum_avg": 61.4,
+    "sample_count": 48
+  }
+}
+```
+
+---
+
+### 有資料的年份清單
+
+```
+GET /api/env/years
+```
+
+**回應：**
+```json
+{"years": ["2026", "2025"]}
+```
+
+年份降序排列。無資料時回傳 `{"years": []}`。
 
 ---
 
@@ -633,7 +732,7 @@ GET /api/desk/sessions?limit=20
 
 **生效時機**：
 - **立即生效（記憶體更新）**：天氣（含地點）、顯示器、在場偵測、語音、Discord 通知、時區、密碼。下次觸發渲染或排程執行時即採用新值，無需重啟。
-- **需重啟服務才生效**：MQTT 設定（`broker_host` / `broker_port` / `client_id`）。設定已寫入 YAML，但現有的 MQTT 連線不會自動重建，需手動重啟：
+- **需重啟服務才生效**：MQTT 設定（`broker_host` / `broker_port` / `client_id` / `username` / `password`）。設定已寫入 YAML，但現有的 MQTT 連線不會自動重建，需手動重啟：
 
 ```bash
 ssh pi@epaper-display.local 'sudo systemctl restart epaper-home-display'

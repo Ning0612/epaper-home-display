@@ -91,7 +91,8 @@ epaper-home-display/
 │   │   ├── _log_helpers.py  # 日誌工具函數
 │   │   ├── _log_images.py   # 圖片元數據日誌與管理
 │   │   ├── _log_notifications.py  # 通知日誌
-│   │   └── _log_sessions.py      # 桌面工作時段日誌
+│   │   ├── _log_sessions.py      # 桌面工作時段日誌
+│   │   └── _log_env_analytics.py # 環境分析查詢（日/月/年聚合、今日極值）
 │   └── webui/
 │       ├── server.py        # FastAPI 應用工廠（注入所有路由）
 │       ├── models.py        # Pydantic 請求/回應模型
@@ -103,6 +104,7 @@ epaper-home-display/
 │           ├── settings.py  # 設定 PUT 端點
 │           ├── wifi.py      # AP 熱點入口（/wifi portal、/api/wifi/scan、/api/wifi/connect，不需認證）
 │           ├── desk.py      # 桌面工作時段 REST API
+│           ├── environment.py  # 環境溫濕度分析（/environment、/api/env/*）
 │           └── images.py    # 圖片上傳/裁切/確認/輪播管理
 ├── tests/                   # pytest 單元測試（mock 硬體）
 ├── scripts/                 # Pi 硬體獨立測試腳本
@@ -343,12 +345,16 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/settings` | HTML 設定介面（含 Leaflet 互動地圖）|
 | `/images` | HTML 圖片管理介面 |
 | `/desk` | HTML 桌面工作時段介面 |
+| `/environment` | HTML 環境溫濕度分析介面（日/月/年圖表）|
 | `/health` | 健康檢查（`{"status": "ok"}`，不需認證）|
 | `/state` | 目前 AgentState 的 JSON 快照 |
 | `/logs/env` | 環境日誌（溫濕度、光線）最近 50 筆 |
 | `/logs/presence` | 占用度日誌最近 50 筆 |
 | `/logs/events` | 系統事件日誌最近 50 筆 |
-| `/settings/config` | 讀取配置（`api_key`/`webhook_url` 遮罩為 boolean；`password_hash`/`session_secret` 移除）|
+| `/api/env/current` | 目前溫濕度 + 今日極值（min/max/avg）|
+| `/api/env/chart?scale=day\|month\|year&ref=...` | 環境歷史圖表資料（日/月/年聚合）|
+| `/api/env/years` | 資料庫中有資料的年份清單 |
+| `/settings/config` | 讀取配置（`api_key`→`api_key_set`、`webhook_url`→`webhook_set`、`mqtt.password`→`password_set` 遮罩為 boolean；`password_hash`/`session_secret` 移除）|
 | `/settings/wifi` | 取得 WiFi 連線資訊（SSID、IP、訊號強度）|
 | `/wifi` | AP 熱點入口網站（`wifi.py`，不需認證）|
 | `/api/wifi/scan` | 掃描周邊 WiFi 網路（GET，AP 模式限定，不需認證）|
