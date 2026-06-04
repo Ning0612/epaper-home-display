@@ -17,6 +17,7 @@ from app.state import state
 logger = logging.getLogger(__name__)
 
 _AP_MODE_REFRESH_INTERVAL = 30.0
+_STARTUP_DATA_TIMEOUT = 180.0
 
 
 def _seconds_until_dashboard_tick(now: _DateTime, trigger_second: int, interval_minutes: int) -> float:
@@ -31,6 +32,25 @@ def _seconds_until_dashboard_tick(now: _DateTime, trigger_second: int, interval_
     target_pos = interval_sec - lag     # position within cycle to fire
     pos = (now.minute * 60 + now.second) % interval_sec
     return float((target_pos - pos) % interval_sec or interval_sec)
+
+
+async def _wait_for_startup_data(timeout_sec: float = _STARTUP_DATA_TIMEOUT) -> None:
+    """Wait until weather + sensor data are ready, or timeout elapses (or AP mode detected)."""
+    deadline = asyncio.get_event_loop().time() + timeout_sec
+    while True:
+        remaining = deadline - asyncio.get_event_loop().time()
+        if remaining <= 0:
+            logger.warning(
+                "Startup data wait timed out after %.0fs — rendering with available data", timeout_sec
+            )
+            return
+        if _is_ap_mode_active():
+            logger.info("AP mode active during startup — skipping data wait")
+            return
+        if state.weather_current is not None and state.temperature is not None:
+            logger.info("Startup data ready (weather + temperature loaded)")
+            return
+        await asyncio.sleep(min(2.0, remaining))
 
 
 def _is_alert_active(settings) -> bool:
@@ -132,13 +152,28 @@ async def _display_loop(
     # init_fast() for a faster partial update. max(1,...) guards against zero in YAML.
     refresh_count = 0
     loop = asyncio.get_event_loop()
+    # startup_wait_done: True once _wait_for_startup_data() has returned.
+    #   Prevents re-calling it (with a fresh 180s timeout) on subsequent iterations.
+    # startup_pending: True until the first render succeeds.
+    #   While True: skip wall-clock alignment and bypass the presence gate.
+    startup_wait_done = False
+    startup_pending = True
 
     while True:
-        # Wait strategy: alert → fixed short interval; ap_mode → 30s; dashboard → wall-clock aligned.
+        # Wait strategy:
+        #   not startup_wait_done → wait for essential data (up to 3 min), then fall through
+        #   startup_pending (data ready, render not yet done) → fall through immediately
+        #   alert → fixed short interval; ap_mode → 30s; dashboard → wall-clock aligned.
         # event value is preserved so callers downstream can react to specific signals
         # (e.g. "wifi_connected" bypasses the presence-check gate).
         event: str | None = None
-        if _is_alert_active(settings):
+        if not startup_wait_done:
+            await _wait_for_startup_data()
+            startup_wait_done = True
+            # Fall through immediately — no scheduling wait before first render
+        elif startup_pending:
+            pass  # data ready, first render not yet done — fall through immediately
+        elif _is_alert_active(settings):
             interval = settings.outdoor_agent.alert_refresh_interval_sec
             try:
                 event = await asyncio.wait_for(display_queue.get(), timeout=interval)
@@ -186,7 +221,9 @@ async def _display_loop(
             pass  # always render AP mode page regardless of presence
         elif state.display_page == "dashboard":
             _maybe_advance_carousel(settings)
-            if state.presence != "OCCUPIED" and event != "wifi_connected":
+            # Bypass presence gate for the very first render so boot-up always
+            # produces a display update regardless of occupancy state.
+            if state.presence != "OCCUPIED" and event != "wifi_connected" and not startup_pending:
                 continue  # pause dashboard updates while nobody home
 
         if state.display_busy:
@@ -233,6 +270,8 @@ async def _display_loop(
                     executor, functools.partial(epaper.display, image, actual_full_refresh)
                 )
                 refresh_count += 1  # only advance cadence on successful panel write
+
+            startup_pending = False  # first render succeeded — clear boot gate
 
             if mqtt_service is not None:
                 try:
