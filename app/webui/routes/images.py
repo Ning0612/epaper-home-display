@@ -5,7 +5,6 @@ import contextlib
 import logging
 import os
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
@@ -245,8 +244,8 @@ def create_images_router(
             state.image_playlist = state.image_playlist + [display_path]
         state.custom_image_path = display_path
         state.carousel_index = state.image_playlist.index(display_path)
-        # Reset advance timer so new image stays visible for at least one interval
-        state.carousel_last_advance = datetime.now()
+        # Reset counter so the new image stays visible for the full interval
+        state.carousel_refresh_count = 0
 
         return {"ok": True, "id": id}
 
@@ -284,7 +283,7 @@ def create_images_router(
     async def get_carousel():
         return {
             "enabled": settings.images.carousel_enabled,
-            "interval_minutes": settings.images.carousel_interval_minutes,
+            "interval_refreshes": settings.images.carousel_interval_refreshes,
             "mode": settings.images.carousel_mode,
         }
 
@@ -294,10 +293,10 @@ def create_images_router(
         if body.enabled is not None:
             settings.images.carousel_enabled = body.enabled
             updates["carousel_enabled"] = body.enabled
-        if body.interval_minutes is not None:
-            val = max(1, body.interval_minutes)
-            settings.images.carousel_interval_minutes = val
-            updates["carousel_interval_minutes"] = val
+        if body.interval_refreshes is not None:
+            val = max(1, body.interval_refreshes)
+            settings.images.carousel_interval_refreshes = val
+            updates["carousel_interval_refreshes"] = val
         if body.mode is not None:
             if body.mode not in ("sequential", "random"):
                 raise HTTPException(400, "mode must be 'sequential' or 'random'")
@@ -314,8 +313,9 @@ def create_images_router(
             raise HTTPException(400, "Need at least 2 images to advance")
 
         prev_path = state.custom_image_path
-        # Force advance by clearing last_advance timestamp
-        state.carousel_last_advance = None
+        # Set counter to threshold - 1 so the next _maybe_advance_carousel call
+        # increments to threshold and triggers the advance.
+        state.carousel_refresh_count = max(1, settings.images.carousel_interval_refreshes) - 1
         from app.loops.display import _maybe_advance_carousel
         _maybe_advance_carousel(settings)
 

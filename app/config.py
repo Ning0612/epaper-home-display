@@ -138,8 +138,8 @@ class ImagesConfig:
         default_factory=lambda: ["JPEG", "PNG", "WEBP", "GIF", "BMP"]
     )
     carousel_enabled: bool = False
-    carousel_interval_minutes: int = 30
-    carousel_mode: str = "sequential"    # "sequential" | "random"
+    carousel_interval_refreshes: int = 10  # advance every N dashboard refreshes
+    carousel_mode: str = "sequential"      # "sequential" | "random"
 
 
 @dataclass

@@ -97,16 +97,16 @@ def _check_alert_timeout(settings) -> bool:
 
 
 def _maybe_advance_carousel(settings) -> None:
-    """Advance carousel to next image if interval elapsed; updates state.custom_image_path."""
+    """Advance carousel every N dashboard refreshes; updates state.custom_image_path."""
     if not settings.images.carousel_enabled:
         return
     if len(state.image_playlist) < 2:
         return
 
-    now = _DateTime.now()
-    interval = _timedelta(minutes=max(1, settings.images.carousel_interval_minutes))
-    if state.carousel_last_advance is not None and (now - state.carousel_last_advance) < interval:
+    state.carousel_refresh_count += 1
+    if state.carousel_refresh_count < max(1, settings.images.carousel_interval_refreshes):
         return
+    state.carousel_refresh_count = 0
 
     # Iterate until a valid image is found, removing missing files along the way.
     while len(state.image_playlist) >= 2:
@@ -127,7 +127,6 @@ def _maybe_advance_carousel(settings) -> None:
         if os.path.exists(playlist[idx]):
             state.carousel_index = idx
             state.custom_image_path = playlist[idx]
-            state.carousel_last_advance = now
             logger.debug("Carousel advanced to index %d: %s", idx, playlist[idx])
             return
 
@@ -220,11 +219,13 @@ async def _display_loop(
         if state.display_page == "ap_mode":
             pass  # always render AP mode page regardless of presence
         elif state.display_page == "dashboard":
-            _maybe_advance_carousel(settings)
             # Bypass presence gate for the very first render so boot-up always
             # produces a display update regardless of occupancy state.
             if state.presence != "OCCUPIED" and event != "wifi_connected" and not startup_pending:
                 continue  # pause dashboard updates while nobody home
+            # Advance carousel AFTER the presence gate so the counter only
+            # increments when a dashboard render is actually about to happen.
+            _maybe_advance_carousel(settings)
 
         if state.display_busy:
             continue

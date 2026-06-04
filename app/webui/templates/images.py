@@ -54,8 +54,8 @@ _IMAGES_CONTENT = r"""
       </div>
       <div class="row2" style="margin-top:.8rem">
         <div class="f">
-          <label>換圖間隔 <span class="hint">（分鐘，最少 1）</span></label>
-          <input type="number" id="c-interval" min="1" max="1440" value="30">
+          <label>換圖間隔 <span class="hint">（每幾次刷新，最少 1）</span></label>
+          <input type="number" id="c-interval" min="1" max="999" value="10">
         </div>
         <div class="f">
           <label>切換模式</label>
@@ -514,7 +514,7 @@ async function loadCarousel() {
     if (!r.ok) return;
     const d = await r.json();
     document.getElementById('c-enabled').checked = d.enabled;
-    document.getElementById('c-interval').value = d.interval_minutes;
+    document.getElementById('c-interval').value = d.interval_refreshes;
     document.getElementById('c-mode').value = d.mode;
   } catch (_) {}
 }
@@ -522,7 +522,7 @@ async function loadCarousel() {
 async function saveCarousel() {
   const body = {
     enabled: document.getElementById('c-enabled').checked,
-    interval_minutes: parseInt(document.getElementById('c-interval').value) || 30,
+    interval_refreshes: parseInt(document.getElementById('c-interval').value) || 10,
     mode: document.getElementById('c-mode').value
   };
   try {

@@ -90,5 +90,5 @@ class _ConfirmBody(BaseModel):
 
 class _CarouselBody(BaseModel):
     enabled: bool | None = None
-    interval_minutes: int | None = None
+    interval_refreshes: int | None = None
     mode: str | None = None  # "sequential" | "random"
