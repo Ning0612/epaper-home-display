@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter
@@ -37,11 +36,13 @@ def create_mqtt_router(settings: "Settings") -> APIRouter:
     @router.get("/api/mqtt/camera/latest", response_class=Response)
     async def camera_latest():
         """Return the latest MQTT camera frame as JPEG, or 204 when none available."""
-        img = state.last_snapshot_image
-        if img is None or state.last_camera_frame_at is None:
+        data = state.last_camera_frame_bytes
+        if data is None or state.last_camera_frame_at is None:
             return Response(status_code=204)
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=85)
-        return Response(content=buf.getvalue(), media_type="image/jpeg")
+        return Response(
+            content=data,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-store"},
+        )
 
     return router

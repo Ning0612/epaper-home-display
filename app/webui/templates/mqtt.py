@@ -208,30 +208,42 @@ function buildTxRows(log) {
   }).join('');
 }
 
-var _camRefreshTimer = null;
+var _cameraAvailable = false;
+var _cameraFrameAt = null;
 
 function updateCameraFeed(cameraAvailable, cameraFrameAt) {
   var badge = document.getElementById('cam-badge');
   var img = document.getElementById('cam-img');
   var noSig = document.getElementById('cam-no-signal');
-  var tsEl = document.getElementById('cam-ts');
+
+  _cameraAvailable = cameraAvailable;
+  _cameraFrameAt = cameraFrameAt;
 
   if (cameraAvailable) {
     badge.className = 'cam-badge live';
     badge.textContent = 'LIVE';
     noSig.style.display = 'none';
     img.style.display = 'block';
-    // Cache-bust with frame timestamp so browser fetches new image each update
-    img.src = '/api/mqtt/camera/latest?t=' + encodeURIComponent(cameraFrameAt || Date.now());
-    tsEl.textContent = cameraFrameAt ? '最後影格：' + fmtTime(cameraFrameAt) + '  (' + relTime(cameraFrameAt) + ')' : '';
   } else {
     badge.className = 'cam-badge offline';
     badge.textContent = '無訊號';
     img.style.display = 'none';
     noSig.style.display = 'flex';
-    tsEl.textContent = cameraFrameAt ? '最後影格：' + fmtTime(cameraFrameAt) + '  (' + relTime(cameraFrameAt) + ')' : '';
+    document.getElementById('cam-ts').textContent =
+      cameraFrameAt ? '最後影格：' + fmtTime(cameraFrameAt) + '  (' + relTime(cameraFrameAt) + ')' : '';
   }
 }
+
+// Camera image refresh independent of status poll — updates as fast as WebUI allows.
+setInterval(function() {
+  if (document.hidden || !_cameraAvailable) return;
+  var img = document.getElementById('cam-img');
+  img.src = '/api/mqtt/camera/latest?t=' + Date.now();
+  if (_cameraFrameAt) {
+    document.getElementById('cam-ts').textContent =
+      '最後影格：' + fmtTime(_cameraFrameAt) + '  (' + relTime(_cameraFrameAt) + ')';
+  }
+}, 333);
 
 async function loadStatus() {
   try {

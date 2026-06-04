@@ -50,8 +50,9 @@ class AgentState:
     codex_7d_reset: str | None = None
 
     display_page: Literal["dashboard", "alert", "ap_mode"] = "dashboard"
-    last_snapshot_image: Any = None          # PIL Image | None — set by display loop or MQTT camera
-    last_camera_frame_at: datetime | None = None  # timestamp of last MQTT camera frame
+    last_snapshot_image: Any = None          # PIL Image | None — used by e-paper renderer
+    last_camera_frame_bytes: bytes | None = None  # raw JPEG — served directly to WebUI
+    last_camera_frame_at: datetime | None = None
     alert_page_started_at: datetime | None = None
     alert_last_triggered_at: datetime | None = None
     alert_dismissed_at: datetime | None = None
