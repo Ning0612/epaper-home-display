@@ -9,8 +9,12 @@ from app.storage.logs import start_desk_session
 
 logger = logging.getLogger(__name__)
 
-# Minimum seconds between manual alarm re-triggers via button 3 (prevents MQTT/voice spam).
-_ALERT_REFRESH_COOLDOWN_SECS = 180
+# Minimum seconds before the same button re-fires while already on the target page.
+_SAME_PAGE_COOLDOWN_SECS = 180
+
+# Per-button last-accepted timestamps (keyed by 1-based button number).
+# Isolated from state so MQTT activity cannot consume a button's cooldown budget.
+_btn_last_accepted: dict[int, _DateTime] = {}
 
 
 def _in_ap_mode(btn_num: int) -> bool:
@@ -20,23 +24,32 @@ def _in_ap_mode(btn_num: int) -> bool:
     return False
 
 
-def _alert_within_cooldown(now: _DateTime) -> bool:
-    """Return True if the last alert refresh is within the cooldown window."""
-    if state.alert_last_triggered_at is None:
+def _within_cooldown(btn_num: int, now: _DateTime) -> bool:
+    """Return True if button was last accepted within _SAME_PAGE_COOLDOWN_SECS."""
+    last = _btn_last_accepted.get(btn_num)
+    if last is None:
         return False
-    return (now - state.alert_last_triggered_at).total_seconds() < _ALERT_REFRESH_COOLDOWN_SECS
+    return (now - last).total_seconds() < _SAME_PAGE_COOLDOWN_SECS
 
 
 async def _handle_btn_dashboard(display_queue: asyncio.Queue) -> None:
     """Button 1 (GPIO 5) — force OCCUPIED and switch to Dashboard.
 
+    When already on dashboard, repeated presses within _SAME_PAGE_COOLDOWN_SECS
+    are ignored.  Switching from another page always proceeds.
     Clears alert state when transitioning from the alert page so that
     presence_loop does not continue acting on stale alert data.
     """
     if _in_ap_mode(1):
         return
+    now = _DateTime.now()
+    if state.display_page == "dashboard" and _within_cooldown(1, now):
+        logger.debug(
+            "Button 1 ignored: already on dashboard within %ds cooldown",
+            _SAME_PAGE_COOLDOWN_SECS,
+        )
+        return
     if state.presence != "OCCUPIED" and state.desk_session_id is None:
-        now = _DateTime.now()
         try:
             session_id = await start_desk_session(now)
             state.desk_session_id = session_id
@@ -52,6 +65,7 @@ async def _handle_btn_dashboard(display_queue: asyncio.Queue) -> None:
         state.alert_page_started_at = None
     state.presence = "OCCUPIED"
     state.display_page = "dashboard"
+    _btn_last_accepted[1] = now
     try:
         display_queue.put_nowait("dashboard")
     except asyncio.QueueFull:
@@ -60,14 +74,25 @@ async def _handle_btn_dashboard(display_queue: asyncio.Queue) -> None:
 
 
 async def _handle_btn_alert_page(display_queue: asyncio.Queue) -> None:
-    """Button 2 (GPIO 6) — switch to Alert page."""
+    """Button 2 (GPIO 6) — switch to Alert page.
+
+    When already on the alert page, repeated presses within _SAME_PAGE_COOLDOWN_SECS
+    are ignored.  Switching from another page always proceeds.
+    """
     if _in_ap_mode(2):
         return
     now = _DateTime.now()
+    if state.display_page == "alert" and _within_cooldown(2, now):
+        logger.debug(
+            "Button 2 ignored: already on alert within %ds cooldown",
+            _SAME_PAGE_COOLDOWN_SECS,
+        )
+        return
     if state.display_page != "alert":
         state.alert_page_started_at = now
     state.alert_last_triggered_at = now
     state.display_page = "alert"
+    _btn_last_accepted[2] = now
     try:
         display_queue.put_nowait("alert")
     except asyncio.QueueFull:
@@ -84,7 +109,8 @@ async def _handle_btn_trigger_alarm(
     Only activates when already on the alert page (entered via MQTT alert).
     Does NOT switch pages or push to the display queue; only publishes to
     home/home_state/alarm_decision and plays the voice alert.
-    Repeated presses within _ALERT_REFRESH_COOLDOWN_SECS are ignored to
+    Also updates alert_last_triggered_at to extend the alert page timeout.
+    Repeated presses within _SAME_PAGE_COOLDOWN_SECS are ignored to
     prevent MQTT and voice spam.
     """
     if _in_ap_mode(3):
@@ -93,12 +119,13 @@ async def _handle_btn_trigger_alarm(
         logger.debug("Button 3 ignored: not on alert page")
         return
     now = _DateTime.now()
-    if _alert_within_cooldown(now):
+    if _within_cooldown(3, now):
         logger.debug(
-            "Button 3 ignored: within %ds cooldown", _ALERT_REFRESH_COOLDOWN_SECS
+            "Button 3 ignored: within %ds cooldown", _SAME_PAGE_COOLDOWN_SECS
         )
         return
-    state.alert_last_triggered_at = now
+    _btn_last_accepted[3] = now
+    state.alert_last_triggered_at = now  # extends alert page timeout
     if mqtt_service is not None:
         try:
             mqtt_service.publish("home/home_state/alarm_decision", {

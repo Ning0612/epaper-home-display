@@ -36,6 +36,16 @@ _MQTT_CONTENT = r"""
   .badge-conn.off{background:rgba(248,113,113,.15);color:#f87171}
   .refresh-ts{font-size:.68rem;color:var(--muted);text-align:right;margin-top:.4rem}
   .empty-log{color:var(--muted);font-size:.82rem;padding:.6rem 0;text-align:center}
+  .cam-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh);margin-bottom:1.2rem}
+  .cam-head{display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem}
+  .cam-title{font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+  .cam-badge{font-size:.68rem;padding:.1rem .5rem;border-radius:99px;font-weight:600;margin-left:auto}
+  .cam-badge.live{background:rgba(52,211,153,.15);color:#34d399}
+  .cam-badge.offline{background:rgba(100,116,139,.12);color:var(--muted)}
+  .cam-frame{position:relative;width:100%;max-width:480px;background:#060A14;border-radius:6px;overflow:hidden;aspect-ratio:4/3}
+  .cam-frame img{width:100%;height:100%;object-fit:contain;display:block}
+  .cam-no-signal{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);font-size:.82rem;gap:.4rem}
+  .cam-ts{font-size:.68rem;color:var(--muted);margin-top:.5rem;font-family:'JetBrains Mono',monospace}
 </style>
 
 <div class="page-wrap">
@@ -74,6 +84,24 @@ _MQTT_CONTENT = r"""
       <div class="topic-rx-time never" id="time-status">從未接收</div>
       <div class="payload-box" id="payload-status">—</div>
     </div>
+  </div>
+
+  <!-- Camera feed -->
+  <div class="card-title" style="margin-bottom:.6rem;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">相機畫面</div>
+  <div class="cam-card">
+    <div class="cam-head">
+      <span class="topic-icon">📷</span>
+      <span class="cam-title">home/security/camera</span>
+      <span class="cam-badge offline" id="cam-badge">無訊號</span>
+    </div>
+    <div class="cam-frame" id="cam-frame">
+      <div class="cam-no-signal" id="cam-no-signal">
+        <span style="font-size:2rem;opacity:.3">📷</span>
+        <span>尚未收到影像</span>
+      </div>
+      <img id="cam-img" alt="camera" style="display:none" />
+    </div>
+    <div class="cam-ts" id="cam-ts"></div>
   </div>
 
   <!-- Message logs -->
@@ -180,6 +208,31 @@ function buildTxRows(log) {
   }).join('');
 }
 
+var _camRefreshTimer = null;
+
+function updateCameraFeed(cameraAvailable, cameraFrameAt) {
+  var badge = document.getElementById('cam-badge');
+  var img = document.getElementById('cam-img');
+  var noSig = document.getElementById('cam-no-signal');
+  var tsEl = document.getElementById('cam-ts');
+
+  if (cameraAvailable) {
+    badge.className = 'cam-badge live';
+    badge.textContent = 'LIVE';
+    noSig.style.display = 'none';
+    img.style.display = 'block';
+    // Cache-bust with frame timestamp so browser fetches new image each update
+    img.src = '/api/mqtt/camera/latest?t=' + encodeURIComponent(cameraFrameAt || Date.now());
+    tsEl.textContent = cameraFrameAt ? '最後影格：' + fmtTime(cameraFrameAt) + '  (' + relTime(cameraFrameAt) + ')' : '';
+  } else {
+    badge.className = 'cam-badge offline';
+    badge.textContent = '無訊號';
+    img.style.display = 'none';
+    noSig.style.display = 'flex';
+    tsEl.textContent = cameraFrameAt ? '最後影格：' + fmtTime(cameraFrameAt) + '  (' + relTime(cameraFrameAt) + ')' : '';
+  }
+}
+
 async function loadStatus() {
   try {
     var r = await fetch('/api/mqtt/status');
@@ -223,6 +276,9 @@ async function loadStatus() {
     document.getElementById('rx-count').textContent = d.rx_log && d.rx_log.length ? '('+d.rx_log.length+')' : '';
     document.getElementById('tx-count').textContent = d.tx_log && d.tx_log.length ? '('+d.tx_log.length+')' : '';
     document.getElementById('refresh-ts').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW',{hour12:false});
+
+    // Camera feed — update with data from status response
+    updateCameraFeed(d.camera_available, d.camera_frame_at);
   } catch(e) {
     console.error('mqtt status', e);
   }

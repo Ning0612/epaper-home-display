@@ -54,11 +54,13 @@ async def _wait_for_startup_data(timeout_sec: float = _STARTUP_DATA_TIMEOUT) -> 
 
 
 def _is_alert_active(settings) -> bool:
-    """True when alert page should be shown: enabled, URL configured, and page is alert."""
+    """True when alert page should be shown: enabled and page is alert.
+
+    snapshot_url is no longer required — MQTT camera feed can supply images without HTTP.
+    """
     return (
         state.display_page == "alert"
         and settings.outdoor_agent.alert_page_enabled
-        and bool(settings.outdoor_agent.snapshot_url)
     )
 
 
@@ -81,10 +83,12 @@ def _check_alert_timeout(settings) -> bool:
         state.last_alarm_decision = None
         state.last_alert = None
         state.alert_face_event = None
+        state.alert_last_triggered_at = None
+        state.alert_page_started_at = None
         return True
 
-    # Normalise disabled / unconfigured alert state immediately
-    if not settings.outdoor_agent.alert_page_enabled or not settings.outdoor_agent.snapshot_url:
+    # Normalise disabled alert state immediately
+    if not settings.outdoor_agent.alert_page_enabled:
         return _dismiss()
 
     if state.alert_last_triggered_at is None:
@@ -258,13 +262,26 @@ async def _display_loop(
             now = _DateTime.now()
 
             if _is_alert_active(settings):
-                # Fetch latest snapshot from outdoor agent (non-blocking)
-                snap = await fetch_snapshot(
-                    settings.outdoor_agent.snapshot_url,
-                    settings.outdoor_agent.snapshot_timeout_sec,
+                # Prefer MQTT camera feed; fall back to HTTP snapshot when no recent MQTT frame.
+                # MQTT camera frames update state.last_snapshot_image directly via _dispatch_camera.
+                mqtt_age: float | None = None
+                if state.last_camera_frame_at is not None:
+                    mqtt_age = (now - state.last_camera_frame_at).total_seconds()
+                # Only skip HTTP if we actually have a cached image AND the MQTT frame is fresh.
+                # last_camera_frame_at is not cleared on alert dismiss, so checking image existence
+                # prevents a stale timestamp from suppressing HTTP on alert re-entry.
+                mqtt_fresh = (
+                    state.last_snapshot_image is not None
+                    and mqtt_age is not None
+                    and mqtt_age <= 5.0
                 )
-                if snap is not None:
-                    state.last_snapshot_image = snap
+                if settings.outdoor_agent.snapshot_url and not mqtt_fresh:
+                    snap = await fetch_snapshot(
+                        settings.outdoor_agent.snapshot_url,
+                        settings.outdoor_agent.snapshot_timeout_sec,
+                    )
+                    if snap is not None:
+                        state.last_snapshot_image = snap
                 image = render_alert_page(state, settings, now)
                 actual_full_refresh = (refresh_count % max(1, settings.display.full_refresh_every) == 0)
                 await loop.run_in_executor(

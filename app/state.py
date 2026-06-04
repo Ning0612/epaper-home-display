@@ -50,7 +50,8 @@ class AgentState:
     codex_7d_reset: str | None = None
 
     display_page: Literal["dashboard", "alert", "ap_mode"] = "dashboard"
-    last_snapshot_image: Any = None          # PIL Image | None — set by display loop
+    last_snapshot_image: Any = None          # PIL Image | None — set by display loop or MQTT camera
+    last_camera_frame_at: datetime | None = None  # timestamp of last MQTT camera frame
     alert_page_started_at: datetime | None = None
     alert_last_triggered_at: datetime | None = None
 

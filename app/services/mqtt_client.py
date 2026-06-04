@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import threading
@@ -8,6 +9,7 @@ from datetime import datetime
 from typing import Callable
 
 import paho.mqtt.client as mqtt
+from PIL import Image
 
 from app.config import MQTTConfig
 from app.state import state
@@ -35,6 +37,8 @@ _SUBSCRIBE_TOPICS = [
     "home/security/alert",
     "home/security/status",
 ]
+_CAMERA_TOPIC = "home/security/camera"
+_MAX_CAMERA_BYTES = 1_048_576   # 1 MB; QVGA JPEG is typically 15-50 KB
 
 
 def make_done_callback(context: str) -> Callable[[asyncio.Future], None]:
@@ -89,6 +93,7 @@ class MQTTService:
             logger.info("MQTT connected")
             for topic in _SUBSCRIBE_TOPICS:
                 client.subscribe(topic, qos=1)
+            client.subscribe(_CAMERA_TOPIC, qos=0)
         else:
             logger.warning("MQTT connect failed rc=%d", rc)
 
@@ -97,6 +102,14 @@ class MQTTService:
         logger.warning("MQTT disconnected rc=%d", rc)
 
     def _on_message(self, client: mqtt.Client, userdata, msg: mqtt.MQTTMessage) -> None:
+        if self._loop is None:
+            return
+        if msg.topic == _CAMERA_TOPIC:
+            future = asyncio.run_coroutine_threadsafe(
+                self._dispatch_camera(bytes(msg.payload)), self._loop
+            )
+            future.add_done_callback(make_done_callback("MQTT camera"))
+            return
         try:
             payload = json.loads(msg.payload.decode())
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -105,12 +118,25 @@ class MQTTService:
         if not isinstance(payload, dict):
             logger.warning("MQTT payload on %s is not a JSON object, ignoring", msg.topic)
             return
-        if self._loop is None:
-            return
         future = asyncio.run_coroutine_threadsafe(
             self._dispatch(msg.topic, payload), self._loop
         )
         future.add_done_callback(make_done_callback("MQTT dispatch"))
+
+    async def _dispatch_camera(self, data: bytes) -> None:
+        if len(data) > _MAX_CAMERA_BYTES:
+            logger.warning("Camera frame too large (%d B), skipping", len(data))
+            return
+        if len(data) < 2 or data[:2] != b"\xff\xd8":
+            logger.debug("Camera frame missing JPEG SOI marker, skipping")
+            return
+        try:
+            img = Image.open(io.BytesIO(data))
+            img.load()
+            state.last_snapshot_image = img.convert("RGB")
+            state.last_camera_frame_at = datetime.now()
+        except Exception as exc:
+            logger.warning("Camera frame decode failed: %s", exc)
 
     async def _dispatch(self, topic: str, payload: dict) -> None:
         now_str = datetime.now().isoformat()
