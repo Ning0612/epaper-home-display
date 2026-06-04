@@ -26,6 +26,11 @@ class AgentState:
     last_alert: dict | None = None
     security_status: dict | None = None
 
+    mqtt_connected: bool = False
+    mqtt_last_rx_by_topic: dict = field(default_factory=dict)
+    mqtt_rx_log: list = field(default_factory=list)  # newest first, max 50
+    mqtt_tx_log: list = field(default_factory=list)  # newest first, max 20
+
     display_busy: bool = False
     active_reminder: str | None = None
 

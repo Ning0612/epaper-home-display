@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 from datetime import datetime
 from typing import Callable
 
@@ -13,6 +14,8 @@ from app.state import state
 from app.storage.logs import log_door_event, log_face_event
 
 logger = logging.getLogger(__name__)
+
+_tx_log_lock = threading.Lock()
 
 _SUBSCRIBE_TOPICS = [
     "home/security/door",
@@ -64,9 +67,13 @@ class MQTTService:
         # agent/timestamp placed last to be authoritative; caller cannot override them
         out = {**payload, "agent": "epaper-home-display", "timestamp": datetime.now().isoformat()}
         self._client.publish(topic, json.dumps(out), qos=1)
+        entry = {"topic": topic, "payload": out, "sent_at": out["timestamp"]}
+        with _tx_log_lock:
+            state.mqtt_tx_log = [entry] + state.mqtt_tx_log[:19]
 
     def _on_connect(self, client: mqtt.Client, userdata, flags, rc: int) -> None:
         if rc == 0:
+            state.mqtt_connected = True
             logger.info("MQTT connected")
             for topic in _SUBSCRIBE_TOPICS:
                 client.subscribe(topic, qos=1)
@@ -74,6 +81,7 @@ class MQTTService:
             logger.warning("MQTT connect failed rc=%d", rc)
 
     def _on_disconnect(self, client: mqtt.Client, userdata, rc: int) -> None:
+        state.mqtt_connected = False
         logger.warning("MQTT disconnected rc=%d", rc)
 
     def _on_message(self, client: mqtt.Client, userdata, msg: mqtt.MQTTMessage) -> None:
@@ -93,6 +101,11 @@ class MQTTService:
         future.add_done_callback(make_done_callback("MQTT dispatch"))
 
     async def _dispatch(self, topic: str, payload: dict) -> None:
+        now_str = datetime.now().isoformat()
+        rx_entry = {"topic": topic, "payload": payload, "received_at": now_str}
+        state.mqtt_last_rx_by_topic[topic] = rx_entry
+        state.mqtt_rx_log = [rx_entry] + state.mqtt_rx_log[:49]
+
         if topic == "home/security/door":
             door_state = str(payload.get("state", ""))[:64]
             state.last_door_event = payload
