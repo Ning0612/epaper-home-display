@@ -132,8 +132,9 @@ Agent 1 的系統狀態心跳。
 
 **效果**：
 - 解碼 JPEG → 轉換為 RGB PIL Image → 更新 `state.last_snapshot_image`
+- 保留原始 JPEG bytes → 更新 `state.last_camera_frame_bytes`（供 WebUI `GET /api/mqtt/camera/latest` 直接轉發，無需重新編碼）
 - 更新 `state.last_camera_frame_at`（時間戳，用於判斷影像新鮮度）
-- 若目前頁面為 `alert`，立即將 `"alert"` 送入 `display_queue` 以觸發畫面更新
+- **不觸發** `display_queue` 排隊；alert 頁面的 e-Paper 渲染依照牆鐘對齊節奏自動排程，渲染時使用當下最新的 `last_snapshot_image`
 - **不記錄**到 `state.mqtt_rx_log` / `state.mqtt_last_rx_by_topic`（binary 幀不走 JSON dispatch）
 
 > **與 HTTP snapshot 的關係**：告警頁面優先使用 MQTT 攝影機畫面（`last_camera_frame_at` 在 5 秒內視為新鮮）；若 MQTT 無新鮮畫面且 `outdoor_agent.snapshot_url` 有設定，仍會以 HTTP GET 擷取快照作為備援。
@@ -182,8 +183,8 @@ Agent 1 的系統狀態心跳。
 
 ```json
 {
-  "decision": "IGNORE",
-  "reason": "Known face detected, occupant present",
+  "alarm_decision": "CANCEL_ALARM",
+  "reason": "Known user present during motion",
   "score": 1.0,
   "agent": "epaper-home-display",
   "timestamp": "2026-05-29T10:30:00.123456"
@@ -192,7 +193,7 @@ Agent 1 的系統狀態心跳。
 
 | 欄位 | 類型 | 說明 |
 |------|------|------|
-| `decision` | string | `"ALARM"`, `"INVESTIGATE"`, 或 `"IGNORE"` |
+| `alarm_decision` | string | `"TRIGGER_ALARM"`, `"NO_ACTION"`, 或 `"CANCEL_ALARM"` |
 | `reason` | string | 決策理由描述 |
 | `score` | float | 當前占用計分 |
 
@@ -200,9 +201,9 @@ Agent 1 的系統狀態心跳。
 
 | 情況 | 決策 |
 |------|------|
-| 無人 + 無已知人臉 | ALARM |
-| 有人 + 已知人臉 | IGNORE |
-| 其他情況 | INVESTIGATE |
+| 無人（UNOCCUPIED / UNKNOWN）且無已知人臉 | `TRIGGER_ALARM` |
+| 有人（OCCUPIED）且有已知人臉 | `CANCEL_ALARM` |
+| 其他不確定情況 | `NO_ACTION` |
 
 ---
 

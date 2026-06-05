@@ -80,9 +80,9 @@ sensors:
   button:
     gpio_pins: [5, 6, 27, 22]  # [B1 dashboard, B2 alert-page, B3 trigger-alarm, B4 cancel-alarm]
                                 # B1=GPIO 5（強制 OCCUPIED + 切換 Dashboard）
-                                # B2=GPIO 6（切換 Alert 頁面）
-                                # B3=GPIO 27（重新觸發告警：MQTT publish + 音效）
-                                # B4=GPIO 22（取消告警：MQTT publish CANCEL_ALARM）
+                                # B2=GPIO 6（切換至 Alert 頁面）
+                                # B3=GPIO 27（重新觸發告警：MQTT publish + 音效；僅在 Alert 頁面時有效）
+                                # B4=GPIO 22（取消告警：MQTT publish CANCEL_ALARM；僅在 Alert 頁面時有效）
     use_mock: false
 ```
 
@@ -194,7 +194,7 @@ sensors:
 
 ## 外部攝影機快照
 
-`outdoor_agent` 區段設定外部攝影機的快照整合功能。當收到 MQTT 安全告警時，系統會從此 URL 擷取即時快照並顯示於 e-Paper 告警頁面。
+`outdoor_agent` 區段設定告警頁面與攝影機畫面整合。告警頁面優先使用 MQTT camera feed（`home/security/camera`）；若無新鮮 MQTT frame（5 秒內），且設定了 `snapshot_url`，才以 HTTP GET 擷取快照作為備援。
 
 ```yaml
 outdoor_agent:
@@ -205,10 +205,10 @@ outdoor_agent:
 ```
 
 **行為說明**：
-- 收到 `home/security/alert` 後立即切換至告警頁面並開始擷取快照
-- 快照擷取失敗（逾時、網路錯誤）時靜默降級，仍顯示告警頁面但無圖像
+- 收到 `home/security/alert` 後立即切換至告警頁面（需 `alert_page_enabled: true`）
+- 告警頁面渲染時才取得畫面：優先用新鮮 MQTT camera frame，無新鮮畫面時若有設定 `snapshot_url` 才以 HTTP 備援；取得失敗時靜默降級顯示無圖像
 - 超出 `alert_page_timeout_sec` 後自動切回儀表板頁面
-- `snapshot_url` 留空或 `alert_page_enabled: false` 時，MQTT callback 仍會短暫設定 `display_page = "alert"`，但 display loop 在每次渲染前執行 `_check_alert_timeout()` 時會立即重置為 `"dashboard"`，實際上不會渲染告警頁面（`/state` 端點可能短暫顯示 `display_page: "alert"`）
+- `alert_page_enabled: false` 時，MQTT callback 仍會短暫設定 `display_page = "alert"`，但 display loop 的 `_is_alert_active()` 判斷失敗，實際上不會渲染告警頁面（`/state` 端點可能短暫顯示 `display_page: "alert"`）；`snapshot_url` 已不再是啟用條件，MQTT camera feed 可在無 HTTP 快照的情況下供圖
 
 ---
 

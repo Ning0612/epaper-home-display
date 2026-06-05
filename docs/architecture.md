@@ -56,6 +56,8 @@ epaper-home-display/
 │   │   ├── renderer_constants.py  # 解析度、顏色（RGB）、版面常數
 │   │   ├── renderer_utils.py    # 天氣圖示、進度條等工具函數
 │   │   └── image_processor.py  # 圖片裁切、旋轉/翻轉、Floyd-Steinberg dithering（六色量化）
+│   │                            # 注意：硬體面板為七色 ACeP，但驅動的 Orange slot 目前映射至 Black，
+│   │                            # 因此自訂圖片量化只使用六個有效色（黑/白/紅/黃/藍/綠）
 │   ├── logic/
 │   │   ├── presence.py      # 占用偵測（純函數，光線 → OCCUPIED/UNOCCUPIED）
 │   │   ├── alarm_decision.py  # 安全告警決策引擎（純函數）
@@ -139,9 +141,9 @@ Agent1 / 攝影機發布：
   home/security/face    ──┤
   home/security/alert   ──┼──► mqtt_client.py ──► state.py ──► logic/ ──► 發布：
   home/security/status  ──┤                                              home/home_state/presence       每 60 秒
-  home/security/camera  ──┘ (raw JPEG, binary)  → state.last_snapshot_image  home/home_state/alarm_decision 決策改變時
-                                                                         home/home_state/alarm_command  Button 3/4 按下時
-                                                                         home/display/status            每次 e-Paper 成功更新後
+  home/security/camera  ──┘ (raw JPEG, binary)  → state.last_snapshot_image     home/home_state/alarm_decision 決策改變時
+                                                 state.last_camera_frame_bytes  home/home_state/alarm_command  Button 3/4 按下時
+                                                 (WebUI /api/mqtt/camera/latest) home/display/status           每次 e-Paper 成功更新後
 ```
 
 ### 顯示更新觸發條件
@@ -149,10 +151,11 @@ Agent1 / 攝影機發布：
 ```
 牆鐘對齊（每 N 分鐘邊界，預設 5 分鐘）─────────────────────────┐
 MQTT 告警事件（立即） ───────────────────────────────────────────┤
-MQTT camera frame（立即，僅告警頁面）────────────────────────────┼──► display_queue ──► _display_loop ──► renderer ──► epaper
-按鈕按下（立即） ───────────────────────────────────────────────┤
+按鈕按下（立即） ───────────────────────────────────────────────┼──► display_queue ──► _display_loop ──► renderer ──► epaper
 wifi_connected 事件（AP 結束後） ───────────────────────────────┘
 ```
+
+> **MQTT camera frame**：只更新 `state.last_snapshot_image` / `last_camera_frame_bytes` / `last_camera_frame_at`，**不**放入 display_queue。Alert 頁面依牆鐘節奏排程，渲染時使用當下最新的快照。
 
 ---
 
@@ -188,7 +191,7 @@ wifi_connected 事件（AP 結束後） ─────────────�
 |---------|------|------|
 | 一般更新 | 牆鐘 N 分鐘邊界（僅 OCCUPIED）| 在邊界前 `(60 - trigger_second)` 秒觸發；trigger_second 由 model 推導（epd7in3e→40, epd7in5_V2→57）|
 | 完整更新（`init`）| 每 `full_refresh_every` 次更新 | 驅動有 `init_fast()` 時才有意義；`epd7in3e` 驅動每次均為完整刷新 |
-| 告警立即更新 | MQTT 告警事件或 MQTT camera frame | 透過 display_queue |
+| 告警立即更新 | MQTT 告警事件（`home/security/alert`）| 透過 display_queue；camera frame 只更新 state 欄位，不觸發 display_queue |
 | 回家立即更新 | 光線變暗（UNOCCUPIED→OCCUPIED）| `_presence_loop` 偵測到後立即觸發 |
 | AP 模式頁面 | 每 30 秒 | 靜態資訊頁，定期刷新時間戳 |
 | 人不在時 | — | `display_loop` 暫停，不做任何更新（wifi_connected 事件可繞過此限制）|
@@ -224,10 +227,12 @@ else:                    → UNOCCUPIED (score = 0.0)
 `app/logic/alarm_decision.py` 中的純函數 `compute_alarm_decision()`：
 
 ```
-if presence ∈ {UNOCCUPIED, UNKNOWN} AND 最近無已知人臉  →  ALARM
-elif presence == OCCUPIED AND 有已知人臉                →  IGNORE
-else                                                    →  INVESTIGATE
+if presence ∈ {UNOCCUPIED, UNKNOWN} AND 最近無已知人臉  →  TRIGGER_ALARM
+elif presence == OCCUPIED AND 有已知人臉                →  CANCEL_ALARM
+else                                                    →  NO_ACTION
 ```
+
+決策結果發布至 `home/home_state/alarm_decision`，鍵名為 `alarm_decision`（非 `decision`）。
 
 ---
 
@@ -264,7 +269,7 @@ else                                                    →  INVESTIGATE
 | `last_door_event` | dict \| None | 最近門事件 |
 | `last_face_event` | dict \| None | 最近人臉事件 |
 | `last_alert` | dict \| None | 最近安全告警 |
-| `last_alarm_decision` | str \| None | 最近告警決策字串（`"ALARM"` / `"INVESTIGATE"` / `"IGNORE"`）|
+| `last_alarm_decision` | str \| None | 最近告警決策字串（`"TRIGGER_ALARM"` / `"NO_ACTION"` / `"CANCEL_ALARM"`）|
 | `alert_face_event` | dict \| None | 告警觸發當下的人臉事件快照（與 `last_face_event` 解耦，避免後續人臉更新影響告警頁面）|
 | `security_status` | dict \| None | Agent 1 狀態心跳（`home/security/status` payload）|
 | `mqtt_connected` | bool | Paho MQTT 連線狀態（`on_connect` / `on_disconnect` 回調更新）|
@@ -287,6 +292,7 @@ else                                                    →  INVESTIGATE
 | `codex_7d_reset` | str \| None | Codex 7d 剩餘時間（如 `"2d 3h"`）|
 | `display_page` | Literal["dashboard", "alert", "ap_mode"] | 目前顯示頁面 |
 | `last_snapshot_image` | Any（PIL Image \| None）| 最後取得的攝影機影像（MQTT camera feed 或 HTTP snapshot；型別標注為 Any，實際為 PIL Image，僅記憶體，不序列化）|
+| `last_camera_frame_bytes` | bytes \| None | 最後一次 MQTT camera frame 的原始 JPEG bytes（供 WebUI `GET /api/mqtt/camera/latest` 直接轉發，不需重新編碼）|
 | `last_camera_frame_at` | datetime \| None | 最後一次收到 MQTT camera frame 的時間戳（用於判斷影像新鮮度：5 秒內視為新鮮，優先於 HTTP snapshot）|
 | `alert_page_started_at` | datetime \| None | 告警頁面首次進入時間（由 MQTT callback 設定，僅在非 alert 狀態時更新）|
 | `alert_last_triggered_at` | datetime \| None | 最後一次告警觸發時間（**用於超時計算**：超過 `alert_page_timeout_sec` 後切回儀表板）|
@@ -362,8 +368,9 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/images` | HTML 圖片管理介面 |
 | `/desk` | HTML 桌面工作時段介面 |
 | `/environment` | HTML 環境溫濕度分析介面（日/月/年圖表）|
+| `/mqtt` | HTML MQTT 監控介面（顯示連線狀態、收發日誌、攝影機畫面）|
 | `/health` | 健康檢查（`{"status": "ok"}`，不需認證）|
-| `/state` | 目前 AgentState 的 JSON 快照 |
+| `/state` | AgentState 部分欄位快照（感測器、天氣、安全事件、AI 使用量；不含 MQTT 連線狀態與日誌，見 `/api/mqtt/status`）|
 | `/logs/env` | 環境日誌（溫濕度、光線）最近 50 筆 |
 | `/logs/presence` | 占用度日誌最近 50 筆 |
 | `/logs/events` | 系統事件日誌最近 50 筆 |
@@ -375,6 +382,8 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/wifi` | AP 熱點入口網站（`wifi.py`，不需認證）|
 | `/api/wifi/scan` | 掃描周邊 WiFi 網路（GET，AP 模式限定，不需認證）|
 | `/api/preview/alert` | 回傳告警頁面的 PNG 預覽（debug 用，**需認證**）|
+| `/api/mqtt/status` | MQTT 連線狀態 JSON（含收發日誌、最後 camera frame 時間戳）|
+| `/api/mqtt/camera/latest` | 最新 MQTT camera frame（JPEG，204 表示無可用畫面）|
 
 **WiFi AP 管理端點（POST，不需認證）**
 

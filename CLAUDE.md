@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**ePaper Home Display** running on Raspberry Pi Zero 2W with a Waveshare 7.5" e-Paper display, DHT22 sensor, light sensor, button, and buzzer/USB speaker.
+**ePaper Home Display** running on Raspberry Pi Zero 2W with a Waveshare 7.3" e-Paper display (epd7in3e, 7-color ACeP), DHT22 sensor, light sensor, button, and buzzer/USB speaker.
 
 Operates independently from Agent 1 and communicates via MQTT.
 
@@ -128,7 +128,7 @@ The display is slow — never block MQTT callbacks or WebUI handlers for it:
 
 - Normal dashboard: wall-clock aligned to `dashboard_interval_minutes` boundaries (default every 5 min). Trigger second is auto-derived per model: `epd7in3e`→40 (full refresh ~20s), `epd7in5_V2`→57 (fast refresh ~0.3s). Not user-configurable.
 - Weather/environment: every 10 minutes
-- Security alert: immediately via display_queue; MQTT camera frames also trigger immediate re-render while on alert page
+- Security alert: immediately via display_queue; MQTT camera frames only update `state.last_snapshot_image` (no display_queue enqueue — alert page renders on wall-clock schedule and picks up the latest snapshot)
 - Refresh cadence: every `full_refresh_every` (default 10) successful writes is a full refresh (init, clears ghosting); others use init_fast (partial). Note: `epd7in3e` has no init_fast — every write is a full refresh.
 
 ### MQTT Topics

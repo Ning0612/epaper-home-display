@@ -147,7 +147,7 @@ GET /health
 GET /state
 ```
 
-回傳 `AgentState` 的 JSON 快照，包含所有感測器讀值、占用狀態、天氣快取、最近 MQTT 事件與 AI 使用量。
+回傳 `AgentState` 的**部分欄位** JSON 快照，包含感測器讀值、占用狀態、天氣快取、安全事件與 AI 使用量。**不含** MQTT 連線狀態（`mqtt_connected`）、收發日誌（`mqtt_rx_log`、`mqtt_tx_log`）、`last_alarm_decision`、`last_camera_frame_at` 等欄位；如需 MQTT 狀態，請使用 `GET /api/mqtt/status`。
 
 **回應範例：**
 ```json
@@ -320,6 +320,32 @@ GET /api/preview/alert
 回傳目前告警頁面的 PNG 截圖（**需 Session cookie 認證**）。供 WebUI 或開發者確認告警版面渲染效果，不觸發實際 e-Paper 刷新。
 
 **回應：** `Content-Type: image/png`，800×480 PNG 圖像。
+
+---
+
+### MQTT 監控
+
+```
+GET /mqtt                       # MQTT 監控頁面（HTML）
+GET /api/mqtt/status            # MQTT 連線狀態 JSON
+GET /api/mqtt/camera/latest     # 最新攝影機畫面（JPEG）
+```
+
+**`GET /api/mqtt/status` 回應：**
+```json
+{
+  "connected": true,
+  "broker_host": "192.168.1.100",
+  "broker_port": 1883,
+  "last_rx": {"home/security/door": {...}, ...},
+  "rx_log": [...],
+  "tx_log": [...],
+  "camera_frame_at": "2026-06-05T09:00:00",
+  "camera_available": true
+}
+```
+
+**`GET /api/mqtt/camera/latest`**：回傳最新 MQTT camera frame 的原始 JPEG（`Content-Type: image/jpeg`，`Cache-Control: no-store`）。若尚未收到任何 camera frame 則回傳 HTTP 204（無內容）。
 
 ---
 

@@ -1,7 +1,7 @@
 # 硬體接線指南
 
 目標板：Raspberry Pi Zero 2W  
-顯示器：Waveshare 7.3" e-Paper (E)（六色：黑、白、紅、黃、藍、綠）
+顯示器：Waveshare 7.3" e-Paper (E)（七色 ACeP：黑、白、紅、黃、藍、綠、橙）
 
 ---
 
@@ -14,9 +14,9 @@
        DHT22  7 ● ○  8
          GND  9 ○ ○  10
               11 ○ ○  12  ← Pin 11 = GPIO 17（電子紙 RST，勿用）
-              13 ● ○  14 GND  ← Pin 13 = GPIO 27（按鈕）
-              ...
-              18     ← 電子紙 BUSY (GPIO 24)
+  B3 (GPIO 27) 13 ● ○  14 GND  ← B3 重新觸發告警
+  B4 (GPIO 22) 15 ● ○  16
+              17 ○ ○  18  ← 電子紙 BUSY (GPIO 24)
               19     ← SPI MOSI  (GPIO 10)
               20 GND
               21     ← SPI MISO  (GPIO  9)
@@ -25,6 +25,9 @@
               24     ← SPI CE0   (GPIO  8) ← 電子紙 CS
               25 GND
               26     ← SPI CE1   (GPIO  7) ← MCP3008 CS
+              ...
+  B1 (GPIO  5) 29 ●  ← B1 強制 OCCUPIED + 切 Dashboard
+  B2 (GPIO  6) 31 ●  ← B2 切換至 Alert 頁面
 ```
 
 ---
@@ -110,7 +113,7 @@ Drawing test image ...
 PASS
 ```
 
-畫面顯示：六色測試圖案（黑/白/紅/黃/藍/綠色塊）+ 中央文字 `ePaper Home Display Test OK`。
+畫面顯示：白底 + 黑色外框矩形 + 中央文字 `ePaper Home Display Test OK`（確認 SPI 通訊與顯示驅動正常運作即可，無色塊測試）。
 
 ---
 
@@ -166,16 +169,24 @@ MCP3008 是 10-bit SPI ADC，將類比光敏電阻訊號轉為數位值。
 
 ---
 
-## 4. 按鈕
+## 4. 按鈕（4 個）
 
-| 按鈕端 | 接到 Pi | 備註 |
-|-------|---------|------|
-| 一端 | Pin 13 (GPIO 27) | |
-| 另一端 | Pin 9 (GND) | 程式碼已啟用內部上拉，按下時讀 LOW |
+系統使用 4 個獨立按鈕，每個按鈕對應一個 GPIO（gpiozero，內建上拉）。按下時讀 LOW，不需外部電阻。
 
-不需要外部電阻，GPIO 已設定 `pull_up_down=GPIO.PUD_UP`。
+| 按鈕 | GPIO (BCM) | Pi 腳位 | 功能 |
+|------|-----------|---------|------|
+| B1 | GPIO 5 | Pin 29 | 強制切換為 OCCUPIED + 切回 Dashboard |
+| B2 | GPIO 6 | Pin 31 | 切換至 Alert 頁面 |
+| B3 | GPIO 27 | Pin 13 | 重新觸發告警（MQTT publish + 播放 alert.wav；**僅在 Alert 頁面時有效**）|
+| B4 | GPIO 22 | Pin 15 | 取消告警（MQTT publish CANCEL_ALARM；**僅在 Alert 頁面時有效**）|
 
-> config.yaml 中 `gpio_pin: 27` 已正確設定。
+**共用接線**：每個按鈕一端接對應 GPIO，另一端接 GND（任意 GND 腳位均可）。
+
+> `config.yaml` 中 `sensors.button.gpio_pins: [5, 6, 27, 22]` 對應 [B1, B2, B3, B4]。
+>
+> **注意**：GPIO 17（Pin 11）已被電子紙 Driver HAT 佔用（RST 信號），不可作為按鈕使用。
+>
+> **AP 模式**：裝置處於 WiFi AP 模式時，所有按鈕按下均被靜默忽略（不觸發任何動作）。
 
 ---
 

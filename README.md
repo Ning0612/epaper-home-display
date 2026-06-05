@@ -1,6 +1,6 @@
 # ePaper Home Display
 
-以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 六色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測、安全偵測與天氣資訊，並與 Agent 1 透過 MQTT 協同工作。
+以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 七色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測、安全偵測與天氣資訊，並與 Agent 1 透過 MQTT 協同工作。
 
 ## 畫面預覽
 
@@ -14,7 +14,7 @@
 
 ![告警頁預覽](docs/images/preview_alert.png)
 
-收到 `home/security/alert` 時立即切換至此頁面，顯示攝影機即時快照（若已設定 `outdoor_agent.snapshot_url`）、門狀態、最後辨識人臉與告警訊息。超過 `alert_page_timeout_sec`（預設 120 秒）後自動返回儀表板。
+收到 `home/security/alert` 時立即切換至此頁面，顯示攝影機快照（優先使用 MQTT camera feed；若無新鮮畫面且有設定 `snapshot_url` 則以 HTTP 備援）、門狀態、最後辨識人臉與告警訊息。超過 `alert_page_timeout_sec`（預設 120 秒）後自動返回儀表板。
 
 ### WiFi 設定模式（AP Mode）
 
@@ -31,7 +31,7 @@ Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並�
 - **天氣面板**：即時天氣 + 5 天預報（OpenWeatherMap），含天氣圖示與溫度
 - **室內環境**：DHT22 溫濕度 + 光線感測器（MCP3008 ADC）
 - **家庭占用偵測**：純光線感測，燈亮 → OCCUPIED，燈暗 → UNOCCUPIED
-- **安全整合**：接收 Agent 1 的門鈴、人臉、告警 MQTT 事件，輸出 ALARM / INVESTIGATE / IGNORE 決策
+- **安全整合**：接收 Agent 1 的門鈴、人臉、告警 MQTT 事件，輸出 TRIGGER_ALARM / NO_ACTION / CANCEL_ALARM 決策
 - **AI 使用量顯示**：直接透過 OAuth 向 Anthropic 與 OpenAI API 輪詢 Claude / Codex 5h 及 7d 使用量，顯示於 e-Paper 面板底部
 - **圖片輪播**：上傳自訂圖片，支援裁切、旋轉、翻轉、Floyd-Steinberg dithering，顯示於 e-Paper 面板
 - **桌面工作時段**：自動追蹤在場時段、記錄每日統計、離場時推送 Discord 摘要
@@ -47,10 +47,10 @@ Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並�
 | 元件 | 型號 | 說明 |
 |------|------|------|
 | 單板電腦 | Raspberry Pi Zero 2W | 運行主服務 |
-| 顯示器 | Waveshare 7.3" e-Paper (E) | 800×480，六色（黑、白、紅、黃、藍、綠）|
+| 顯示器 | Waveshare 7.3" e-Paper (E) | 800×480，七色（黑、白、紅、黃、藍、綠、橙）|
 | 溫濕度感測器 | DHT22 | GPIO 4（BCM） |
 | 光線感測器 | 光敏電阻 + MCP3008 ADC | SPI CE1（GPIO 7） |
-| 按鈕 | 任意常開按鈕 | GPIO 27（BCM） |
+| 按鈕（×4）| 任意常開按鈕 | GPIO 5（B1）/ 6（B2）/ 27（B3）/ 22（B4）|
 | 音效輸出 | USB 音箱 / USB 喇叭 | micro USB OTG 轉接 |
 
 ---
