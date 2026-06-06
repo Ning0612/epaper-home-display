@@ -111,8 +111,7 @@ async def _handle_btn_trigger_alarm(
     Does NOT switch pages or push to the display queue; only publishes to
     home/home_state/alarm_command and plays the voice alert.
     Also updates alert_last_triggered_at to extend the alert page timeout.
-    Repeated presses within _SAME_PAGE_COOLDOWN_SECS are ignored to
-    prevent MQTT and voice spam.
+    No cooldown — every press immediately triggers MQTT publish and voice playback.
     """
     if _in_ap_mode(3):
         return
@@ -120,12 +119,6 @@ async def _handle_btn_trigger_alarm(
         logger.debug("Button 3 ignored: not on alert page")
         return
     now = _DateTime.now()
-    if _within_cooldown(3, now):
-        logger.debug(
-            "Button 3 ignored: within %ds cooldown", _SAME_PAGE_COOLDOWN_SECS
-        )
-        return
-    _btn_last_accepted[3] = now
     state.alert_last_triggered_at = now  # extends alert page timeout
     if mqtt_service is not None:
         try:
