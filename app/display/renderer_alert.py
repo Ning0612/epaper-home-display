@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw
 from app.display.renderer_constants import BG, DISPLAY_H, DISPLAY_W, FG, PAD
 from app.display.renderer_utils import (
     _cx_text, _font, _paste_icon, _weather_item,
-    fmt_door, fmt_face, fmt_alarm, _temp_color,
+    fmt_door, fmt_face, fmt_alarm, _temp_color, is_mqtt_status_online,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,9 +73,12 @@ def _draw_info_panel(
     y += PAD + 2
 
     # Security state rows
-    door = fmt_door(state.last_door_event)
-    face = fmt_face(getattr(state, "alert_face_event", None))
-    alarm = fmt_alarm(getattr(state, "last_alarm_decision", None))
+    if not is_mqtt_status_online(state, now):
+        door = face = alarm = "Disconn"
+    else:
+        door = fmt_door(state.last_door_event)
+        face = fmt_face(getattr(state, "alert_face_event", None))
+        alarm = fmt_alarm(getattr(state, "last_alarm_decision", None))
 
     for label, val in [("D", door), ("F", face), ("A", alarm)]:
         _cx_text(draw, f"{label}:{val}", ix, iw, y, _font(14, bold=True))

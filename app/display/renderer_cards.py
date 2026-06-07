@@ -18,7 +18,7 @@ from app.display.renderer_constants import (
 from app.display.renderer_utils import (
     _font, _cx_text, _paste_icon, _draw_progress_bar,
     _pick_daily_forecast, _weather_item, _temp_color, _usage_color,
-    fmt_door, fmt_face, fmt_alarm,
+    fmt_door, fmt_face, fmt_alarm, is_mqtt_status_online,
 )
 
 if TYPE_CHECKING:
@@ -166,7 +166,7 @@ def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState", *, color: 
     _cx_text(draw, hum_str, ix, iw, sy + 41, _font(17, bold=True))
 
 
-def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
+def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState", now: datetime) -> None:
     draw.rectangle(
         [(AGENT1_X, AGENT1_Y), (AGENT1_X + AGENT1_W - 1, AGENT1_Y + AGENT1_H - 1)],
         outline=FG, width=1,
@@ -175,9 +175,12 @@ def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState") -> None:
     iw = AGENT1_W - 2 * PAD
     ih = AGENT1_H - 2 * PAD
 
-    door_st = fmt_door(state.last_door_event)
-    face_id = fmt_face(state.last_face_event)
-    alarm_st = fmt_alarm(state.last_alarm_decision)
+    if not is_mqtt_status_online(state, now):
+        door_st = face_id = alarm_st = "Disconn"
+    else:
+        door_st = fmt_door(state.last_door_event)
+        face_id = fmt_face(state.last_face_event)
+        alarm_st = fmt_alarm(state.last_alarm_decision)
     mode_map = {"OCCUPIED": "HOME", "UNOCCUPIED": "AWAY", "UNKNOWN": "?"}
     mode_str = mode_map.get(state.presence, state.presence[:6])
 

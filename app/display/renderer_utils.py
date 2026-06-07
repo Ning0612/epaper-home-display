@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from datetime import datetime, date, timezone
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -211,3 +211,20 @@ def fmt_alarm(decision: str | None) -> str:
     if decision is None:
         return "NONE"
     return _DECISION_COLOR_LABEL.get(decision, decision[:5])
+
+
+_MQTT_STATUS_TOPIC = "home/security/status"
+_MQTT_STATUS_TIMEOUT_SECS = 180
+
+
+def is_mqtt_status_online(state: Any, now: datetime) -> bool:
+    """Return False if home/security/status has not been received within 3 minutes."""
+    try:
+        entry = state.mqtt_last_rx_by_topic.get(_MQTT_STATUS_TOPIC)
+        if not entry:
+            return False
+        last = datetime.fromisoformat(entry["received_at"])
+        delta = (now - last).total_seconds()
+        return 0 <= delta <= _MQTT_STATUS_TIMEOUT_SECS
+    except (AttributeError, KeyError, ValueError, TypeError):
+        return False
