@@ -1,5 +1,8 @@
-"""Unit tests for VoiceService config validation (volume, alsa_mixer_control)."""
+"""Unit tests for VoiceService config validation and speak_or_play routing."""
 from __future__ import annotations
+
+import asyncio
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -70,3 +73,32 @@ class TestAlsaMixerControlValidation:
     def test_name_with_hyphen_inside_accepted(self):
         svc = _make_service(alsa_mixer_control="PCM-Out")
         assert svc._config.alsa_mixer_control == "PCM-Out"
+
+
+class TestSpeakOrPlay:
+    def _make_svc(self, tts_engine="espeak-ng") -> VoiceService:
+        return _make_service(tts_engine=tts_engine)
+
+    def test_tts_enabled_calls_speak_on_success(self):
+        svc = self._make_svc(tts_engine="espeak-ng")
+        with patch.object(svc, "speak", new=AsyncMock(return_value=True)) as mock_speak, \
+             patch.object(svc, "play", new=AsyncMock()) as mock_play:
+            asyncio.run(svc.speak_or_play("警報！", "alert.wav"))
+            mock_speak.assert_awaited_once_with("警報！")
+            mock_play.assert_not_awaited()
+
+    def test_tts_enabled_fallbacks_to_play_on_speak_failure(self):
+        svc = self._make_svc(tts_engine="espeak-ng")
+        with patch.object(svc, "speak", new=AsyncMock(return_value=False)) as mock_speak, \
+             patch.object(svc, "play", new=AsyncMock()) as mock_play:
+            asyncio.run(svc.speak_or_play("警報！", "alert.wav"))
+            mock_speak.assert_awaited_once_with("警報！")
+            mock_play.assert_awaited_once_with("alert.wav")
+
+    def test_tts_disabled_calls_play_directly(self):
+        svc = self._make_svc(tts_engine="none")
+        with patch.object(svc, "speak", new=AsyncMock(return_value=False)) as mock_speak, \
+             patch.object(svc, "play", new=AsyncMock()) as mock_play:
+            asyncio.run(svc.speak_or_play("警報！", "alert.wav"))
+            mock_speak.assert_not_awaited()
+            mock_play.assert_awaited_once_with("alert.wav")

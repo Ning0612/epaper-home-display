@@ -227,7 +227,9 @@ class MQTTService:
             if self._voice_service is not None:
                 if self._voice_task is not None and not self._voice_task.done():
                     self._voice_task.cancel()  # alert preempts any lower-priority audio (e.g. door reminder)
-                self._voice_task = asyncio.ensure_future(self._voice_service.play("alert.wav"))
+                self._voice_task = asyncio.ensure_future(
+                    self._voice_service.speak_or_play("警報！有人入侵！", "alert.wav")
+                )
             logger.info(
                 "Alert triggered — %s (agent=%s)",
                 "new alert, switching page" if is_new_alert else "refreshing timeout",

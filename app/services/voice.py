@@ -98,16 +98,28 @@ class VoiceService:
             return
         await self._run_player(path, filename)
 
-    async def speak(self, text: str) -> None:
-        """Synthesize text with the configured TTS engine and play it."""
+    async def speak_or_play(self, text: str, fallback_filename: str) -> None:
+        """Use TTS if enabled and successful; fall back to a pre-recorded file otherwise."""
+        if self._config.tts_engine != "none":
+            if await self.speak(text):
+                return
+            logger.warning("TTS failed; falling back to %s", fallback_filename)
+        await self.play(fallback_filename)
+
+    async def speak(self, text: str) -> bool:
+        """Synthesize text with the configured TTS engine and play it.
+
+        Returns True if playback completed, False on any non-cancellation failure.
+        CancelledError propagates to the caller unchanged.
+        """
         if not self._config.enabled:
-            return
+            return False
         if self._config.tts_engine == "none":
-            return
+            return False
         if not text:
-            return
+            return False
         tmp_dir = "/dev/shm" if os.path.isdir("/dev/shm") else "/tmp"
-        tmp_path = os.path.join(tmp_dir, f"door_reminder_{uuid.uuid4().hex[:8]}.wav")
+        tmp_path = os.path.join(tmp_dir, f"tts_{uuid.uuid4().hex[:8]}.wav")
         tts_proc = None
         try:
             tts_proc = await asyncio.create_subprocess_exec(
@@ -122,11 +134,12 @@ class VoiceService:
             await tts_proc.wait()
             if tts_proc.returncode != 0:
                 logger.warning("espeak-ng exited with code %d for text %r", tts_proc.returncode, text)
-                return
+                return False
             if not os.path.isfile(tmp_path):
                 logger.warning("espeak-ng produced no output file for text %r", text)
-                return
+                return False
             await self._run_player(tmp_path, "tts")
+            return True
         except asyncio.CancelledError:
             if tts_proc is not None and tts_proc.returncode is None:
                 tts_proc.terminate()
@@ -137,6 +150,7 @@ class VoiceService:
             raise
         except Exception as exc:
             logger.warning("TTS speak failed: %s", exc)
+            return False
         finally:
             try:
                 os.unlink(tmp_path)

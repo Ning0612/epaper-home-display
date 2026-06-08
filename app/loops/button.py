@@ -128,7 +128,7 @@ async def _handle_btn_trigger_alarm(
         except Exception as exc:
             logger.error("Button 3: MQTT publish failed: %s", exc)
     if voice_service is not None:
-        await voice_service.play("alert.wav")
+        await voice_service.speak_or_play("警報！有人入侵！", "alert.wav")
     logger.info("Button 3: alarm re-triggered (MQTT + voice, no display change)")
 
 
