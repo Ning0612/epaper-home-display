@@ -103,6 +103,9 @@ class VoiceConfig:
     enabled: bool = True
     player: str = "aplay"
     sounds_dir: str = "assets/sounds"
+    tts_engine: str = "espeak-ng"   # "espeak-ng" | "none"
+    tts_language: str = "zh"        # espeak-ng voice identifier
+    tts_speed: int = 130            # espeak-ng -s (words per minute)
 
 
 @dataclass

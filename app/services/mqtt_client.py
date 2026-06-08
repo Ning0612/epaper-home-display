@@ -20,7 +20,9 @@ logger = logging.getLogger(__name__)
 _tx_log_lock = threading.Lock()
 
 _UNKNOWN_SENTINELS = frozenset({"unknown", "no_face", ""})
-_ALERT_COOLDOWN_SEC = 180.0  # 3 minutes: suppress re-trigger after recent dismissal
+_ALERT_COOLDOWN_SEC = 180.0       # 3 minutes: suppress re-trigger after recent dismissal
+_DOOR_REMINDER_COOLDOWN_SEC = 60.0  # 1 minute: prevent rapid re-trigger on door bounces
+_FACE_EVENT_STALE_SEC = 15.0        # face event older than this is ignored for door gate
 
 
 def _coerce_known(raw: object, identity: str) -> bool:
@@ -60,6 +62,7 @@ class MQTTService:
         self._voice_service = voice_service
         self._voice_task: asyncio.Task | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._last_door_reminder_at: datetime | None = None
 
         self._client = mqtt.Client(client_id=config.client_id)
         if config.username:
@@ -124,6 +127,38 @@ class MQTTService:
         )
         future.add_done_callback(make_done_callback("MQTT dispatch"))
 
+    async def _maybe_play_door_reminder(self) -> None:
+        """Play a weather-based TTS reminder when the door opens and no known face is nearby."""
+        now = datetime.now()
+
+        # Cooldown: avoid rapid re-trigger (e.g. door bounces)
+        if self._last_door_reminder_at is not None:
+            if (now - self._last_door_reminder_at).total_seconds() < _DOOR_REMINDER_COOLDOWN_SEC:
+                logger.debug("Door reminder suppressed: within cooldown")
+                return
+
+        # Face gate: known face detected recently → someone just came in, not leaving
+        face_at = state.last_face_event_at
+        if face_at is not None:
+            face_age = (now - face_at).total_seconds()
+            if face_age <= _FACE_EVENT_STALE_SEC and (state.last_face_event or {}).get("known", False):
+                logger.info("Door reminder skipped: known face %.1fs ago", face_age)
+                return
+
+        from app.logic.door_reminder import generate_door_exit_text
+        text = generate_door_exit_text(state.weather_current, state.weather_forecast)
+        if text is None:
+            logger.debug("Door reminder: no weather condition triggered")
+            return
+
+        if self._voice_service is not None:
+            if self._voice_task is None or self._voice_task.done():
+                self._last_door_reminder_at = now
+                self._voice_task = asyncio.ensure_future(self._voice_service.speak(text))
+                logger.info("Door reminder: %r", text)
+            else:
+                logger.debug("Door reminder skipped: voice busy")
+
     async def _dispatch_camera(self, data: bytes) -> None:
         if len(data) > _MAX_CAMERA_BYTES:
             logger.warning("Camera frame too large (%d B), skipping", len(data))
@@ -147,16 +182,20 @@ class MQTTService:
         state.mqtt_rx_log = [rx_entry] + state.mqtt_rx_log[:49]
 
         if topic == "home/security/door":
+            prev_door_state = (state.last_door_event or {}).get("state")
             door_state = str(payload.get("door_state") or payload.get("state") or "")[:64]
             state.last_door_event = {**payload, "state": door_state, "door_state": door_state}
             await log_door_event(door_state, payload)
             logger.info("Door: %s", door_state)
+            if door_state == "open" and prev_door_state == "closed":
+                await self._maybe_play_door_reminder()
 
         elif topic == "home/security/face":
             raw_identity = payload.get("user_name") or payload.get("identity") or ""
             identity = str(raw_identity).strip()[:64] or "unknown"
             known = _coerce_known(payload.get("known"), identity)
             state.last_face_event = {**payload, "identity": identity, "user_name": identity, "known": known}
+            state.last_face_event_at = datetime.now()
             await log_face_event(identity, known, payload)
             logger.info("Face: %s known=%s", identity, known)
 
@@ -186,8 +225,9 @@ class MQTTService:
             state.alert_last_triggered_at = now_dt
             state.display_page = "alert"
             if self._voice_service is not None:
-                if self._voice_task is None or self._voice_task.done():
-                    self._voice_task = asyncio.ensure_future(self._voice_service.play("alert.wav"))
+                if self._voice_task is not None and not self._voice_task.done():
+                    self._voice_task.cancel()  # alert preempts any lower-priority audio (e.g. door reminder)
+                self._voice_task = asyncio.ensure_future(self._voice_service.play("alert.wav"))
             logger.info(
                 "Alert triggered — %s (agent=%s)",
                 "new alert, switching page" if is_new_alert else "refreshing timeout",

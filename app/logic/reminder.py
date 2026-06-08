@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-_RAIN_CODES = frozenset({
+RAIN_CODES = frozenset({
     200, 201, 202, 210, 211, 212, 221, 230, 231, 232,
     300, 301, 302, 310, 311, 312, 313, 314, 321,
     500, 501, 502, 503, 504, 511, 520, 521, 522, 531,
 })
+_RAIN_CODES = RAIN_CODES  # backwards-compat alias
 
 
 def generate_reminder(
