@@ -27,6 +27,34 @@ class VoiceService:
         config.tts_engine = tts_engine
         self._config = config
 
+    async def _run_player(self, path: str, label: str) -> None:
+        """Invoke the configured audio player on an absolute path."""
+        proc = None
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                self._config.player, path,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await proc.wait()
+            logger.info("Played: %s", label)
+        except asyncio.CancelledError:
+            if proc is not None and proc.returncode is None:
+                proc.terminate()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    try:
+                        await proc.wait()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            raise
+        except Exception as exc:
+            logger.warning("Voice play failed (%s): %s", label, exc)
+
     async def play(self, filename: str) -> None:
         if not self._config.enabled:
             return
@@ -42,59 +70,7 @@ class VoiceService:
         if not os.path.isfile(path):
             logger.warning("Sound file not found: %s", path)
             return
-        proc = None
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                self._config.player, path,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            await proc.wait()
-            logger.info("Played: %s", filename)
-        except asyncio.CancelledError:
-            if proc is not None and proc.returncode is None:
-                proc.terminate()
-                try:
-                    await asyncio.wait_for(proc.wait(), timeout=2.0)
-                except asyncio.TimeoutError:
-                    proc.kill()
-                    try:
-                        await proc.wait()
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-            raise
-        except Exception as exc:
-            logger.warning("Voice play failed: %s", exc)
-
-    async def _play_raw(self, path: str) -> None:
-        """Play an absolute path directly, bypassing sounds_dir boundary check."""
-        proc = None
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                self._config.player, path,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            await proc.wait()
-            logger.info("Played (raw): %s", path)
-        except asyncio.CancelledError:
-            if proc is not None and proc.returncode is None:
-                proc.terminate()
-                try:
-                    await asyncio.wait_for(proc.wait(), timeout=2.0)
-                except asyncio.TimeoutError:
-                    proc.kill()
-                    try:
-                        await proc.wait()
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-            raise
-        except Exception as exc:
-            logger.warning("Voice _play_raw failed: %s", exc)
+        await self._run_player(path, filename)
 
     async def speak(self, text: str) -> None:
         """Synthesize text with the configured TTS engine and play it."""
@@ -124,7 +100,7 @@ class VoiceService:
             if not os.path.isfile(tmp_path):
                 logger.warning("espeak-ng produced no output file for text %r", text)
                 return
-            await self._play_raw(tmp_path)
+            await self._run_player(tmp_path, "tts")
         except asyncio.CancelledError:
             if tts_proc is not None and tts_proc.returncode is None:
                 tts_proc.terminate()

@@ -211,6 +211,25 @@ _SETTINGS_CONTENT = r"""
           <label>播放器指令</label>
           <input type="text" id="v-player" placeholder="aplay">
         </div>
+        <hr>
+        <div class="c-sub">開門天氣提醒（TTS）</div>
+        <div class="row2">
+          <div class="f">
+            <label>TTS 引擎</label>
+            <select id="v-tts-engine" onchange="onTtsEngineChange(this.value)">
+              <option value="espeak-ng">eSpeak NG</option>
+              <option value="none">停用 TTS</option>
+            </select>
+          </div>
+          <div class="f" id="v-tts-lang-row">
+            <label>語音語言 <span class="hint">（espeak-ng voice，如 zh / zh-TW）</span></label>
+            <input type="text" id="v-tts-lang" placeholder="zh" style="max-width:140px">
+          </div>
+        </div>
+        <div class="f" id="v-tts-speed-row">
+          <label>語速 <span class="hint">（50–500 words/min，預設 130）</span></label>
+          <input type="number" id="v-tts-speed" min="50" max="500" step="10" style="max-width:140px">
+        </div>
         <div class="btn-row"><button class="btn-p" onclick="saveVoice()">儲存</button></div>
       </div>
     </div>
@@ -466,6 +485,11 @@ async function loadCfg(){
     var v=c.voice||{};
     document.getElementById('v-en').checked=v.enabled!==false;
     document.getElementById('v-player').value=v.player||'aplay';
+    var eng=v.tts_engine||'espeak-ng';
+    document.getElementById('v-tts-engine').value=eng;
+    document.getElementById('v-tts-lang').value=v.tts_language||'zh';
+    document.getElementById('v-tts-speed').value=v.tts_speed??130;
+    onTtsEngineChange(eng);
     var dc=c.discord||{};
     document.getElementById('n-discord').placeholder=dc.webhook_set?'（已設定，重新輸入以更新）':'https://discord.com/api/webhooks/...';
     document.getElementById('n-online').checked=dc.notify_device_online!==false;
@@ -553,12 +577,24 @@ async function savePresence(){
     toast('✓ 在場偵測已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
+function onTtsEngineChange(val){
+  var hide=val==='none';
+  document.getElementById('v-tts-lang-row').style.display=hide?'none':'';
+  document.getElementById('v-tts-speed-row').style.display=hide?'none':'';
+}
 async function saveVoice(){
   try{
-    await put('/settings/voice',{
+    var eng=document.getElementById('v-tts-engine').value;
+    var body={
       enabled:document.getElementById('v-en').checked,
-      player:document.getElementById('v-player').value.trim()
-    });
+      player:document.getElementById('v-player').value.trim(),
+      tts_engine:eng
+    };
+    if(eng!=='none'){
+      body.tts_language=document.getElementById('v-tts-lang').value.trim();
+      body.tts_speed=+document.getElementById('v-tts-speed').value;
+    }
+    await put('/settings/voice',body);
     toast('✓ 語音設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }

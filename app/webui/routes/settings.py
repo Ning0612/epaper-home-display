@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _ALLOWED_PLAYERS = frozenset({"aplay", "mpg123", "mpg321", "omxplayer", "paplay", "cvlc"})
+_ALLOWED_TTS_ENGINES = frozenset({"espeak-ng", "none"})
 
 
 def create_settings_router(settings: "Settings", weather_service: "WeatherService") -> APIRouter:
@@ -213,6 +214,24 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
                     detail=f"player must be one of: {', '.join(sorted(_ALLOWED_PLAYERS))}",
                 )
             patch["player"] = player
+        if "tts_engine" in patch and patch["tts_engine"] not in _ALLOWED_TTS_ENGINES:
+            raise HTTPException(
+                400,
+                detail=f"tts_engine must be one of: {', '.join(sorted(_ALLOWED_TTS_ENGINES))}",
+            )
+        # When TTS is disabled, language/speed are irrelevant — discard them silently
+        if patch.get("tts_engine") == "none":
+            patch.pop("tts_language", None)
+            patch.pop("tts_speed", None)
+        if "tts_language" in patch:
+            lang = patch["tts_language"].strip()
+            if not lang:
+                lang = "zh"  # reset to default rather than silently keeping old value
+            if not re.match(r"^[A-Za-z][A-Za-z0-9_.+\-]{0,31}$", lang):
+                raise HTTPException(400, detail="tts_language must be a valid espeak voice name (e.g. zh, zh-TW, en)")
+            patch["tts_language"] = lang
+        if "tts_speed" in patch and not (50 <= patch["tts_speed"] <= 500):
+            raise HTTPException(400, detail="tts_speed must be 50–500")
         if not patch:
             return {"ok": True}
 

@@ -37,6 +37,9 @@ class _PresenceBody(BaseModel):
 class _VoiceBody(BaseModel):
     enabled: bool | None = None
     player: str | None = None
+    tts_engine: str | None = None
+    tts_language: str | None = None
+    tts_speed: int | None = None
 
 
 class _NotificationsBody(BaseModel):
