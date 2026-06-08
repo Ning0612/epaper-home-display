@@ -195,14 +195,22 @@ def fmt_door(event: dict | None) -> str:
 
 
 def fmt_face(event: dict | None) -> str:
-    """Known name, Unknown (detected/unrecognized), or NONE (no face detected)."""
+    """Known name, Unknown (detected/unrecognized), or None (no face detected)."""
     if not event:
-        return "NONE"
+        return "None"
+    vote = str(event.get("vote_result") or "").strip().upper()
+    if vote == "KNOWN_CONFIRMED":
+        name = str(event.get("user_name") or "").strip()
+        return name[:8] if name else "Known"
+    if vote == "UNKNOWN_CONFIRMED":
+        return "Unknown"
+    if vote == "NONE":
+        return "None"
+    # Legacy fallback: no vote_result field (pre-FaceGuard protocol events)
     identity = str(event.get("identity") or "").strip()
     known = event.get("known")
-    # Check no-face sentinels first ("NONE" / "no_face") before the known=False branch
     if not identity or identity.lower() in _NO_FACE_IDS:
-        return "NONE"
+        return "None"
     if known is False or identity.lower() == "unknown":
         return "Unknown"
     return identity[:8]

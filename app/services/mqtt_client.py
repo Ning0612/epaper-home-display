@@ -140,13 +140,23 @@ class MQTTService:
                 logger.debug("Door reminder suppressed: within cooldown")
                 return
 
-        # Face gate: any face (known or unknown) detected recently → someone is at the door, not leaving
-        face_at = state.last_face_event_at
-        if face_at is not None:
-            face_age = (now - face_at).total_seconds()
-            if face_age <= _FACE_EVENT_STALE_SEC:
-                logger.info("Door reminder skipped: face detected %.1fs ago", face_age)
-                return
+        # Face gate: skip when MQTT offline (FaceGuard unreachable → treat as no face)
+        # or when no face detected recently (last_face_event_at is None or stale).
+        mqtt_status_entry = state.mqtt_last_rx_by_topic.get("home/security/status")
+        mqtt_online = False
+        if mqtt_status_entry:
+            try:
+                last_status = datetime.fromisoformat(mqtt_status_entry["received_at"])
+                mqtt_online = (now - last_status).total_seconds() <= 180
+            except (ValueError, KeyError):
+                pass
+        if mqtt_online:
+            face_at = state.last_face_event_at
+            if face_at is not None:
+                face_age = (now - face_at).total_seconds()
+                if face_age <= _FACE_EVENT_STALE_SEC:
+                    logger.info("Door reminder skipped: face detected %.1fs ago", face_age)
+                    return
 
         from app.logic.door_reminder import generate_door_exit_text
         text = generate_door_exit_text(state.weather_current, state.weather_forecast)
@@ -200,10 +210,22 @@ class MQTTService:
         elif topic == "home/security/face":
             # Primary: vote_result (FaceGuard protocol); fallback: legacy user_name/identity fields
             raw_vote = str(payload.get("vote_result") or "").strip()[:64]
+            raw_vote_upper = raw_vote.upper()
             raw_legacy = str(payload.get("user_name") or payload.get("identity") or "").strip()[:64]
-            identity = raw_vote or raw_legacy or "NONE"
+            # Derive human-readable identity from vote_result enum; preserve original user_name in event
+            if raw_vote_upper == "KNOWN_CONFIRMED":
+                identity = raw_legacy or "Known"
+            elif raw_vote_upper == "UNKNOWN_CONFIRMED":
+                identity = "Unknown"
+            elif raw_vote_upper == "NONE":
+                identity = "NONE"
+            elif raw_vote:
+                identity = raw_vote   # legacy direct-name or unrecognised enum
+            else:
+                identity = raw_legacy or "NONE"
             known = _coerce_known(payload.get("known"), identity)
-            state.last_face_event = {**payload, "identity": identity, "user_name": identity, "known": known}
+            # Normalize vote_result in storage; user_name from **payload is preserved (not overwritten)
+            state.last_face_event = {**payload, "vote_result": raw_vote_upper or "NONE", "identity": identity, "known": known}
             # "NONE" / "no_face" → no one at door: clear timestamp so gate passes on next door open.
             # If door is already open (face arrived after door open), retry the reminder now.
             # "UNKNOWN" / known name → face present: stamp now so gate blocks for _FACE_EVENT_STALE_SEC.

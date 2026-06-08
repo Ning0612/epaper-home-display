@@ -205,29 +205,61 @@ def _face_event(identity: str, known: bool) -> dict:
     return {"identity": identity, "known": known}
 
 
+# --- fmt_face: new FaceGuard vote_result protocol ---
+
 def test_fmt_face_no_event_returns_none():
-    assert fmt_face(None) == "NONE"
+    assert fmt_face(None) == "None"
+
+
+def test_fmt_face_known_confirmed_returns_user_name():
+    """KNOWN_CONFIRMED with user_name → display the user name."""
+    assert fmt_face({"vote_result": "KNOWN_CONFIRMED", "user_name": "Alice"}) == "Alice"
+
+
+def test_fmt_face_known_confirmed_truncates_to_8():
+    assert fmt_face({"vote_result": "KNOWN_CONFIRMED", "user_name": "verylongname"}) == "verylong"
+
+
+def test_fmt_face_known_confirmed_no_user_name_returns_known():
+    """KNOWN_CONFIRMED without user_name falls back to 'Known'."""
+    assert fmt_face({"vote_result": "KNOWN_CONFIRMED"}) == "Known"
+
+
+def test_fmt_face_unknown_confirmed_returns_unknown():
+    assert fmt_face({"vote_result": "UNKNOWN_CONFIRMED"}) == "Unknown"
 
 
 def test_fmt_face_vote_result_none_returns_none():
-    """vote_result='NONE' stored as identity='NONE' → display 'NONE', not 'Unknown'."""
-    assert fmt_face(_face_event("NONE", False)) == "NONE"
+    """vote_result='NONE' → display 'None'."""
+    assert fmt_face({"vote_result": "NONE"}) == "None"
 
 
-def test_fmt_face_none_lowercase():
-    assert fmt_face(_face_event("none", False)) == "NONE"
+def test_fmt_face_vote_result_none_lowercase():
+    """Lowercase 'none' is normalised to NONE enum match → 'None'."""
+    assert fmt_face({"vote_result": "none"}) == "None"
 
+
+# --- fmt_face: legacy identity/known fallback ---
 
 def test_fmt_face_legacy_no_face_returns_none():
-    assert fmt_face(_face_event("no_face", False)) == "NONE"
+    assert fmt_face(_face_event("no_face", False)) == "None"
 
 
 def test_fmt_face_empty_identity_returns_none():
-    assert fmt_face(_face_event("", False)) == "NONE"
+    assert fmt_face(_face_event("", False)) == "None"
+
+
+def test_fmt_face_legacy_none_identity_returns_none():
+    """Legacy event with identity='NONE' falls through to legacy path → 'None'."""
+    assert fmt_face(_face_event("NONE", False)) == "None"
+
+
+def test_fmt_face_legacy_none_lowercase():
+    assert fmt_face(_face_event("none", False)) == "None"
 
 
 def test_fmt_face_unknown_returns_unknown():
-    """vote_result='UNKNOWN' → face detected but unrecognized → 'Unknown'."""
+    """Legacy vote_result='UNKNOWN' identity → 'Unknown'."""
     assert fmt_face(_face_event("UNKNOWN", False)) == "Unknown"
 
 
