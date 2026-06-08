@@ -21,8 +21,9 @@ _tx_log_lock = threading.Lock()
 
 _UNKNOWN_SENTINELS = frozenset({"unknown", "no_face", ""})
 _ALERT_COOLDOWN_SEC = 180.0       # 3 minutes: suppress re-trigger after recent dismissal
-_DOOR_REMINDER_COOLDOWN_SEC = 60.0  # 1 minute: prevent rapid re-trigger on door bounces
-_FACE_EVENT_STALE_SEC = 15.0        # face event older than this is ignored for door gate
+_DOOR_REMINDER_COOLDOWN_SEC = 60.0   # 1 minute: prevent rapid re-trigger on door bounces
+_FACE_EVENT_STALE_SEC = 15.0         # face event older than this is ignored for door gate
+_DOOR_REMINDER_FALLBACK_TEXT = "出門注意安全"  # played when weather data has no specific warning
 
 
 def _coerce_known(raw: object, identity: str) -> bool:
@@ -128,7 +129,7 @@ class MQTTService:
         future.add_done_callback(make_done_callback("MQTT dispatch"))
 
     async def _maybe_play_door_reminder(self) -> None:
-        """Play a weather-based TTS reminder when the door opens and no known face is nearby."""
+        """Play a TTS reminder when the door opens and no face (from outdoor agent) is nearby."""
         now = datetime.now()
 
         # Cooldown: avoid rapid re-trigger (e.g. door bounces)
@@ -137,19 +138,19 @@ class MQTTService:
                 logger.debug("Door reminder suppressed: within cooldown")
                 return
 
-        # Face gate: known face detected recently → someone just came in, not leaving
+        # Face gate: any face (known or unknown) detected recently → someone is at the door, not leaving
         face_at = state.last_face_event_at
         if face_at is not None:
             face_age = (now - face_at).total_seconds()
-            if face_age <= _FACE_EVENT_STALE_SEC and (state.last_face_event or {}).get("known", False):
-                logger.info("Door reminder skipped: known face %.1fs ago", face_age)
+            if face_age <= _FACE_EVENT_STALE_SEC:
+                logger.info("Door reminder skipped: face detected %.1fs ago", face_age)
                 return
 
         from app.logic.door_reminder import generate_door_exit_text
         text = generate_door_exit_text(state.weather_current, state.weather_forecast)
         if text is None:
-            logger.debug("Door reminder: no weather condition triggered")
-            return
+            logger.debug("Door reminder: no weather condition, using fallback")
+            text = _DOOR_REMINDER_FALLBACK_TEXT
 
         if self._voice_service is not None:
             if self._voice_task is None or self._voice_task.done():
@@ -195,7 +196,11 @@ class MQTTService:
             identity = str(raw_identity).strip()[:64] or "unknown"
             known = _coerce_known(payload.get("known"), identity)
             state.last_face_event = {**payload, "identity": identity, "user_name": identity, "known": known}
-            state.last_face_event_at = datetime.now()
+            # Only update timestamp for real face detections.
+            # "no_face" (case-insensitive) means no one is present — must not gate the door reminder.
+            # "unknown" means an unrecognised face was detected and SHOULD gate it.
+            if identity.lower() != "no_face":
+                state.last_face_event_at = datetime.now()
             await log_face_event(identity, known, payload)
             logger.info("Face: %s known=%s", identity, known)
 
