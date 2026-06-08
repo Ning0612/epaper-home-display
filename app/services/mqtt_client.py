@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 _tx_log_lock = threading.Lock()
 
-_UNKNOWN_SENTINELS = frozenset({"unknown", "no_face", ""})
+_UNKNOWN_SENTINELS = frozenset({"unknown", "no_face", "none", ""})
 _ALERT_COOLDOWN_SEC = 180.0       # 3 minutes: suppress re-trigger after recent dismissal
 _DOOR_REMINDER_COOLDOWN_SEC = 60.0   # 1 minute: prevent rapid re-trigger on door bounces
 _FACE_EVENT_STALE_SEC = 15.0         # face event older than this is ignored for door gate
@@ -192,14 +192,15 @@ class MQTTService:
                 await self._maybe_play_door_reminder()
 
         elif topic == "home/security/face":
-            raw_identity = payload.get("user_name") or payload.get("identity") or ""
-            identity = str(raw_identity).strip()[:64] or "unknown"
+            # Primary: vote_result (FaceGuard protocol); fallback: legacy user_name/identity fields
+            raw_vote = str(payload.get("vote_result") or "").strip()[:64]
+            raw_legacy = str(payload.get("user_name") or payload.get("identity") or "").strip()[:64]
+            identity = raw_vote or raw_legacy or "NONE"
             known = _coerce_known(payload.get("known"), identity)
             state.last_face_event = {**payload, "identity": identity, "user_name": identity, "known": known}
-            # Only update timestamp for real face detections.
-            # "no_face" (case-insensitive) means no one is present — must not gate the door reminder.
-            # "unknown" means an unrecognised face was detected and SHOULD gate it.
-            if identity.lower() != "no_face":
+            # "NONE" / "no_face" (case-insensitive) means no one present — must not gate the door reminder.
+            # "UNKNOWN" means an unrecognised face was detected and SHOULD gate it.
+            if identity.lower() not in ("none", "no_face"):
                 state.last_face_event_at = datetime.now()
             await log_face_event(identity, known, payload)
             logger.info("Face: %s known=%s", identity, known)
