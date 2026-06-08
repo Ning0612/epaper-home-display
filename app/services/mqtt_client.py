@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 _tx_log_lock = threading.Lock()
 
 _UNKNOWN_SENTINELS = frozenset({"unknown", "no_face", "none", ""})
+# Identities that mean "no face at door right now" — shared by timestamp gate and retry logic
+_NO_FACE_SENTINELS = frozenset({"none", "no_face"})
 _ALERT_COOLDOWN_SEC = 180.0       # 3 minutes: suppress re-trigger after recent dismissal
 _DOOR_REMINDER_COOLDOWN_SEC = 60.0   # 1 minute: prevent rapid re-trigger on door bounces
 _FACE_EVENT_STALE_SEC = 15.0         # face event older than this is ignored for door gate
@@ -198,9 +200,14 @@ class MQTTService:
             identity = raw_vote or raw_legacy or "NONE"
             known = _coerce_known(payload.get("known"), identity)
             state.last_face_event = {**payload, "identity": identity, "user_name": identity, "known": known}
-            # "NONE" / "no_face" (case-insensitive) means no one present — must not gate the door reminder.
-            # "UNKNOWN" means an unrecognised face was detected and SHOULD gate it.
-            if identity.lower() not in ("none", "no_face"):
+            # "NONE" / "no_face" → no one at door: clear timestamp so gate passes on next door open.
+            # If door is already open (face arrived after door open), retry the reminder now.
+            # "UNKNOWN" / known name → face present: stamp now so gate blocks for _FACE_EVENT_STALE_SEC.
+            if identity.lower() in _NO_FACE_SENTINELS:
+                state.last_face_event_at = None
+                if (state.last_door_event or {}).get("state") == "open":
+                    await self._maybe_play_door_reminder()
+            else:
                 state.last_face_event_at = datetime.now()
             await log_face_event(identity, known, payload)
             logger.info("Face: %s known=%s", identity, known)

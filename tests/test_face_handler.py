@@ -41,8 +41,58 @@ def fake_state():
 # --- vote_result: NONE (no face) ---
 
 @pytest.mark.asyncio
+async def test_none_clears_existing_timestamp(svc, fake_state):
+    """vote_result='NONE' must clear a pre-existing last_face_event_at so the door gate passes."""
+    fake_state.last_face_event_at = datetime.now()  # simulates a previous real face event
+    await _dispatch_face(svc, {"vote_result": "NONE"}, fake_state)
+    assert fake_state.last_face_event_at is None
+
+
+# --- MQTT ordering: door open before/after NONE ---
+
+async def _dispatch_face_open(svc, payload, fake_state):
+    """Dispatch a face event while door is already 'open' in state."""
+    fake_state.last_door_event = {"state": "open"}
+    await _dispatch_face(svc, payload, fake_state)
+
+
+@pytest.mark.asyncio
+async def test_none_then_door_open_plays(svc, fake_state):
+    """NONE arrives first, then door opens: gate should pass (timestamp was cleared)."""
+    fake_state.last_face_event_at = datetime.now()  # stale face from before
+    await _dispatch_face(svc, {"vote_result": "NONE"}, fake_state)
+    # After NONE, timestamp is cleared; door gate would now pass
+    assert fake_state.last_face_event_at is None
+
+
+@pytest.mark.asyncio
+async def test_unknown_then_door_open_then_none_retries(svc, fake_state):
+    """UNKNOWN → door open (suppressed) → NONE: face handler should retry _maybe_play_door_reminder."""
+    fake_state.last_face_event_at = datetime.now()  # UNKNOWN set this recently
+    # Simulate door is already open when NONE arrives
+    calls = []
+    original = svc._maybe_play_door_reminder
+
+    async def mock_reminder():
+        calls.append(1)
+
+    svc._maybe_play_door_reminder = mock_reminder
+    await _dispatch_face_open(svc, {"vote_result": "NONE"}, fake_state)
+    assert len(calls) == 1, "NONE with door open should retry _maybe_play_door_reminder"
+
+
+@pytest.mark.asyncio
+async def test_unknown_then_none_then_unknown_blocks(svc, fake_state):
+    """UNKNOWN → NONE → UNKNOWN → door open: last UNKNOWN should still gate the reminder."""
+    await _dispatch_face(svc, {"vote_result": "UNKNOWN"}, fake_state)
+    await _dispatch_face(svc, {"vote_result": "NONE"}, fake_state)
+    await _dispatch_face(svc, {"vote_result": "UNKNOWN"}, fake_state)
+    assert fake_state.last_face_event_at is not None
+
+
+@pytest.mark.asyncio
 async def test_none_does_not_update_timestamp(svc, fake_state):
-    """vote_result='NONE' must not update last_face_event_at."""
+    """vote_result='NONE' on a fresh state also leaves last_face_event_at as None."""
     fake_state.last_face_event_at = None
     await _dispatch_face(svc, {"vote_result": "NONE"}, fake_state)
     assert fake_state.last_face_event_at is None
