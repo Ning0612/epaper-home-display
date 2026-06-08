@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import uuid
 
 from app.config import VoiceConfig
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 _ALLOWED_PLAYERS = frozenset({"aplay", "mpg123", "mpg321", "omxplayer", "paplay", "cvlc"})
 _ALLOWED_TTS_ENGINES = frozenset({"espeak-ng", "none"})
+_ALSA_CONTROL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _-]{0,63}$")
 
 
 class VoiceService:
@@ -25,10 +27,34 @@ class VoiceService:
             logger.warning("voice.tts_engine %r not in allowlist; disabling TTS", config.tts_engine)
             tts_engine = "none"
         config.tts_engine = tts_engine
+        config.volume = max(0, min(100, int(config.volume)))
+        ctrl = (config.alsa_mixer_control or "").strip()
+        if ctrl and not _ALSA_CONTROL_RE.match(ctrl):
+            logger.warning("voice.alsa_mixer_control %r is invalid; disabling volume control", config.alsa_mixer_control)
+            ctrl = ""
+        config.alsa_mixer_control = ctrl
         self._config = config
+
+    async def _set_volume(self) -> None:
+        """Set ALSA mixer volume (best-effort; failures are non-fatal)."""
+        control = (self._config.alsa_mixer_control or "").strip()
+        if not control:
+            return
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "amixer", "sset", control, f"{self._config.volume}%",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await proc.wait()
+            if proc.returncode != 0:
+                logger.debug("amixer exited with code %d for control %r", proc.returncode, control)
+        except Exception as exc:
+            logger.debug("amixer volume set skipped: %s", exc)
 
     async def _run_player(self, path: str, label: str) -> None:
         """Invoke the configured audio player on an absolute path."""
+        await self._set_volume()
         proc = None
         try:
             proc = await asyncio.create_subprocess_exec(

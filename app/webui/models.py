@@ -40,6 +40,8 @@ class _VoiceBody(BaseModel):
     tts_engine: str | None = None
     tts_language: str | None = None
     tts_speed: int | None = None
+    volume: int | None = None
+    alsa_mixer_control: str | None = None
 
 
 class _NotificationsBody(BaseModel):

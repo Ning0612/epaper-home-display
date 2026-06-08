@@ -212,6 +212,18 @@ _SETTINGS_CONTENT = r"""
           <input type="text" id="v-player" placeholder="aplay">
         </div>
         <hr>
+        <div class="c-sub">音量</div>
+        <div class="f">
+          <label>播放音量 <span class="hint">（0–100，目前：<b id="v-vol-val">80</b>）</span></label>
+          <input type="range" id="v-vol" min="0" max="100" step="5"
+                 oninput="document.getElementById('v-vol-val').textContent=this.value"
+                 style="width:100%;accent-color:var(--primary)">
+        </div>
+        <div class="f">
+          <label>ALSA Mixer 控制項 <span class="hint">（如 PCM / Master；留空則跳過音量設定）</span></label>
+          <input type="text" id="v-alsa" placeholder="PCM" style="max-width:160px">
+        </div>
+        <hr>
         <div class="c-sub">開門天氣提醒（TTS）</div>
         <div class="row2">
           <div class="f">
@@ -485,6 +497,10 @@ async function loadCfg(){
     var v=c.voice||{};
     document.getElementById('v-en').checked=v.enabled!==false;
     document.getElementById('v-player').value=v.player||'aplay';
+    var vol=v.volume!=null?v.volume:80;
+    document.getElementById('v-vol').value=vol;
+    document.getElementById('v-vol-val').textContent=vol;
+    document.getElementById('v-alsa').value=v.alsa_mixer_control!=null?v.alsa_mixer_control:'PCM';
     var eng=v.tts_engine||'espeak-ng';
     document.getElementById('v-tts-engine').value=eng;
     document.getElementById('v-tts-lang').value=v.tts_language||'zh';
@@ -588,6 +604,8 @@ async function saveVoice(){
     var body={
       enabled:document.getElementById('v-en').checked,
       player:document.getElementById('v-player').value.trim(),
+      volume:+document.getElementById('v-vol').value,
+      alsa_mixer_control:document.getElementById('v-alsa').value.trim(),
       tts_engine:eng
     };
     if(eng!=='none'){

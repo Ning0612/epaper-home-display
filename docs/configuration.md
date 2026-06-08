@@ -119,7 +119,16 @@ voice:
   enabled: true          # false = 停用所有音效（silent mode）
   player: "aplay"        # 播放指令，Pi 使用 "aplay"（ALSA）
   sounds_dir: "assets/sounds"  # 音效檔案目錄
+  volume: 80             # 播放音量 0–100（透過 ALSA amixer sset 設定）
+  alsa_mixer_control: "PCM"  # ALSA 控制項名稱（常見：PCM / Master）；留空跳過音量設定
+  tts_engine: "espeak-ng"    # "espeak-ng"（開門提醒語音合成）| "none"（停用 TTS）
+  tts_language: "zh"         # espeak-ng 語音識別碼（zh / zh-TW / en 等）
+  tts_speed: 130             # 語速（words per minute），建議 110–150
 ```
+
+**volume / alsa_mixer_control 說明**：每次播放前自動以 `amixer sset <alsa_mixer_control> <volume>%` 設定音量。不同 Pi 音訊設定的控制項名稱不同，可用 `amixer scontrols` 查詢可用名稱；`alsa_mixer_control` 留空則跳過音量設定（使用系統目前音量）。
+
+**tts_engine 說明**：`espeak-ng` 需在 Pi 安裝套件（`sudo apt install espeak-ng espeak-ng-data`）。`none` 停用 TTS 但仍正常播放 `assets/sounds/` 中的預錄音檔。
 
 ---
 
@@ -351,6 +360,11 @@ voice:
   enabled: true
   player: "aplay"
   sounds_dir: "assets/sounds"
+  volume: 80
+  alsa_mixer_control: "PCM"
+  tts_engine: "espeak-ng"
+  tts_language: "zh"
+  tts_speed: 130
 
 discord:
   webhook_url: ""

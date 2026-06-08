@@ -232,6 +232,13 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
             patch["tts_language"] = lang
         if "tts_speed" in patch and not (50 <= patch["tts_speed"] <= 500):
             raise HTTPException(400, detail="tts_speed must be 50–500")
+        if "volume" in patch and not (0 <= patch["volume"] <= 100):
+            raise HTTPException(400, detail="volume must be 0–100")
+        if "alsa_mixer_control" in patch:
+            ctrl = patch["alsa_mixer_control"].strip()
+            if ctrl and not re.match(r"^[A-Za-z0-9][A-Za-z0-9 _-]{0,63}$", ctrl):
+                raise HTTPException(400, detail="alsa_mixer_control contains invalid characters")
+            patch["alsa_mixer_control"] = ctrl  # allow empty string (disables volume control)
         if not patch:
             return {"ok": True}
 

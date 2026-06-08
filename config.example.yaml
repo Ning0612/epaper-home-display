@@ -39,6 +39,8 @@ voice:
   enabled: true
   player: "aplay"
   sounds_dir: "assets/sounds"
+  volume: 80                 # 播放音量 0–100（透過 ALSA amixer sset 設定）
+  alsa_mixer_control: "PCM"  # ALSA 控制項名稱（常見：PCM / Master；留空跳過音量設定）
   tts_engine: "espeak-ng"    # "espeak-ng" | "none"（none 停用 TTS 但保留預錄音檔播放）
   tts_language: "zh"         # espeak-ng voice（zh / zh-TW / en 等，需 Pi 已安裝對應語音包）
   tts_speed: 130             # 語速（words per minute，建議 110–150）
