@@ -186,7 +186,11 @@ class MQTTService:
 
         if topic == "home/security/door":
             prev_door_state = (state.last_door_event or {}).get("state")
-            door_state = str(payload.get("door_state") or payload.get("state") or "")[:64]
+            raw_ds = str(payload.get("door_state") or payload.get("state") or "")[:64]
+            # Normalize: "DOOR_OPEN" → "open", "DOOR_CLOSED" → "closed"
+            door_state = raw_ds.lower()
+            if door_state.startswith("door_"):
+                door_state = door_state[len("door_"):]
             state.last_door_event = {**payload, "state": door_state, "door_state": door_state}
             await log_door_event(door_state, payload)
             logger.info("Door: %s", door_state)
