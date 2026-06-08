@@ -223,6 +223,10 @@ _SETTINGS_CONTENT = r"""
           <label>ALSA Mixer 控制項 <span class="hint">（如 PCM / Master；留空則跳過音量設定）</span></label>
           <input type="text" id="v-alsa" placeholder="PCM" style="max-width:160px">
         </div>
+        <div class="btn-row" style="margin-top:.6rem;margin-bottom:0;justify-content:flex-start;align-items:center;gap:.75rem">
+          <button class="btn-s" id="v-test-btn" onclick="testVoice()">▶ 測試語音</button>
+          <span id="v-test-status" style="font-size:.8rem;color:var(--muted)"></span>
+        </div>
         <hr>
         <div class="c-sub">開門天氣提醒（TTS）</div>
         <div class="row2">
@@ -597,6 +601,32 @@ function onTtsEngineChange(val){
   var hide=val==='none';
   document.getElementById('v-tts-lang-row').style.display=hide?'none':'';
   document.getElementById('v-tts-speed-row').style.display=hide?'none':'';
+}
+async function testVoice(){
+  var btn=document.getElementById('v-test-btn');
+  var status=document.getElementById('v-test-status');
+  btn.disabled=true;
+  status.textContent='播放中...';
+  try{
+    var eng=document.getElementById('v-tts-engine').value;
+    var body={
+      volume:+document.getElementById('v-vol').value,
+      alsa_mixer_control:document.getElementById('v-alsa').value.trim(),
+      tts_engine:eng
+    };
+    if(eng!=='none'){
+      body.tts_language=document.getElementById('v-tts-lang').value.trim();
+      body.tts_speed=+document.getElementById('v-tts-speed').value;
+    }
+    var r=await fetch('/settings/voice/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    status.textContent='已送出測試';
+    setTimeout(function(){status.textContent='';},4000);
+  }catch(e){
+    status.textContent='失敗：'+e.message;
+  }finally{
+    btn.disabled=false;
+  }
 }
 async function saveVoice(){
   try{

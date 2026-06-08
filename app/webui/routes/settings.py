@@ -13,9 +13,10 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.requests import Request
 
 from app.webui.config_helpers import _save_to_config
+from app.services.voice import VoiceService as _VoiceService
 from app.webui.models import (
     _LocationBody, _WeatherBody, _MQTTBody, _DisplayBody,
-    _PresenceBody, _VoiceBody, _NotificationsBody, _GeneralBody, _AuthBody,
+    _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _GeneralBody, _AuthBody,
 )
 from app.webui.routes.auth import _pwd_ctx, _pw_version
 from app.webui.templates.settings import _SETTINGS_HTML
@@ -250,6 +251,46 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
 
         for k, v in patch.items():
             setattr(settings.voice, k, v)
+        return {"ok": True}
+
+    _voice_test_task: asyncio.Task | None = None
+
+    @router.post("/settings/voice/test")
+    async def test_voice(body: _VoiceTestBody):
+        nonlocal _voice_test_task
+        tmp_cfg = dataclasses.replace(settings.voice)
+        if body.volume is not None:
+            tmp_cfg.volume = body.volume
+        if body.alsa_mixer_control is not None:
+            tmp_cfg.alsa_mixer_control = body.alsa_mixer_control
+        if body.tts_engine is not None:
+            if body.tts_engine not in _ALLOWED_TTS_ENGINES:
+                raise HTTPException(400, detail=f"tts_engine must be one of: {', '.join(sorted(_ALLOWED_TTS_ENGINES))}")
+            tmp_cfg.tts_engine = body.tts_engine
+        if body.tts_language is not None:
+            lang = body.tts_language.strip() or "zh"
+            if not re.match(r"^[A-Za-z][A-Za-z0-9_.+\-]{0,31}$", lang):
+                raise HTTPException(400, detail="tts_language must be a valid espeak voice name (e.g. zh, zh-TW, en)")
+            tmp_cfg.tts_language = lang
+        if body.tts_speed is not None:
+            if not (50 <= body.tts_speed <= 500):
+                raise HTTPException(400, detail="tts_speed must be 50–500")
+            tmp_cfg.tts_speed = body.tts_speed
+        if _voice_test_task is not None and not _voice_test_task.done():
+            _voice_test_task.cancel()
+        svc = _VoiceService(tmp_cfg)  # validates and sanitizes remaining inputs
+
+        def _log_test_exc(t: asyncio.Task) -> None:
+            try:
+                t.result()
+            except asyncio.CancelledError:
+                pass
+            except Exception as exc:
+                logger.warning("Voice test failed: %s", exc)
+
+        task = asyncio.create_task(svc.speak_or_play("音量測試", "alert.wav"))
+        task.add_done_callback(_log_test_exc)
+        _voice_test_task = task
         return {"ok": True}
 
     @router.put("/settings/notifications")

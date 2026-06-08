@@ -44,6 +44,14 @@ class _VoiceBody(BaseModel):
     alsa_mixer_control: str | None = None
 
 
+class _VoiceTestBody(BaseModel):
+    volume: int | None = None
+    alsa_mixer_control: str | None = None
+    tts_engine: str | None = None
+    tts_language: str | None = None
+    tts_speed: int | None = None
+
+
 class _NotificationsBody(BaseModel):
     discord_webhook_url: str | None = None
     notify_device_online: bool | None = None
