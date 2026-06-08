@@ -111,6 +111,9 @@ display:
 | `test_presence.py` | `app/logic/presence.py` | 6+ 個測試案例 |
 | `test_alarm_decision.py` | `app/logic/alarm_decision.py` | 決策樹所有路徑 |
 | `test_reminder.py` | `app/logic/reminder.py` | 各提醒觸發條件 |
+| `test_door_reminder.py` | `app/logic/door_reminder.py` | 開門提醒文字生成（天氣情境、無資料備援）|
+| `test_face_handler.py` | `app/services/mqtt_client.py`（face dispatch）| vote_result 正規化、sentinel 處理、known 推導 |
+| `test_voice_config.py` | `app/services/voice.py`（設定解析）| 語音設定驗證 |
 | `test_renderer.py` | `app/display/renderer.py` | 圖像渲染（Pillow mock）|
 | `test_state.py` | `app/state.py` | 狀態初始化與更新 |
 | `test_desk_session.py` | `app/logic/desk_session.py` | 桌面工作時段狀態機 |

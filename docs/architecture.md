@@ -62,7 +62,8 @@ epaper-home-display/
 │   │   ├── presence.py      # 占用偵測（純函數，光線 → OCCUPIED/UNOCCUPIED）
 │   │   ├── alarm_decision.py  # 安全告警決策引擎（純函數）
 │   │   ├── desk_session.py  # 桌面工作時段狀態機（純函數）
-│   │   └── reminder.py      # 天氣提醒生成（純函數）
+│   │   ├── reminder.py      # 天氣提醒生成（純函數，用於 AI 語音提醒）
+│   │   └── door_reminder.py # 開門天氣提醒文字生成（純函數，門開時 TTS 播報）
 │   ├── sensors/
 │   │   ├── dht22.py         # DHT22 溫濕度（Real + Mock）
 │   │   ├── light_sensor.py  # MCP3008 ADC + 光敏電阻（Real + Mock）
@@ -249,6 +250,27 @@ else                                                    →  NO_ACTION
 
 ---
 
+## 開門天氣提醒
+
+`app/logic/door_reminder.py` 中的純函數 `generate_door_exit_text()`，由 MQTT 客戶端在偵測到 `closed → open` 門狀態轉換時呼叫，觸發條件與文字格式如下：
+
+**格式**：`[現在 X度，天氣][，warning1][，warning2]`（最多兩項提醒；天氣簡報固定前置）
+
+| 判斷條件（按優先度）| 提醒文字 |
+|----------|---------|
+| 未來 ~12 小時有雨（pop ≥ 0.6 或 OWM 代碼屬雨）| `記得帶雨傘` |
+| feels_like < 15°C | `今天比較冷，記得穿外套` |
+| 目前溫度 > 30°C | `外面很熱，注意防曬` |
+| 未來 12 小時溫度下降 > 5°C | `稍後溫度會下降，帶件外套` |
+
+**門控保護**：
+- 冷卻 60 秒（防止門彈跳重複觸發）
+- 15 秒內有任何人臉事件（known 或 unknown），不播報（表示有人在門口，非離家）
+- 無人臉 sentinel（`"NONE"` / `"no_face"`）到達且門為開啟狀態時，重試播報
+- 無天氣資料時播報固定備援文字：`出門注意安全`
+
+---
+
 ## 全局狀態（AgentState）
 
 `app/state.py` 定義的全局單例 `state = AgentState()`，被所有模組引用：
@@ -266,8 +288,9 @@ else                                                    →  NO_ACTION
 | `weather_current` | dict \| None | 目前天氣 JSON |
 | `weather_forecast` | list[dict] | 5 天預報列表 |
 | `weather_fetched_at` | datetime \| None | 最後 fetch 時間 |
-| `last_door_event` | dict \| None | 最近門事件 |
-| `last_face_event` | dict \| None | 最近人臉事件 |
+| `last_door_event` | dict \| None | 最近門事件（含正規化後的 `state` 與 `door_state` 欄位）|
+| `last_face_event` | dict \| None | 最近人臉事件（身份統一寫入 `identity` 與 `user_name`）|
+| `last_face_event_at` | datetime \| None | 最近有效人臉事件的時間戳（無人臉 sentinel 到達時設為 `None`，供開門提醒門控使用）|
 | `last_alert` | dict \| None | 最近安全告警 |
 | `last_alarm_decision` | str \| None | 最近告警決策字串（`"TRIGGER_ALARM"` / `"NO_ACTION"` / `"CANCEL_ALARM"`）|
 | `alert_face_event` | dict \| None | 告警觸發當下的人臉事件快照（與 `last_face_event` 解耦，避免後續人臉更新影響告警頁面）|

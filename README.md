@@ -146,8 +146,10 @@ Agent 1（MQTT）                 ├── _weather_loop()        → OpenWeath
                                 └── server.serve()         → FastAPI WebUI（:8000）
 home/security/*  →
                                 app/ 層架構：
-← home/home_state/presence ✓     sensors/ → display/ → logic/ → services/ → storage/
-← home/home_state/* (部分計劃中)
+← home/home_state/presence        sensors/ → display/ → logic/ → services/ → storage/
+← home/home_state/alarm_decision
+← home/home_state/alarm_command
+← home/display/status
                                                 ↕
                                            state.py（全局狀態）
 

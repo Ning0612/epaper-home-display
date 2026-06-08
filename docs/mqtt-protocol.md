@@ -25,7 +25,7 @@
 
 ```json
 {
-  "state": "open",
+  "door_state": "open",
   "timestamp": "2026-05-29T10:30:00",
   "agent": "agent-1"
 }
@@ -33,13 +33,17 @@
 
 | 欄位 | 類型 | 說明 |
 |------|------|------|
-| `state` | string | `"open"` 或 `"closed"` |
+| `door_state` | string | 優先讀取此欄位；舊版 Agent 1 可能使用 `state` 欄位，兩者均受支援 |
+| `state` | string | 舊版相容欄位（與 `door_state` 二擇一，`door_state` 優先）|
 | `timestamp` | string | ISO 8601 格式 |
 | `agent` | string | 發送方識別碼 |
 
+**正規化**：服務端會將原始值統一轉換為小寫，並移除 `door_` 前綴（例如 `"DOOR_OPEN"` → `"open"`，`"DOOR_CLOSED"` → `"closed"`）。
+
 **效果**：
-- 更新 `state.last_door_event`
+- 更新 `state.last_door_event`（內含正規化後的 `state` 與 `door_state` 欄位）
 - 寫入 `door_events` 資料表
+- 僅在偵測到 `closed → open` 狀態轉換時觸發開門天氣提醒（`_maybe_play_door_reminder()`）
 
 ---
 
@@ -49,8 +53,7 @@
 
 ```json
 {
-  "identity": "lance",
-  "user_name": "lance",
+  "vote_result": "lance",
   "known": true,
   "timestamp": "2026-05-29T10:30:00",
   "agent": "agent-1"
@@ -59,16 +62,30 @@
 
 | 欄位 | 類型 | 說明 |
 |------|------|------|
-| `user_name` 或 `identity` | string | 辨識出的身份（已知人員名稱，或 `"unknown"`）；`user_name` 優先於 `identity` |
-| `known` | bool | `true` = 已知人員；`false` = 陌生人（若省略，根據 identity 是否為 "unknown"/"no_face" 推導）|
+| `vote_result` | string | **主欄位（FaceGuard 協定）**：多幀投票後的最終身份結果（已知人員名稱、`"UNKNOWN"` 或 `"NONE"`）|
+| `user_name` | string | 舊版相容欄位；`vote_result` 為空時作為 fallback |
+| `identity` | string | 舊版相容欄位；`vote_result` 與 `user_name` 均為空時作為 fallback |
+| `known` | bool | `true` = 已知人員；`false` = 陌生人（若省略，根據正規化後身份推導）|
 | `timestamp` | string | ISO 8601 格式 |
 | `agent` | string | 發送方識別碼 |
 
+**身份欄位優先度**：`vote_result` → `user_name` → `identity`，均為空時預設為 `"NONE"`。
+
+**正規化邏輯**：`known` 缺失時根據正規化後的身份自動推導。實作分兩層 sentinel：
+
+| 身份值 | 語意 | `known` 推導 | `last_face_event_at` |
+|--------|------|-------------|----------------------|
+| `"NONE"` / `"no_face"` | 門口**無人臉**（攝影機未偵測到人）| `false` | 清除為 `None`（不阻擋開門提醒）|
+| `"UNKNOWN"` / `""` | 偵測到人臉但**未識別** | `false` | 更新為當下時間（視為有人，阻擋開門提醒 15 秒）|
+| 已知人員名稱 | 已識別人員 | `true` | 更新為當下時間 |
+
+**`"NONE"` / `"no_face"` 特殊處理**：清除 `state.last_face_event_at`（使下次開門不受人臉時間戳門控阻擋）；若門當下已為開啟狀態，立即重試開門天氣提醒。`"UNKNOWN"` 不在此範圍，仍會阻擋提醒。
+
 **效果**：
-- 更新 `state.last_face_event`
+- 更新 `state.last_face_event`（身份統一正規化寫入 `identity` 與 `user_name` 欄位）
+- 更新 `state.last_face_event_at`（有人臉時設為當下時間；無人臉時設為 `None`）
 - 寫入 `face_events` 資料表
-- 已知人臉（`known: true`）供告警決策（`compute_alarm_decision()`）使用
-- 觸發告警決策重新計算
+- **告警決策不會立即重算**：`compute_alarm_decision()` 在 `_presence_loop()` 的 60 秒排程中執行，且只有 `state.last_alert` 存在時才計算並發布 `alarm_decision`；人臉事件到達後最多延遲 60 秒才反映至決策
 
 ---
 
@@ -179,7 +196,9 @@ Agent 1 的系統狀態心跳。
 
 ### `home/home_state/alarm_decision` — 告警決策
 
-收到新告警事件、或相同告警下 presence 變化導致決策改變時發布（同時每次計算都記錄至 `alarm_decisions` 資料表）。
+由 `_presence_loop()` 每 60 秒計算並發布（非 MQTT alert callback 立即觸發）：計算條件為 `state.last_alert` 存在且 presence / 人臉狀態改變；每次計算均記錄至 `alarm_decisions` 資料表。
+
+> **時序注意**：收到 `home/security/alert` 後，`alarm_decision` 最多延遲 60 秒才發布；整合方設計超時策略時應考慮此延遲。
 
 ```json
 {
@@ -245,8 +264,8 @@ Agent 1 的系統狀態心跳。
 | `alarm_decision` | string | `"TRIGGER_ALARM"`（按鈕 3：重新觸發告警）或 `"CANCEL_ALARM"`（按鈕 4：取消告警）|
 
 **觸發條件**：
-- 按鈕 3（TRIGGER_ALARM）：目前頁面為 `alert`，且距上次發送超過 180 秒（冷卻保護）；同步播放 `alert.wav`
-- 按鈕 4（CANCEL_ALARM）：目前頁面為 `alert`，不重複觸發限制
+- 按鈕 3（TRIGGER_ALARM）：目前頁面為 `alert` 時，每次按下均立即發布 MQTT 並同步播放 `alert.wav`；**無冷卻**，連按會重複通知 Agent 1 並重播警報音；同時更新 `alert_last_triggered_at` 以延長告警頁面逾時計時
+- 按鈕 4（CANCEL_ALARM）：目前頁面為 `alert` 時發布；無冷卻保護
 
 > 此主題不切換頁面、不清除 alert state，純粹通知 Agent 1 採取對應行動。
 
@@ -287,15 +306,19 @@ Agent 1 的系統狀態心跳。
 # 訂閱所有 home/# 主題（監聽模式）
 mosquitto_sub -h 192.168.1.100 -t "home/#" -v
 
-# 模擬 Agent 1 發送門開事件
+# 模擬 Agent 1 發送門開事件（先送 closed 再送 open，才能觸發開門天氣提醒）
 mosquitto_pub -h 192.168.1.100 \
   -t "home/security/door" \
-  -m '{"state":"open","timestamp":"2026-05-29T10:30:00","agent":"test"}'
+  -m '{"door_state":"closed","timestamp":"2026-05-29T10:29:00","agent":"test"}'
 
-# 模擬已知人臉辨識
+mosquitto_pub -h 192.168.1.100 \
+  -t "home/security/door" \
+  -m '{"door_state":"open","timestamp":"2026-05-29T10:30:00","agent":"test"}'
+
+# 模擬已知人臉辨識（FaceGuard 協定，使用 vote_result）
 mosquitto_pub -h 192.168.1.100 \
   -t "home/security/face" \
-  -m '{"identity":"lance","known":true,"timestamp":"2026-05-29T10:30:00","agent":"test"}'
+  -m '{"vote_result":"lance","known":true,"timestamp":"2026-05-29T10:30:00","agent":"test"}'
 
 # 模擬安全告警（會立即觸發 e-Paper 更新）
 mosquitto_pub -h 192.168.1.100 \
