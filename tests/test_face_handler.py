@@ -1,4 +1,4 @@
-"""Unit tests for the face MQTT handler identity parsing and last_face_event_at gate."""
+"""Unit tests for face MQTT handler identity parsing and fmt_face display formatting."""
 from __future__ import annotations
 
 import asyncio
@@ -144,3 +144,51 @@ async def test_legacy_no_face_does_not_update_timestamp(svc, fake_state):
     fake_state.last_face_event_at = None
     await _dispatch_face(svc, {"user_name": "no_face"}, fake_state)
     assert fake_state.last_face_event_at is None
+
+
+# --- fmt_face display formatting ---
+
+from app.display.renderer_utils import fmt_face
+
+
+def _face_event(identity: str, known: bool) -> dict:
+    return {"identity": identity, "known": known}
+
+
+def test_fmt_face_no_event_returns_none():
+    assert fmt_face(None) == "NONE"
+
+
+def test_fmt_face_vote_result_none_returns_none():
+    """vote_result='NONE' stored as identity='NONE' → display 'NONE', not 'Unknown'."""
+    assert fmt_face(_face_event("NONE", False)) == "NONE"
+
+
+def test_fmt_face_none_lowercase():
+    assert fmt_face(_face_event("none", False)) == "NONE"
+
+
+def test_fmt_face_legacy_no_face_returns_none():
+    assert fmt_face(_face_event("no_face", False)) == "NONE"
+
+
+def test_fmt_face_empty_identity_returns_none():
+    assert fmt_face(_face_event("", False)) == "NONE"
+
+
+def test_fmt_face_unknown_returns_unknown():
+    """vote_result='UNKNOWN' → face detected but unrecognized → 'Unknown'."""
+    assert fmt_face(_face_event("UNKNOWN", False)) == "Unknown"
+
+
+def test_fmt_face_unknown_without_known_field():
+    """'UNKNOWN' identity without known field also displays 'Unknown' (defensive)."""
+    assert fmt_face({"identity": "UNKNOWN"}) == "Unknown"
+
+
+def test_fmt_face_known_name_returns_name():
+    assert fmt_face(_face_event("alice", True)) == "alice"
+
+
+def test_fmt_face_name_truncated_to_8():
+    assert fmt_face(_face_event("verylongname", True)) == "verylong"

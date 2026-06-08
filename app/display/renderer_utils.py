@@ -182,7 +182,8 @@ _DECISION_COLOR_LABEL: dict[str, str] = {
     "NO_ACTION":     "WARN",
     "CANCEL_ALARM":  "GREEN",
 }
-_UNKNOWN_FACE_IDS = frozenset({"unknown", "no_face", ""})
+# Sentinels that mean "no face detected" → display "NONE"
+_NO_FACE_IDS = frozenset({"none", "no_face", ""})
 
 
 def fmt_door(event: dict | None) -> str:
@@ -194,14 +195,15 @@ def fmt_door(event: dict | None) -> str:
 
 
 def fmt_face(event: dict | None) -> str:
-    """Known name, Unknown (detected/unrecognized), or NONE (no event)."""
+    """Known name, Unknown (detected/unrecognized), or NONE (no face detected)."""
     if not event:
         return "NONE"
     identity = str(event.get("identity") or "").strip()
     known = event.get("known")
-    if known is False:
-        return "Unknown"
-    if not identity or identity.lower() in _UNKNOWN_FACE_IDS:
+    # Check no-face sentinels first ("NONE" / "no_face") before the known=False branch
+    if not identity or identity.lower() in _NO_FACE_IDS:
+        return "NONE"
+    if known is False or identity.lower() == "unknown":
         return "Unknown"
     return identity[:8]
 
