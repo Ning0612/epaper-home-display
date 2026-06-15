@@ -23,7 +23,7 @@ def compute_alarm_decision(
     if alert_payload is None:
         return "CANCEL_ALARM", "No alert payload"
 
-    alert_type = alert_payload.get("type", "unknown")
+    alert_type = alert_payload.get("alert_type", "unknown")
     is_known = last_known_face is not None and bool(last_known_face.get("known"))
 
     if presence_state in ("UNOCCUPIED", "UNKNOWN") and not is_known:

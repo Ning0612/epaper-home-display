@@ -82,6 +82,7 @@ async def main() -> None:
     notification_manager = NotificationManager(discord_service, settings.discord)
 
     loop = asyncio.get_running_loop()
+    state.alert_wake_event = asyncio.Event()
     mqtt_service = MQTTService(settings.mqtt, display_queue, voice_service)
     mqtt_service.start(loop)
 

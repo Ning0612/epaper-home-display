@@ -85,7 +85,7 @@
 - 更新 `state.last_face_event`（身份統一正規化寫入 `identity` 與 `user_name` 欄位）
 - 更新 `state.last_face_event_at`（有人臉時設為當下時間；無人臉時設為 `None`）
 - 寫入 `face_events` 資料表
-- **告警決策不會立即重算**：`compute_alarm_decision()` 在 `_presence_loop()` 的 60 秒排程中執行，且只有 `state.last_alert` 存在時才計算並發布 `alarm_decision`；人臉事件到達後最多延遲 60 秒才反映至決策
+- **告警決策即時重算**：`compute_alarm_decision()` 在 `_presence_loop()` 中執行；收到 `home/security/alert` 後透過 `asyncio.Event` 立即喚醒 presence loop（無需等待 60 秒週期）；人臉事件到達後若有待決告警亦會在下一 presence 週期（最多 60 秒）反映至決策
 
 ---
 
@@ -95,17 +95,17 @@
 
 ```json
 {
-  "type": "motion",
-  "severity": "high",
+  "alert_type": "UNKNOWN_CONFIRMED",
+  "alert_level": "ALERT_YELLOW",
   "timestamp": "2026-05-29T10:30:00",
-  "agent": "agent-1"
+  "agent": "FaceGuard"
 }
 ```
 
 | 欄位 | 類型 | 說明 |
 |------|------|------|
-| `type` | string | 告警類型，如 `"motion"`, `"unknown-person"` |
-| `severity` | string | 嚴重程度（可選） |
+| `alert_type` | string | 告警類型，如 `"UNKNOWN_CONFIRMED"`, `"motion"` |
+| `alert_level` | string | 嚴重程度，如 `"ALERT_YELLOW"`, `"ALERT_RED"` |
 | `timestamp` | string | ISO 8601 格式 |
 | `agent` | string | 發送方識別碼 |
 
@@ -145,7 +145,7 @@ Agent 1 的系統狀態心跳。
 |------|-----|------|
 | QoS | 0 | 儘力送達，可能遺失，不重傳 |
 | 酬載格式 | raw JPEG bytes | 必須以 `\xff\xd8`（JPEG SOI marker）開頭 |
-| 大小限制 | 最大 1 MB | 超過則靜默丟棄 |
+| 大小限制 | 最大 64 KB | FaceGuard 規格最大 48 KB；超過則靜默丟棄 |
 
 **效果**：
 - 解碼 JPEG → 轉換為 RGB PIL Image → 更新 `state.last_snapshot_image`
@@ -160,7 +160,7 @@ Agent 1 的系統狀態心跳。
 
 ## 發布主題（出站）
 
-> **實作狀態**：四個出站主題均已啟用。`home/home_state/presence` 每 60 秒發布；`home/home_state/alarm_decision` 在新告警到達或相同告警下決策改變時發布；`home/display/status` 在每次 e-Paper 成功更新後發布；`home/home_state/alarm_command` 由 Button 3/4 觸發時發布。
+> **實作狀態**：四個出站主題均已啟用。`home/home_state/presence` 每 60 秒發布；`home/home_state/alarm_decision` 在告警到達後立即發布（wake-on-event），後續每 60 秒重算，90 秒窗口過期後停止；`home/display/status` 在每次 e-Paper 成功更新後發布；`home/home_state/alarm_command` 由 Button 3/4 觸發時發布（任意頁面皆有效）。
 
 本服務發布以下主題，供 **Agent 1** 或其他訂閱者使用：
 
@@ -196,15 +196,16 @@ Agent 1 的系統狀態心跳。
 
 ### `home/home_state/alarm_decision` — 告警決策
 
-由 `_presence_loop()` 每 60 秒計算並發布（非 MQTT alert callback 立即觸發）：計算條件為 `state.last_alert` 存在且 presence / 人臉狀態改變；每次計算均記錄至 `alarm_decisions` 資料表。
+由 `_presence_loop()` 計算並發布：收到 `home/security/alert` 時透過 `asyncio.Event` 立即喚醒，後續每 60 秒週期性重算（若告警仍有效）；計算條件為 `state.last_alert` 存在且未超過 90 秒決策窗口；每次計算均記錄至 `alarm_decisions` 資料表。
 
-> **時序注意**：收到 `home/security/alert` 後，`alarm_decision` 最多延遲 60 秒才發布；整合方設計超時策略時應考慮此延遲。
+> **時序**：收到 `home/security/alert` 後，`alarm_decision` 通常在數百毫秒內發布（wake-on-event）；90 秒窗口過期後停止發布，避免對已超時的告警繼續決策。
 
 ```json
 {
   "alarm_decision": "CANCEL_ALARM",
+  "source": "presence_loop",
   "reason": "Known user present during motion",
-  "score": 1.0,
+  "score": 1,
   "agent": "epaper-home-display",
   "timestamp": "2026-05-29T10:30:00.123456"
 }
@@ -213,8 +214,9 @@ Agent 1 的系統狀態心跳。
 | 欄位 | 類型 | 說明 |
 |------|------|------|
 | `alarm_decision` | string | `"TRIGGER_ALARM"`, `"NO_ACTION"`, 或 `"CANCEL_ALARM"` |
+| `source` | string | 固定為 `"presence_loop"` |
 | `reason` | string | 決策理由描述 |
-| `score` | float | 當前占用計分 |
+| `score` | int | 當前占用計分（整數） |
 
 **決策邏輯**：
 
@@ -290,7 +292,7 @@ Agent 1 的系統狀態心跳。
 | 訂閱 | `home/security/face` | 人臉辨識事件（JSON, QoS 1）|
 | 訂閱 | `home/security/alert` | 安全告警（立即顯示，JSON, QoS 1）|
 | 訂閱 | `home/security/status` | Agent 1 狀態心跳（JSON, QoS 1）|
-| 訂閱 | `home/security/camera` | 即時攝影機 JPEG 畫面（raw binary, QoS 0, max 1 MB）|
+| 訂閱 | `home/security/camera` | 即時攝影機 JPEG 畫面（raw binary, QoS 0, max 64 KB）|
 | 發布 | `home/home_state/presence` | 占用狀態更新 |
 | 發布 | `home/home_state/alarm_decision` | 告警決策結果 |
 | 發布 | `home/home_state/alarm_command` | 按鈕觸發告警指令（TRIGGER_ALARM / CANCEL_ALARM）|

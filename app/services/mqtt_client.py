@@ -44,7 +44,7 @@ _SUBSCRIBE_TOPICS = [
     "home/security/status",
 ]
 _CAMERA_TOPIC = "home/security/camera"
-_MAX_CAMERA_BYTES = 1_048_576   # 1 MB; QVGA JPEG is typically 15-50 KB
+_MAX_CAMERA_BYTES = 64 * 1024   # 64 KB; FaceGuard spec max 48 KB, small buffer
 
 
 def make_done_callback(context: str) -> Callable[[asyncio.Future], None]:
@@ -239,12 +239,9 @@ class MQTTService:
             logger.info("Face: %s known=%s", identity, known)
 
         elif topic == "home/security/alert":
-            state.last_alert = payload
-            state.alert_face_event = state.last_face_event
             now_dt = datetime.now()
 
-            # Cooldown: if alert page was recently dismissed and we're back on dashboard,
-            # don't re-trigger within _ALERT_COOLDOWN_SEC (prevents rapid alert→dismiss→alert cycling).
+            # Cooldown: suppress rapid re-trigger after recent dismissal (check before any state update)
             if state.display_page != "alert" and state.alert_dismissed_at is not None:
                 elapsed = (now_dt - state.alert_dismissed_at).total_seconds()
                 if elapsed < _ALERT_COOLDOWN_SEC:
@@ -253,6 +250,13 @@ class MQTTService:
                         elapsed, _ALERT_COOLDOWN_SEC, payload.get("agent", "?"),
                     )
                     return
+
+            # Alert accepted: snapshot face state and wake presence loop for immediate decision
+            state.last_alert = payload
+            state.alert_face_event = state.last_face_event.copy() if state.last_face_event else None
+            state.last_alert_received_at = now_dt
+            if state.alert_wake_event is not None:
+                state.alert_wake_event.set()
 
             is_new_alert = state.display_page != "alert"
             if is_new_alert:

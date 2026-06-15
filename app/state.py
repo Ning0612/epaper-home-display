@@ -25,9 +25,11 @@ class AgentState:
     last_face_event: dict | None = None
     last_face_event_at: datetime | None = None
     last_alert: dict | None = None
+    last_alert_received_at: datetime | None = None
     last_alarm_decision: str | None = None
     alert_face_event: dict | None = None
     security_status: dict | None = None
+    alert_wake_event: Any = None  # asyncio.Event; set by mqtt_client when alert accepted
 
     mqtt_connected: bool = False
     mqtt_last_rx_by_topic: dict = field(default_factory=dict)

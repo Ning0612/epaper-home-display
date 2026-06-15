@@ -105,21 +105,19 @@ async def _handle_btn_trigger_alarm(
     voice_service,
     mqtt_service,
 ) -> None:
-    """Button 3 (GPIO 27) — re-send alarm signal while on the alert page.
+    """Button 3 (GPIO 27) — send TRIGGER_ALARM command to FaceGuard.
 
-    Only activates when already on the alert page (entered via MQTT alert).
+    Active from any display page (alarm_command has no timing restriction per protocol).
     Does NOT switch pages or push to the display queue; only publishes to
     home/home_state/alarm_command and plays the voice alert.
-    Also updates alert_last_triggered_at to extend the alert page timeout.
+    Updates alert_last_triggered_at only when already on alert page (extends timeout).
     No cooldown — every press immediately triggers MQTT publish and voice playback.
     """
     if _in_ap_mode(3):
         return
-    if state.display_page != "alert":
-        logger.debug("Button 3 ignored: not on alert page")
-        return
     now = _DateTime.now()
-    state.alert_last_triggered_at = now  # extends alert page timeout
+    if state.display_page == "alert":
+        state.alert_last_triggered_at = now  # extends alert page timeout
     if mqtt_service is not None:
         try:
             mqtt_service.publish("home/home_state/alarm_command", {
@@ -129,20 +127,17 @@ async def _handle_btn_trigger_alarm(
             logger.error("Button 3: MQTT publish failed: %s", exc)
     if voice_service is not None:
         await voice_service.speak_or_play("警報！有人入侵！", "alert.wav")
-    logger.info("Button 3: alarm re-triggered (MQTT + voice, no display change)")
+    logger.info("Button 3: TRIGGER_ALARM sent (page=%s)", state.display_page)
 
 
 async def _handle_btn_cancel_alarm(mqtt_service) -> None:
-    """Button 4 (GPIO 22) — send cancel signal while on the alert page.
+    """Button 4 (GPIO 22) — send CANCEL_ALARM command to FaceGuard.
 
-    Only activates when already on the alert page.
+    Active from any display page (alarm_command has no timing restriction per protocol).
     Does NOT switch pages or clear state; only publishes
     home/home_state/alarm_command with alarm_decision=CANCEL_ALARM.
     """
     if _in_ap_mode(4):
-        return
-    if state.display_page != "alert":
-        logger.debug("Button 4 ignored: not on alert page")
         return
     if mqtt_service is not None:
         try:
@@ -151,4 +146,4 @@ async def _handle_btn_cancel_alarm(mqtt_service) -> None:
             })
         except Exception as exc:
             logger.error("Button 4: MQTT publish failed: %s", exc)
-    logger.info("Button 4: alarm cancel signal sent")
+    logger.info("Button 4: CANCEL_ALARM sent (page=%s)", state.display_page)
