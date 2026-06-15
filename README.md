@@ -1,5 +1,14 @@
 # ePaper Home Display
 
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Raspberry Pi](https://img.shields.io/badge/Raspberry_Pi-Zero_2W-C51A4A?style=flat-square&logo=raspberry-pi&logoColor=white)](https://www.raspberrypi.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![MQTT](https://img.shields.io/badge/MQTT-Paho_2.1%2B-3C5280?style=flat-square&logo=eclipse-mosquitto&logoColor=white)](https://www.eclipse.org/paho/)
+[![SQLite](https://img.shields.io/badge/SQLite-WAL_mode-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Pillow](https://img.shields.io/badge/Pillow-10.4%2B-FFD43B?style=flat-square&logo=python&logoColor=black)](https://python-pillow.org/)
+[![asyncio](https://img.shields.io/badge/asyncio-9_coroutines-4B8BBE?style=flat-square&logo=python&logoColor=white)](https://docs.python.org/3/library/asyncio.html)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+
 以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 七色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測、安全偵測與天氣資訊，並與 Agent 1 透過 MQTT 協同工作。
 
 ## 畫面預覽
@@ -126,6 +135,7 @@ scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 | [docs/mqtt-protocol.md](docs/mqtt-protocol.md) | MQTT 主題清單與 JSON 訊息格式規範 |
 | [docs/webui.md](docs/webui.md) | WebUI 設定介面完整使用說明與 REST API 參考 |
 | [tools/README.md](tools/README.md) | Claude / Codex OAuth 憑證設定工具說明 |
+| [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) | 第三方元件授權聲明（weather icons / Waveshare driver / DejaVu fonts）|
 
 ---
 
@@ -172,3 +182,21 @@ home/security/*  →
 ## 相關專案
 
 - **Agent 1**：門鈴攝影機 + 人臉辨識端，透過 MQTT 發布安全事件至本專案
+
+---
+
+## 課程資訊
+
+本專案為期末作業，實作與驗證課程所學物聯網系統整合設計概念，涵蓋嵌入式 Linux、感測器驅動、MQTT 事件驅動架構與異步服務設計。
+
+| 項目 | 說明 |
+|------|------|
+| 課程 | EE5325701 物聯網系統應用與設計實務（Design and Application in Internet of Things）|
+| 學期 | 114-2（2025–2026 春季）|
+| 學生 | B11115024 王政甯 |
+
+---
+
+## 授權
+
+本專案採用 [MIT 授權條款](LICENSE)。

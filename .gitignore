@@ -15,6 +15,7 @@ data/*.db
 data/*.log
 data/claude_creds.json
 data/codex_creds.json
+data/images/
 
 
 # Sounds — add your own audio files
