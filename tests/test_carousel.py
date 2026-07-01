@@ -14,11 +14,13 @@ def reset_carousel_state():
     state.carousel_index = 0
     state.custom_image_path = None
     state.carousel_refresh_count = 0
+    state.carousel_skip_next_advance = False
     yield
     state.image_playlist = []
     state.carousel_index = 0
     state.custom_image_path = None
     state.carousel_refresh_count = 0
+    state.carousel_skip_next_advance = False
 
 
 def _make_settings(enabled=True, interval=1, mode="sequential"):
@@ -158,6 +160,29 @@ class TestMaybeAdvanceCarousel:
             _maybe_advance_carousel(_make_settings())
         assert state.custom_image_path == "c.png"
         assert "b_missing.png" not in state.image_playlist
+
+    def test_skip_next_advance_consumed_without_advancing(self):
+        state.image_playlist = ["a.png", "b.png"]
+        state.custom_image_path = "a.png"
+        state.carousel_index = 0
+        state.carousel_refresh_count = 0
+        state.carousel_skip_next_advance = True
+        with patch("app.loops.display.os.path.exists", return_value=True):
+            _maybe_advance_carousel(_make_settings(interval=1))
+        assert state.custom_image_path == "a.png"
+        assert state.carousel_refresh_count == 0
+        assert state.carousel_skip_next_advance is False
+
+    def test_skip_next_advance_only_suppresses_once(self):
+        state.image_playlist = ["a.png", "b.png"]
+        state.custom_image_path = "a.png"
+        state.carousel_index = 0
+        state.carousel_refresh_count = 0
+        state.carousel_skip_next_advance = True
+        with patch("app.loops.display.os.path.exists", return_value=True):
+            _maybe_advance_carousel(_make_settings(interval=1))  # consumed, no advance
+            _maybe_advance_carousel(_make_settings(interval=1))  # normal advance now applies
+        assert state.custom_image_path == "b.png"
 
     def test_stale_index_corrected_after_collapse_to_one(self):
         state.image_playlist = ["a.png", "b_missing.png"]

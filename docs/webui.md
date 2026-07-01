@@ -662,7 +662,7 @@ Content-Type: application/json
 }
 ```
 
-產生 280×448 display PNG（dashboard 圖片區塊尺寸），寫入 DB，立即更新輪播並觸發 e-Paper 刷新。
+產生 280×448 display PNG（dashboard 圖片區塊尺寸），寫入 DB 並更新輪播狀態（設為目前顯示圖片）。不會強制觸發 e-Paper 立即刷新，新圖片會在下次排定的 dashboard 渲染時顯示。
 
 **回應：**
 ```json
@@ -687,7 +687,7 @@ GET /api/images/original/{id}    # 取得原始上傳檔案
 ```
 GET  /api/images/carousel                    # 讀取輪播設定
 PUT  /api/images/carousel                    # 更新輪播設定
-PUT  /api/images/carousel/advance            # 手動換圖
+PUT  /api/images/carousel/advance            # 手動換圖（僅更新狀態，不強制刷新面板，於下次排定渲染時生效）
 ```
 
 PUT carousel 請求體：

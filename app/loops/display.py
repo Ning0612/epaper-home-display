@@ -103,18 +103,12 @@ def _check_alert_timeout(settings) -> bool:
     return False
 
 
-def _maybe_advance_carousel(settings) -> None:
-    """Advance carousel every N dashboard refreshes; updates state.custom_image_path."""
-    if not settings.images.carousel_enabled:
-        return
-    if len(state.image_playlist) < 2:
-        return
+def _advance_image_selection(settings) -> None:
+    """Pick the next carousel image and update state.custom_image_path/carousel_index.
 
-    state.carousel_refresh_count += 1
-    if state.carousel_refresh_count < max(1, settings.images.carousel_interval_refreshes):
-        return
-    state.carousel_refresh_count = 0
-
+    Shared by the interval-driven auto-advance below and the manual "advance now"
+    WebUI endpoint. Does not touch carousel_refresh_count.
+    """
     # Iterate until a valid image is found, removing missing files along the way.
     while len(state.image_playlist) >= 2:
         playlist = state.image_playlist
@@ -149,6 +143,27 @@ def _maybe_advance_carousel(settings) -> None:
         state.carousel_index = 0
     else:
         state.carousel_index = state.image_playlist.index(state.custom_image_path)
+
+
+def _maybe_advance_carousel(settings) -> None:
+    """Advance carousel every N dashboard refreshes; updates state.custom_image_path."""
+    if not settings.images.carousel_enabled:
+        return
+    if len(state.image_playlist) < 2:
+        return
+
+    if state.carousel_skip_next_advance:
+        # A manual advance (WebUI) just picked the current image outside of this
+        # loop — let it render for one full cycle before the interval countdown
+        # resumes, so it's never skipped past when carousel_interval_refreshes == 1.
+        state.carousel_skip_next_advance = False
+        return
+
+    state.carousel_refresh_count += 1
+    if state.carousel_refresh_count < max(1, settings.images.carousel_interval_refreshes):
+        return
+    state.carousel_refresh_count = 0
+    _advance_image_selection(settings)
 
 
 async def _display_loop(

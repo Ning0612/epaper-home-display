@@ -244,8 +244,11 @@ def create_images_router(
             state.image_playlist = state.image_playlist + [display_path]
         state.custom_image_path = display_path
         state.carousel_index = state.image_playlist.index(display_path)
-        # Reset counter so the new image stays visible for the full interval
+        # Reset counter so the new image stays visible for the full interval, and
+        # suppress the next scheduled render's auto-advance check so this image is
+        # guaranteed to show at least once (matters when carousel_interval_refreshes == 1)
         state.carousel_refresh_count = 0
+        state.carousel_skip_next_advance = True
 
         return {"ok": True, "id": id}
 
@@ -272,6 +275,8 @@ def create_images_router(
         if is_current:
             state.custom_image_path = new_playlist[0] if new_playlist else None
             state.carousel_index = 0
+            state.carousel_refresh_count = 0
+            state.carousel_skip_next_advance = True
 
         # Remove files last (orphan tolerable, inconsistent state is not)
         _remove_image_files(deleted, settings.images.storage_dir)
@@ -313,16 +318,18 @@ def create_images_router(
             raise HTTPException(400, "Need at least 2 images to advance")
 
         prev_path = state.custom_image_path
-        # Set counter to threshold - 1 so the next _maybe_advance_carousel call
-        # increments to threshold and triggers the advance.
-        state.carousel_refresh_count = max(1, settings.images.carousel_interval_refreshes) - 1
-        from app.loops.display import _maybe_advance_carousel
-        _maybe_advance_carousel(settings)
+        from app.loops.display import _advance_image_selection
+        _advance_image_selection(settings)
+        state.carousel_refresh_count = 0
 
         changed = state.custom_image_path != prev_path
-        if display_queue is not None and changed:
-            with contextlib.suppress(Exception):
-                display_queue.put_nowait("carousel_advance")
+        if changed:
+            # Only updates in-memory state — the e-paper panel picks it up on its
+            # next normally scheduled render instead of being forced to refresh
+            # immediately. Suppress that render's own automatic advance check so
+            # this manually picked image is guaranteed to show at least once
+            # (matters when carousel_interval_refreshes == 1).
+            state.carousel_skip_next_advance = True
 
         return {"ok": True, "changed": changed, "current": state.custom_image_path}
 

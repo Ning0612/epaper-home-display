@@ -305,6 +305,7 @@ else                                                    →  NO_ACTION
 | `image_playlist` | list[str] | 已確認圖片的完整路徑清單 |
 | `carousel_index` | int | 輪播當前索引 |
 | `carousel_refresh_count` | int | 距上次換圖的 dashboard 刷新計數（達到 `carousel_interval_refreshes` 時換圖）|
+| `carousel_skip_next_advance` | bool | one-shot 旗標：WebUI 手動換圖後設為 `True`，下一次 dashboard 渲染前的自動換圖判斷會消耗此旗標並跳過（不遞增計數、不再次換圖），確保手動選中的圖片至少顯示一次 |
 | `claude_usage_5h` | float \| None | Claude 5h 使用率（0.0–1.0）|
 | `claude_usage_week` | float \| None | Claude 週使用率（0.0–1.0）|
 | `codex_usage_5h` | float \| None | Codex 5h 使用率（0.0–1.0）|
@@ -441,7 +442,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | GET | `/api/images/original/{id}` | 提供原始上傳檔案 |
 | GET | `/api/images/carousel` | 讀取輪播設定 |
 | PUT | `/api/images/carousel` | 更新輪播設定（enabled/interval/mode）|
-| PUT | `/api/images/carousel/advance` | 手動強制換圖 |
+| PUT | `/api/images/carousel/advance` | 手動切換輪播圖片（僅更新狀態，不強制 e-Paper 立即刷新）|
 
 **桌面工作時段（Desk）**
 

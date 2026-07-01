@@ -43,6 +43,7 @@ class AgentState:
     image_playlist: list[str] = field(default_factory=list)
     carousel_index: int = 0
     carousel_refresh_count: int = 0
+    carousel_skip_next_advance: bool = False
     claude_usage_5h: float | None = None
     claude_usage_week: float | None = None
     claude_5h_reset: str | None = None
