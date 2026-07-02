@@ -9,7 +9,6 @@ from app.display.renderer_constants import DISPLAY_W, DISPLAY_H, BG
 from app.display.renderer_cards import (
     _draw_card_weather,
     _draw_card_image,
-    _draw_card_indoor,
     _draw_card_usage,
     _draw_card_hydra,
 )
@@ -33,7 +32,6 @@ def render_dashboard(
     color = settings.display.is_color
     _draw_card_weather(img, draw, state, now, color=color)
     _draw_card_image(img, draw, state)
-    _draw_card_indoor(draw, state, color=color)
     _draw_card_usage(draw, state, color=color)
     _draw_card_hydra(draw, state, settings, color=color)
 

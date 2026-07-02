@@ -10,7 +10,6 @@ from app.display.renderer_constants import (
     FG, PAD,
     WEATHER_X, WEATHER_Y, WEATHER_W, WEATHER_H,
     IMAGE_X, IMAGE_Y, IMAGE_W, IMAGE_H,
-    INDOOR_X, INDOOR_Y, INDOOR_W, INDOOR_H,
     USAGE_X, USAGE_Y, USAGE_W, USAGE_H,
     HYDRA_X, HYDRA_Y, HYDRA_W, HYDRA_H,
     _WX_TOP_H, _WEEKDAYS,
@@ -18,6 +17,7 @@ from app.display.renderer_constants import (
 from app.display.renderer_utils import (
     _font, _cx_text, _paste_icon, _draw_progress_bar,
     _pick_daily_forecast, _weather_item, _temp_color, _usage_color,
+    _draw_thermometer_icon, _draw_droplet_icon,
 )
 
 if TYPE_CHECKING:
@@ -48,7 +48,61 @@ def _draw_card_weather(
     _cx_text(draw, date_str, ix, inner_w, dt_top, _font(36, bold=True))
 
     time_str = now.strftime("%H:%M")
-    _cx_text(draw, time_str, ix, inner_w, dt_top + 46, _font(160, bold=True))
+    time_y = dt_top + 46
+
+    sensor_font = _font(22, bold=True)
+    icon_sz = 20
+    icon_gap = 6
+    row_gap = 8
+    row_h = 28
+    group_gap = 24
+
+    temp_str = f"{state.temperature:.1f}°" if state.temperature is not None else "--°"
+    hum_str = f"{state.humidity:.0f}%" if state.humidity is not None else "--%"
+    temp_bb = draw.textbbox((0, 0), temp_str, font=sensor_font)
+    hum_bb = draw.textbbox((0, 0), hum_str, font=sensor_font)
+    temp_w = temp_bb[2] - temp_bb[0]
+    hum_w = hum_bb[2] - hum_bb[0]
+    sensor_w = icon_sz + icon_gap + max(temp_w, hum_w)
+
+    # Shrink the clock font if needed so the (time + sensor block) group never
+    # overflows the card — guards against wider fonts/strings in the future.
+    time_size = 130
+    while True:
+        time_font = _font(time_size, bold=True)
+        time_bb = draw.textbbox((0, 0), time_str, font=time_font)
+        time_w = time_bb[2] - time_bb[0]
+        group_w = time_w + group_gap + sensor_w
+        if group_w <= inner_w or time_size <= 90:
+            break
+        time_size -= 5
+
+    group_x = ix + max(0, (inner_w - group_w) // 2)
+    if group_x + group_w > ix + inner_w:
+        group_x = max(ix, ix + inner_w - group_w)
+
+    draw.text((group_x, time_y), time_str, font=time_font, fill=FG)
+
+    sensor_x = group_x + time_w + group_gap
+    sensor_block_h = row_h * 2 + row_gap
+    # Align the midpoint between the temp/humidity rows to the time text's
+    # visual vertical centerline (accounts for the font's top bearing).
+    time_visible_center = time_y + (time_bb[1] + time_bb[3]) / 2
+    sensor_y = int(time_visible_center - sensor_block_h / 2)
+
+    temp_color = _temp_color(state.temperature, color)
+    _draw_thermometer_icon(draw, sensor_x, sensor_y + (row_h - icon_sz) // 2, icon_sz, fill=temp_color)
+    draw.text(
+        (sensor_x + icon_sz + icon_gap, sensor_y + (row_h - 22) // 2),
+        temp_str, font=sensor_font, fill=temp_color,
+    )
+
+    hum_y = sensor_y + row_h + row_gap
+    _draw_droplet_icon(draw, sensor_x, hum_y + (row_h - icon_sz) // 2, icon_sz, fill=FG)
+    draw.text(
+        (sensor_x + icon_sz + icon_gap, hum_y + (row_h - 22) // 2),
+        hum_str, font=sensor_font, fill=FG,
+    )
 
     div_y = WEATHER_Y + PAD + _WX_TOP_H
     draw.line([(WEATHER_X + 1, div_y), (WEATHER_X + WEATHER_W - 2, div_y)], fill=FG, width=1)
@@ -146,29 +200,6 @@ def _draw_card_image(img: Image.Image, draw: ImageDraw.ImageDraw, state: "AgentS
     except (OSError, IOError) as e:
         logger.warning("custom image load failed: %s", e)
         draw.text((ix + 4, iy + 4), "Image Error", font=_font(16, bold=True), fill=FG)
-
-
-def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState", *, color: bool = True) -> None:
-    draw.rectangle(
-        [(INDOOR_X, INDOOR_Y), (INDOOR_X + INDOOR_W - 1, INDOOR_Y + INDOOR_H - 1)],
-        outline=FG, width=1,
-    )
-    ix, iy = INDOOR_X + PAD, INDOOR_Y + PAD
-    iw = INDOOR_W - 2 * PAD
-    ih = INDOOR_H - 2 * PAD
-
-    temp_str = f"{state.temperature:.1f}°" if state.temperature is not None else "--°"
-    hum_str = f"{state.humidity:.0f}%" if state.humidity is not None else "--%"
-    mode_map = {"OCCUPIED": "HOME", "UNOCCUPIED": "AWAY", "UNKNOWN": "?"}
-    mode_str = mode_map.get(state.presence, state.presence[:6])
-
-    content_h = 14 + 5 + 17 + 5 + 17 + 5 + 14
-    sy = iy + max(0, (ih - content_h) // 2)
-
-    _cx_text(draw, "Indoor", ix, iw, sy, _font(14, bold=True))
-    _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17, bold=True), fill=_temp_color(state.temperature, color))
-    _cx_text(draw, hum_str, ix, iw, sy + 41, _font(17, bold=True))
-    _cx_text(draw, mode_str, ix, iw, sy + 63, _font(14, bold=True))
 
 
 def _draw_usage_row(

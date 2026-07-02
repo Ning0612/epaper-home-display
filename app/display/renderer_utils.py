@@ -161,6 +161,40 @@ def _temp_color(temp: float | None, color: bool = True) -> tuple[int, int, int]:
     return FG
 
 
+def _draw_thermometer_icon(
+    draw: ImageDraw.ImageDraw, x: int, y: int, size: int, fill: tuple[int, int, int] = FG,
+) -> None:
+    """Draw a simple filled thermometer glyph inside the [x, x+size] x [y, y+size] box."""
+    if size <= 0:
+        return
+    cx = x + size / 2
+    bulb_r = size * 0.28
+    bulb_cy = y + size - bulb_r
+    stem_w = size * 0.30
+    stem_top = y + size * 0.05
+    draw.rounded_rectangle(
+        [cx - stem_w / 2, stem_top, cx + stem_w / 2, bulb_cy],
+        radius=stem_w / 2, fill=fill,
+    )
+    draw.ellipse([cx - bulb_r, bulb_cy - bulb_r, cx + bulb_r, bulb_cy + bulb_r], fill=fill)
+
+
+def _draw_droplet_icon(
+    draw: ImageDraw.ImageDraw, x: int, y: int, size: int, fill: tuple[int, int, int] = FG,
+) -> None:
+    """Draw a simple filled water-drop glyph inside the [x, x+size] x [y, y+size] box."""
+    if size <= 0:
+        return
+    cx = x + size / 2
+    r = size * 0.32
+    circle_cy = y + size - r - size * 0.02
+    draw.ellipse([cx - r, circle_cy - r, cx + r, circle_cy + r], fill=fill)
+    apex_y = y + size * 0.05
+    tri_base_y = circle_cy - r * 0.15
+    tri_half_w = r * 0.95
+    draw.polygon([(cx, apex_y), (cx - tri_half_w, tri_base_y), (cx + tri_half_w, tri_base_y)], fill=fill)
+
+
 def _cx_text(
     draw: ImageDraw.ImageDraw,
     text: str,
