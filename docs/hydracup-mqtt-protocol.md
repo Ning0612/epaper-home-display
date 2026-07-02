@@ -19,12 +19,17 @@ epaper-display 與 [esp32-hydracup](https://github.com/Ning0612/esp32-hydracup)�
 
 ## Topics
 
-| Topic | 方向 | QoS | Retained | 說明 |
-|-------|------|-----|----------|------|
-| `hydracup/status` | HydraCup → epaper-display | 1 | 是 | 喝水資料本體 |
-| `hydracup/availability` | HydraCup → epaper-display | 1 | 是 | 裝置線上/離線狀態（LWT） |
+| Topic | 方向 | 目標 QoS | 實際 QoS | Retained | 說明 |
+|-------|------|---------|---------|----------|------|
+| `hydracup/status` | HydraCup → epaper-display | 1 | **0** | 是 | 喝水資料本體 |
+| `hydracup/availability`（上線 `{"online":true}`）| HydraCup → epaper-display | 1 | **0** | 是 | 裝置上線通知（主動發布）|
+| `hydracup/availability`（離線 `{"online":false}`）| HydraCup → epaper-display（broker 代發）| 1 | 1 | 是 | 裝置離線通知（LWT，broker 於斷線時代發）|
 
 Retained 訊息的用意：epaper-display 服務重啟後，broker 會立即重送最後一筆訊息，不需要等待下一次事件或心跳。
+
+> **QoS 落差說明（已知、已接受）**：實際落地時 HydraCup 端採用 `knolleary/PubSubClient`（OSS 版），其 `publish()` API **完全沒有 QoS 參數，一律以 QoS 0 發布**，只有 `connect()` 時透過 `willQos` 註冊的 LWT 才能真正指定 QoS。因此 `hydracup/status` 與上線通知實際都是 QoS 0（at-most-once），只有離線通知（LWT，由 broker 代發、不受 `publish()` API 限制）真正達到 QoS 1。
+>
+> **epaper-display 端不需要因此修改程式碼**：`app/services/mqtt_client.py` 訂閱時要求 `qos=1`，但 MQTT 協議規定實際送達的 QoS 是「發布端 QoS」與「訂閱端要求 QoS」兩者取最小值，broker 會自動把 QoS 1 的訂閱降級成 QoS 0 送達，不會報錯或連線失敗。現有的過期判斷機制（`heartbeat_timeout_sec`，見下方）本來就是為了容忍偶發訊息遺失而設計的（心跳定期重送，單筆遺失不影響顯示，需連續 3 次心跳都遺失才會被判定過期），恰好能吸收 QoS 0 下偶發遺失的風險，在家用區網環境下影響極小。
 
 ### `hydracup/status`
 
@@ -66,9 +71,9 @@ Payload（JSON）：
 {"online": false}
 ```
 
-離線訊息建議透過 MQTT **LWT（Last Will and Testament）** 機制設定：HydraCup 連線時向 broker 註冊 `will_set("hydracup/availability", '{"online": false}', qos=1, retain=true)`，若裝置異常斷線（斷電、WiFi 掉線、未正常呼叫 disconnect），broker 會自動代發此訊息，epaper-display 不需要額外的逾時偵測就能得知裝置離線。
+離線訊息透過 MQTT **LWT（Last Will and Testament）** 機制設定：HydraCup 連線時向 broker 註冊 will（`willQos=1, willRetain=true`），若裝置異常斷線（斷電、WiFi 掉線、未正常呼叫 disconnect），broker 會自動代發此訊息（真正的 QoS 1），epaper-display 不需要額外的逾時偵測就能得知裝置離線。
 
-正常上線時，HydraCup 應在 `connect()` 成功後主動發布一次 `{"online": true}`（retained）覆蓋上一次的 LWT 離線訊息。
+正常上線時，HydraCup 應在 `connect()` 成功後主動發布一次 `{"online": true}`（retained，實際 QoS 0，見上方說明）覆蓋上一次的 LWT 離線訊息。
 
 ## 發布時機
 
@@ -76,8 +81,8 @@ Payload（JSON）：
 |------|---------|-------|
 | 事件觸發 | `DrinkDetector` 進入 `DRINK_CONFIRMED` 或 `REFILL_DETECTED` 狀態 | `hydracup/status`（`event` 設為對應值） |
 | 定期心跳 | 每 `mqttHeartbeatSec`（建議預設 60 秒）| `hydracup/status`（`event: "heartbeat"`） |
-| 上線通知 | MQTT 連線成功後立即發一次 | `hydracup/availability`（`{"online": true}`） |
-| 離線通知 | 異常斷線（LWT 自動觸發）或正常關機前主動發送 | `hydracup/availability`（`{"online": false}`） |
+| 上線通知 | MQTT 連線成功後立即發一次 | `hydracup/availability`（`{"online": true}`，實際 QoS 0） |
+| 離線通知（異常斷線）| broker 偵測到連線中斷時代發 LWT | `hydracup/availability`（`{"online": false}`，真正 QoS 1） |
 
 ## epaper-display 端的過期判斷
 
@@ -118,7 +123,7 @@ mosquitto_pub -h epaper-display.local -p 1883 -u <username> -P <password> \
   -t 'hydracup/availability' -q 1 -r -m '{"online": true}'
 ```
 
-發布後可透過 `GET /state`（epaper-display WebUI，需登入）確認 `hydra_*` 欄位是否更新，或直接等待下一次 dashboard 刷新查看 Water 卡片。
+發布後可透過 `GET /state`（epaper-display WebUI，需登入）確認 `hydra_*` 欄位是否更新，或直接等待下一次 dashboard 刷新查看 Water 卡片。（上方指令用 `-q 1` 是為了用 `mosquitto_pub` CLI 完整測試 QoS 1 路徑；實際 HydraCup 裝置因函式庫限制會以 QoS 0 發布，見上方「QoS 落差說明」。）
 
 ## epaper-display 端狀態欄位對照
 
