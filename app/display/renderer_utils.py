@@ -79,6 +79,37 @@ def _draw_progress_bar(
         draw.rectangle([(x + 1, y + 1), (x + fill_w, y + h - 2)], fill=fill)
 
 
+def _ellipsize(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    max_w: int,
+) -> str:
+    if not text:
+        return text
+
+    def _text_w(value: str) -> int:
+        bb = draw.textbbox((0, 0), value, font=font)
+        return bb[2] - bb[0]
+
+    if _text_w(text) <= max_w:
+        return text
+    ellipsis = "…"
+    if _text_w(ellipsis) > max_w:
+        return ""
+    lo, hi = 0, len(text)
+    best = ellipsis
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        candidate = text[:mid].rstrip() + ellipsis
+        if _text_w(candidate) <= max_w:
+            best = candidate
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
 def _weather_item(payload: dict) -> dict:
     return (payload.get("weather") or [{}])[0]
 
@@ -208,5 +239,3 @@ def _cx_text(
     bb = draw.textbbox((0, 0), text, font=font)
     tw = bb[2] - bb[0]
     draw.text((col_x + (col_w - tw) // 2, y), text, font=font, fill=fill)
-
-

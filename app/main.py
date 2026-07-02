@@ -29,6 +29,7 @@ from app.services.codex_usage import CodexUsageService
 from app.services.discord import DiscordService
 from app.services.mqtt_client import MQTTService
 from app.services.notification_manager import NotificationManager
+from app.services.printer_mqtt import BambuMQTTService
 from app.services.voice import VoiceService
 from app.services.weather import WeatherService
 from app.services.wifi_monitor import _wifi_monitor_loop
@@ -88,6 +89,7 @@ async def main() -> None:
     discord_service = DiscordService(settings.discord)
     notification_manager = NotificationManager(discord_service, settings.discord)
     mqtt_service = MQTTService(settings.mqtt)
+    printer_service = BambuMQTTService(settings.printer)
 
     loop = asyncio.get_running_loop()
 
@@ -98,7 +100,7 @@ async def main() -> None:
     button.register_callback(0, _on_btn_0)
 
     uvicorn_config = uvicorn.Config(
-        create_app(settings, weather_service, mqtt_service, display_queue),
+        create_app(settings, weather_service, mqtt_service, printer_service, display_queue),
         host=settings.webui.host,
         port=settings.webui.port,
         log_level="warning",
@@ -130,6 +132,7 @@ async def main() -> None:
 
     try:
         mqtt_service.start(loop)
+        printer_service.start(loop)
         await asyncio.gather(
             _sensor_loop(dht22, light, executor, settings),
             _presence_loop(display_queue, notification_manager, settings),
@@ -143,6 +146,7 @@ async def main() -> None:
         )
     finally:
         mqtt_service.stop()
+        printer_service.stop()
         executor.shutdown(wait=False)
         await log_system_event("INFO", "main", "ePaper Home Display stopped")
 

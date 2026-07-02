@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ePaper Home Display** running on Raspberry Pi Zero 2W with a Waveshare 7.3" e-Paper display (epd7in3e, 7-color ACeP), DHT22 sensor, light sensor, button, and buzzer/USB speaker.
 
-Originally a course final project that integrated with a separate agent ("Agent 1") over MQTT for doorbell/face-recognition security alerts. That integration has been removed from `main` — the historical final-project state is preserved on the `archive/final-project` branch. `main` now covers standalone functionality (local sensors, e-Paper, weather, WebUI, image carousel, Claude/Codex usage display) plus a new, unrelated MQTT integration with [esp32-hydracup](https://github.com/Ning0612/esp32-hydracup) (a smart water cup) for displaying daily water-drinking progress — see [docs/hydracup-mqtt-protocol.md](docs/hydracup-mqtt-protocol.md).
+Originally a course final project that integrated with a separate agent ("Agent 1") over MQTT for doorbell/face-recognition security alerts. That integration has been removed from `main` — the historical final-project state is preserved on the `archive/final-project` branch. `main` now covers standalone functionality (local sensors, e-Paper, weather, WebUI, image carousel, Claude/Codex usage display) plus a new, unrelated MQTT integration with [esp32-hydracup](https://github.com/Ning0612/esp32-hydracup) (a smart water cup) for displaying daily water-drinking progress — see [docs/hydracup-mqtt-protocol.md](docs/hydracup-mqtt-protocol.md) — and a second, independent local-LAN MQTT integration with a Bambu Lab 3D printer (LAN Only Mode) for live print progress — see [docs/bambu-mqtt-protocol.md](docs/bambu-mqtt-protocol.md).
 
 ---
 
@@ -123,6 +123,13 @@ esp32-hydracup → Mosquitto broker (Pi, :1883) → app/services/mqtt_client.py 
   → app/logic/hydration.py (parse_status, pure) → app/state.py (hydra_*) → renderer_cards.py::_draw_card_hydra()
 ```
 `MQTTService.start()`/`.stop()` are wired in `app/main.py` around the `asyncio.gather()` call — paho-mqtt runs its own background thread (`loop_start()`), so it is not itself a gathered coroutine. Full protocol spec: [docs/hydracup-mqtt-protocol.md](docs/hydracup-mqtt-protocol.md).
+
+**Bambu Lab MQTT → State → Display:**
+```
+Bambu Lab printer (LAN Only Mode, mqtts://<printer-ip>:8883) → app/services/printer_mqtt.py (paho-mqtt + TLS, background thread)
+  → app/logic/printer.py (parse_print_status, pure) → app/state.py (printer_*) → renderer_cards.py::_draw_card_water_printer()
+```
+`BambuMQTTService.start()`/`.stop()` are wired in `app/main.py` next to `MQTTService`, same background-thread reasoning (not itself a gathered coroutine). Connects directly to the printer's own built-in broker (TLS, self-signed cert — verification intentionally skipped, standard for Bambu LAN mode), independent of the Pi's Mosquitto broker used for HydraCup. Unlike HydraCup, on connect it actively publishes a `pushall` request (the printer doesn't retain a full status by default) and merges incoming fields per-field rather than replacing the whole status (Bambu's report stream is incremental — a message missing a field must not blank out the last known value). No heartbeat-timeout staleness — offline is `printer_broker_connected` only, since a Bambu printer's socket drops on unreachability. `printer.host`/`serial`/`access_code` left empty disables the integration with no connection attempts. Full protocol spec: [docs/bambu-mqtt-protocol.md](docs/bambu-mqtt-protocol.md).
 
 ### e-Paper Update Timing
 

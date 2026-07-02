@@ -16,7 +16,7 @@ from app.webui.config_helpers import _save_to_config
 from app.services.voice import VoiceService as _VoiceService
 from app.webui.models import (
     _LocationBody, _WeatherBody, _DisplayBody,
-    _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _MQTTBody, _GeneralBody, _AuthBody,
+    _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _MQTTBody, _PrinterBody, _GeneralBody, _AuthBody,
 )
 from app.webui.routes.auth import _pwd_ctx, _pw_version
 from app.webui.templates.settings import _SETTINGS_HTML
@@ -24,6 +24,7 @@ from app.webui.templates.settings import _SETTINGS_HTML
 if TYPE_CHECKING:
     from app.config import Settings
     from app.services.mqtt_client import MQTTService
+    from app.services.printer_mqtt import BambuMQTTService
     from app.services.weather import WeatherService
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ def create_settings_router(
     settings: "Settings",
     weather_service: "WeatherService",
     mqtt_service: "MQTTService",
+    printer_service: "BambuMQTTService",
 ) -> APIRouter:
     router = APIRouter()
 
@@ -62,6 +64,9 @@ def create_settings_router(
         mq = d.get("mqtt", {})
         password = mq.pop("password", "")
         mq["password_set"] = bool(password)
+        pr = d.get("printer", {})
+        access_code = pr.pop("access_code", "")
+        pr["access_code_set"] = bool(access_code)
         wu = d.get("webui", {})
         wu.pop("password_hash", None)
         wu.pop("session_secret", None)
@@ -352,6 +357,35 @@ def create_settings_router(
             # reconnect failure as best-effort (surfaced later via hydra_broker_connected
             # on /state) rather than reporting the whole save as failed.
             logger.warning("MQTT settings saved but live reconnect failed: %s", exc)
+        return {"ok": True}
+
+    @router.put("/settings/printer")
+    async def set_printer(body: _PrinterBody):
+        patch = body.model_dump(exclude_none=True)
+        if "host" in patch:
+            patch["host"] = patch["host"].strip()
+        if "port" in patch and not (1 <= patch["port"] <= 65535):
+            raise HTTPException(400, detail="port must be 1..65535")
+        if "serial" in patch:
+            serial = patch["serial"].strip()
+            if serial and re.fullmatch(r"[A-Za-z0-9_-]{1,32}", serial) is None:
+                raise HTTPException(400, detail="serial must be empty or 1-32 characters: letters, numbers, _ or -")
+            patch["serial"] = serial
+        if not patch:
+            return {"ok": True}
+
+        try:
+            _save_to_config({"printer": patch})
+        except Exception as exc:
+            logger.error("Failed to persist printer settings: %s", exc)
+            raise HTTPException(500, detail="Failed to persist settings")
+
+        for k, v in patch.items():
+            setattr(settings.printer, k, v)
+        try:
+            printer_service.update_config(settings.printer)
+        except Exception as exc:
+            logger.warning("Printer settings saved but live reconnect failed: %s", exc)
         return {"ok": True}
 
     @router.put("/settings/general")

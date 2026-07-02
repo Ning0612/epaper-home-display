@@ -43,6 +43,12 @@ class AgentState:
     hydra_updated_at: datetime | None = None
     hydra_broker_connected: bool = False
     hydra_device_online: bool = False
+    printer_pct: float | None = None
+    printer_remaining_min: int | None = None
+    printer_task_name: str | None = None
+    printer_gcode_state: str | None = None
+    printer_updated_at: datetime | None = None
+    printer_broker_connected: bool = False
 
     display_page: Literal["dashboard", "ap_mode"] = "dashboard"
 

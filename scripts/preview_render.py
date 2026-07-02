@@ -37,6 +37,12 @@ def _make_state() -> AgentState:
     st.hydra_updated_at = datetime.now()
     st.hydra_broker_connected = True
     st.hydra_device_online = True
+    st.printer_pct = 0.42
+    st.printer_remaining_min = 83
+    st.printer_task_name = "benchy_v2.3mf"
+    st.printer_gcode_state = "RUNNING"
+    st.printer_updated_at = datetime.now()
+    st.printer_broker_connected = True
 
     # Current weather — 22°C (black, normal range)
     st.weather_current = {

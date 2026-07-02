@@ -62,6 +62,13 @@ class _MQTTBody(BaseModel):
     heartbeat_timeout_sec: int | None = None
 
 
+class _PrinterBody(BaseModel):
+    host: str | None = None
+    port: int | None = None
+    serial: str | None = None
+    access_code: str | None = None
+
+
 class _GeneralBody(BaseModel):
     timezone: str | None = None
 

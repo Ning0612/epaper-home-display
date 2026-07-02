@@ -299,6 +299,43 @@ _SETTINGS_CONTENT = r"""
     </div>
   </div>
 
+  <div class="acc-item" id="acc-printer">
+    <div class="acc-head" onclick="toggle('printer')">
+      <span class="acc-ic">🖨️</span>Bambu 印表機設定
+      <span class="acc-chev">⌄</span>
+    </div>
+    <div class="acc-body">
+      <div class="card" id="printer-status-card">
+        <div class="info">
+          <div class="ik">連線狀態</div><div class="iv" id="pr-st-broker">--</div>
+          <div class="ik">列印狀態</div><div class="iv" id="pr-st-state">--</div>
+          <div class="ik">最後更新</div><div class="iv" id="pr-st-updated">--</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row2">
+          <div class="f">
+            <label>Host</label>
+            <input type="text" id="pr-host" placeholder="留空停用">
+          </div>
+          <div class="f">
+            <label>Port</label>
+            <input type="number" id="pr-port" min="1" max="65535">
+          </div>
+        </div>
+        <div class="f">
+          <label>Serial</label>
+          <input type="text" id="pr-serial" placeholder="印表機序號">
+        </div>
+        <div class="f">
+          <label>Access Code</label>
+          <input type="password" id="pr-code" placeholder="重新輸入以更新">
+        </div>
+        <div class="btn-row"><button class="btn-p" onclick="savePrinter()">儲存</button></div>
+      </div>
+    </div>
+  </div>
+
   <div class="acc-item" id="acc-general">
     <div class="acc-head" onclick="toggle('general')">
       <span class="acc-ic">⚙️</span>一般設定
@@ -400,6 +437,7 @@ function toggle(name){
     }
     if(name==='wifi') loadWifi();
     if(name==='mqtt') loadMqttStatus();
+    if(name==='printer') loadPrinterStatus();
     if(name==='presence') startLightPoll();
   }
 }
@@ -529,6 +567,11 @@ async function loadCfg(){
     document.getElementById('mq-user').value=mq.username||'';
     document.getElementById('mq-pass').placeholder=mq.password_set?'已設定，重新輸入以更新':'重新輸入以更新';
     document.getElementById('mq-heartbeat').value=mq.heartbeat_timeout_sec??180;
+    var pr=c.printer||{};
+    document.getElementById('pr-host').value=pr.host||'';
+    document.getElementById('pr-port').value=pr.port??8883;
+    document.getElementById('pr-serial').value=pr.serial||'';
+    document.getElementById('pr-code').placeholder=pr.access_code_set?'已設定，重新輸入以更新':'重新輸入以更新';
     document.getElementById('g-tz').value=c.timezone||'Asia/Taipei';
   }catch(e){console.error('loadCfg',e)}
 }
@@ -563,6 +606,21 @@ async function loadMqttStatus(){
     document.getElementById('mq-st-broker').textContent='無法取得';
     document.getElementById('mq-st-device').textContent='無法取得';
     document.getElementById('mq-st-updated').textContent='無法取得';
+  }
+}
+
+async function loadPrinterStatus(){
+  try{
+    var r=await fetch('/state');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    var d=await r.json();
+    document.getElementById('pr-st-broker').textContent=d.printer_broker_connected?'已連線':'未連線';
+    document.getElementById('pr-st-state').textContent=d.printer_gcode_state||'--';
+    document.getElementById('pr-st-updated').textContent=d.printer_updated_at||'--';
+  }catch(e){
+    document.getElementById('pr-st-broker').textContent='讀取失敗';
+    document.getElementById('pr-st-state').textContent='讀取失敗';
+    document.getElementById('pr-st-updated').textContent='讀取失敗';
   }
 }
 
@@ -692,6 +750,22 @@ async function saveMqtt(){
     toast('HydraCup MQTT 設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
+async function savePrinter(){
+  try{
+    var body={
+      host:document.getElementById('pr-host').value.trim(),
+      port:+document.getElementById('pr-port').value,
+      serial:document.getElementById('pr-serial').value.trim()
+    };
+    var code=document.getElementById('pr-code').value;
+    if(code!=='') body.access_code=code;
+    await put('/settings/printer',body);
+    document.getElementById('pr-code').value='';
+    document.getElementById('pr-code').placeholder='已設定，重新輸入以更新';
+    await loadPrinterStatus();
+    toast('Bambu 印表機設定已儲存',true);
+  }catch(e){toast('儲存失敗：'+e.message,false);}
+}
 async function saveGeneral(){
   try{
     await put('/settings/general',{timezone:document.getElementById('g-tz').value.trim()});
@@ -716,6 +790,7 @@ async function saveAuth(){
 
 loadCfg();
 loadMqttStatus();
+loadPrinterStatus();
 initMap();
 </script>
 """

@@ -43,6 +43,12 @@ def create_read_only_router() -> APIRouter:
             "hydra_updated_at": state.hydra_updated_at.isoformat() if state.hydra_updated_at else None,
             "hydra_broker_connected": state.hydra_broker_connected,
             "hydra_device_online": state.hydra_device_online,
+            "printer_pct": state.printer_pct,
+            "printer_remaining_min": state.printer_remaining_min,
+            "printer_task_name": state.printer_task_name,
+            "printer_gcode_state": state.printer_gcode_state,
+            "printer_updated_at": state.printer_updated_at.isoformat() if state.printer_updated_at else None,
+            "printer_broker_connected": state.printer_broker_connected,
         })
 
     @router.get("/logs/env")

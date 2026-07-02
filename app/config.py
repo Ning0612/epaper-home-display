@@ -173,6 +173,14 @@ class MQTTConfig:
 
 
 @dataclass
+class PrinterConfig:
+    host: str = ""
+    port: int = 8883
+    serial: str = ""
+    access_code: str = ""
+
+
+@dataclass
 class Settings:
     weather: WeatherConfig = field(default_factory=WeatherConfig)
     sensors: SensorsConfig = field(default_factory=SensorsConfig)
@@ -186,6 +194,7 @@ class Settings:
     claude_usage: ClaudeUsageConfig = field(default_factory=ClaudeUsageConfig)
     codex_usage: CodexUsageConfig = field(default_factory=CodexUsageConfig)
     mqtt: MQTTConfig = field(default_factory=MQTTConfig)
+    printer: PrinterConfig = field(default_factory=PrinterConfig)
     timezone: str = "Asia/Taipei"
 
 

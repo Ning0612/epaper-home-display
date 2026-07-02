@@ -15,10 +15,11 @@ from app.display.renderer_constants import (
     _WX_TOP_H, _WEEKDAYS,
 )
 from app.display.renderer_utils import (
-    _font, _cx_text, _paste_icon, _draw_progress_bar,
+    _font, _cx_text, _paste_icon, _draw_progress_bar, _ellipsize,
     _pick_daily_forecast, _weather_item, _temp_color, _usage_color,
     _draw_thermometer_icon, _draw_droplet_icon,
 )
+from app.logic.printer import format_remaining
 
 if TYPE_CHECKING:
     from app.config import Settings
@@ -240,6 +241,47 @@ def _draw_usage_row(
         draw.text((bar_x + _BW + _G, y), reset_text, font=fnt, fill=FG)
 
 
+def _draw_progress_row(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    w: int,
+    pct: float | None,
+    right_text: str,
+    *,
+    fg: tuple[int, int, int],
+    bar_fill: tuple[int, int, int],
+    pct_col_w: int,
+    bar_w: int,
+) -> None:
+    """Draw `pct% | bar | right_text`, with pct_col_w/bar_w supplied by the
+    caller so multiple rows can share identical bar geometry (see
+    _draw_card_water_printer, which needs the Water and Print bars to be
+    pixel-identical in position and size)."""
+    fnt = _font(13, bold=True)
+    if pct is None:
+        pct_text = "--%"
+        bar_pct = 0.0
+    else:
+        pct_text = f"{max(0, min(100, int(round(pct * 100))))}%"
+        bar_pct = pct
+
+    gap, bar_h = 4, 10
+
+    pct_bb = draw.textbbox((0, 0), pct_text, font=fnt)
+    pct_w = pct_bb[2] - pct_bb[0]
+    draw.text((x + max(0, pct_col_w - pct_w), y), pct_text, font=fnt, fill=fg)
+
+    bar_x = x + pct_col_w + gap
+    bar_y = y + (15 - bar_h) // 2
+    _draw_progress_bar(draw, bar_x, bar_y, bar_w, bar_h, bar_pct, fill=bar_fill)
+
+    right_x = bar_x + bar_w + gap
+    right_max_w = max(x + w - right_x, 0)
+    right_text = _ellipsize(draw, right_text, fnt, right_max_w)
+    draw.text((right_x, y), right_text, font=fnt, fill=fg)
+
+
 def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState", *, color: bool = True) -> None:
     draw.rectangle(
         [(USAGE_X, USAGE_Y), (USAGE_X + USAGE_W - 1, USAGE_Y + USAGE_H - 1)],
@@ -279,7 +321,7 @@ def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState", *, color: b
     _draw_usage_row(draw, ix, sep_y + 35, "7d", state.codex_usage_week, state.codex_7d_reset, iw, _max_rw, color=color)
 
 
-def _draw_card_hydra(
+def _draw_card_water_printer(
     draw: ImageDraw.ImageDraw,
     state: "AgentState",
     settings: "Settings",
@@ -305,15 +347,55 @@ def _draw_card_hydra(
 
     if state.hydra_current_ml is None or state.hydra_goal_ml is None:
         amount_str = "--/--ml"
+        goal_text = "--"
     else:
         amount_str = f"{state.hydra_current_ml}/{state.hydra_goal_ml}ml"
-    pct = state.hydra_pct
-    pct_str = "--%" if pct is None else f"{max(0, min(100, int(round(pct * 100))))}%"
+        remaining = state.hydra_goal_ml - state.hydra_current_ml
+        goal_text = "Goal!" if remaining <= 0 else f"{remaining}ml"
 
-    content_h = 14 + 5 + 16 + 5 + 20 + 7 + 12
+    printer_active = state.printer_broker_connected and state.printer_gcode_state in {"RUNNING", "PAUSE"}
+    printer_fill = FG if printer_active else _STALE_FILL
+    printer_bar_fill = (255, 128, 0) if (printer_active and color) else printer_fill
+
+    task_text = (state.printer_task_name or "No active print") if printer_active else "No active print"
+    printer_pct = state.printer_pct if printer_active else None
+    printer_remaining = format_remaining(state.printer_remaining_min) if printer_active else "--"
+
+    title_font = _font(13, bold=True)
+
+    # Shared column geometry so the Water and Print progress bars are
+    # pixel-identical in position and width (same pct column width, same
+    # bar width) regardless of how long each row's own text happens to be.
+    pct_col_bb = draw.textbbox((0, 0), "100%", font=title_font)
+    pct_col_w = pct_col_bb[2] - pct_col_bb[0]
+    goal_bb = draw.textbbox((0, 0), goal_text, font=title_font)
+    remaining_bb = draw.textbbox((0, 0), printer_remaining, font=title_font)
+    right_col_w = max(goal_bb[2] - goal_bb[0], remaining_bb[2] - remaining_bb[0])
+    row_gap, min_bar_w = 4, 20
+    bar_w = max(min_bar_w, iw - pct_col_w - row_gap - right_col_w - row_gap)
+
+    # Vertical rhythm mirrors _draw_card_usage() exactly (header at sy,
+    # two rows at sy+16/sy+32, separator at sy+49, second section repeats
+    # at sep_y+3/sep_y+19/sep_y+35) so both cards read as one visual system.
+    content_h = 99
     sy = iy + max(0, (ih - content_h) // 2)
 
-    _cx_text(draw, "Water", ix, iw, sy, _font(14, bold=True), fill=fill)
-    _cx_text(draw, amount_str, ix, iw, sy + 19, _font(16, bold=True), fill=fill)
-    _cx_text(draw, pct_str, ix, iw, sy + 40, _font(20, bold=True), fill=fill)
-    _draw_progress_bar(draw, ix + 4, sy + 67, iw - 8, 12, pct or 0.0, fill=bar_fill)
+    _cx_text(draw, "HydraCup", ix, iw, sy, title_font, fill=fill)
+    _cx_text(draw, amount_str, ix, iw, sy + 16, title_font, fill=fill)
+    _draw_progress_row(
+        draw, ix, sy + 32, iw, state.hydra_pct, goal_text,
+        fg=fill, bar_fill=bar_fill, pct_col_w=pct_col_w, bar_w=bar_w,
+    )
+
+    sep_y = sy + 49
+    draw.line([(ix, sep_y), (ix + iw - 1, sep_y)], fill=FG, width=1)
+
+    _cx_text(draw, "3D Printer", ix, iw, sep_y + 3, title_font, fill=printer_fill)
+    _cx_text(
+        draw, _ellipsize(draw, task_text, title_font, iw), ix, iw, sep_y + 19,
+        title_font, fill=printer_fill,
+    )
+    _draw_progress_row(
+        draw, ix, sep_y + 35, iw, printer_pct, printer_remaining,
+        fg=printer_fill, bar_fill=printer_bar_fill, pct_col_w=pct_col_w, bar_w=bar_w,
+    )

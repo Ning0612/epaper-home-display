@@ -111,6 +111,45 @@ def test_render_hydra_device_online_but_no_status_yet(settings):
     assert img.size == (800, 480)
 
 
+def test_render_printer_running(settings):
+    s = AgentState()
+    s.hydra_current_ml = 1450
+    s.hydra_goal_ml = 2000
+    s.hydra_pct = 0.725
+    s.hydra_updated_at = datetime.now()
+    s.hydra_broker_connected = True
+    s.hydra_device_online = True
+    s.printer_pct = 0.42
+    s.printer_remaining_min = 83
+    s.printer_task_name = "benchy_v2.3mf"
+    s.printer_gcode_state = "RUNNING"
+    s.printer_broker_connected = True
+    img = render_dashboard(s, settings)
+    assert img.size == (800, 480)
+
+
+def test_render_printer_running_with_long_task_name(settings):
+    s = AgentState()
+    s.printer_pct = 0.88
+    s.printer_remaining_min = 125
+    s.printer_task_name = "very_long_print_name_" * 8
+    s.printer_gcode_state = "RUNNING"
+    s.printer_broker_connected = True
+    img = render_dashboard(s, settings)
+    assert img.size == (800, 480)
+
+
+def test_render_printer_offline_muted(settings):
+    s = AgentState()
+    s.printer_pct = 0.5
+    s.printer_remaining_min = 60
+    s.printer_task_name = "offline.3mf"
+    s.printer_gcode_state = "RUNNING"
+    s.printer_broker_connected = False
+    img = render_dashboard(s, settings)
+    assert img.size == (800, 480)
+
+
 def test_render_long_reminder(settings):
     s = AgentState()
     s.active_reminder = "A" * 100

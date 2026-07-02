@@ -88,6 +88,12 @@ mqtt:
   password: ""                 # 部署上必填：broker 已設定 allow_anonymous false，留空會連線失敗（程式碼本身不強制）
   heartbeat_timeout_sec: 180   # HydraCup 心跳逾時秒數，預設為 60 秒心跳的 3 倍
 
+printer:
+  host: ""                    # 印表機區網 IP，留空停用此功能（例：192.168.1.50）
+  port: 8883                  # Bambu LAN 模式 MQTT broker port（TLS，固定 8883）
+  serial: ""                  # 印表機序號（印表機螢幕「設定 → 韌體資訊」或 Bambu Studio 裝置頁面查詢）
+  access_code: ""             # 印表機「存取碼」（印表機螢幕「設定 → 網路 → LAN 模式」）；host/serial/access_code 任一留空即停用，不會嘗試連線
+
 codex_usage:
   creds_path: "data/codex_creds.json"    # OAuth token 儲存路徑（.gitignored，不要 commit）
   poll_interval_seconds: 600              # 每 10 分鐘向 OpenAI WHAM API 拉取一次用量
