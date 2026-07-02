@@ -77,7 +77,7 @@ wifi:
 
 claude_usage:
   creds_path: "data/claude_creds.json"   # OAuth token 儲存路徑（.gitignored，不要 commit）
-  poll_interval_seconds: 600              # 每 10 分鐘向 Anthropic API 拉取一次用量
+  poll_interval_seconds: 600              # 每 10 分鐘向 Anthropic API 拉取一次用量；範圍 60-1800（1-30 分鐘），可透過 WebUI /settings 的「AI 工具用量設定」調整，存檔後下一輪刷新即套用，不需重啟服務
   # 初次授權：在筆電執行 python tools/claude_auth.py，授權後 scp data/claude_creds.json 到 Pi
 
 mqtt:
@@ -97,6 +97,6 @@ printer:
 
 codex_usage:
   creds_path: "data/codex_creds.json"    # OAuth token 儲存路徑（.gitignored，不要 commit）
-  poll_interval_seconds: 600              # 每 10 分鐘向 OpenAI WHAM API 拉取一次用量
+  poll_interval_seconds: 600              # 每 10 分鐘向 OpenAI WHAM API 拉取一次用量；範圍 60-1800（1-30 分鐘），可透過 WebUI /settings 的「AI 工具用量設定」調整，存檔後下一輪刷新即套用，不需重啟服務
   # 初次授權：在筆電執行 python tools/codex_auth.py，授權後 scp data/codex_creds.json 到 Pi
   # 注意：access_token 約 1 小時後過期；若 Pi log 出現 401 請重新執行 codex_auth.py 並重新 scp

@@ -16,6 +16,11 @@ class _WeatherBody(BaseModel):
     fetch_interval_seconds: int | None = None
 
 
+class _UsagePollBody(BaseModel):
+    claude_poll_interval_seconds: int | None = None
+    codex_poll_interval_seconds: int | None = None
+
+
 class _DisplayBody(BaseModel):
     model: str | None = None
     dashboard_interval_minutes: int | None = None

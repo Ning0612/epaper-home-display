@@ -323,6 +323,29 @@ _SETTINGS_CONTENT = r"""
     </div>
   </div>
 
+  <div class="acc-item" id="acc-usage">
+    <div class="acc-head" onclick="toggle('usage')">
+      <span class="acc-ic">🤖</span>AI 工具用量設定
+      <span class="acc-chev">⌄</span>
+    </div>
+    <div class="acc-body">
+      <div class="card">
+        <div class="row2">
+          <div class="f">
+            <label>Claude 刷新間隔（分鐘）</label>
+            <input type="number" id="us-claude" min="1" max="30">
+          </div>
+          <div class="f">
+            <label>Codex 刷新間隔（分鐘）</label>
+            <input type="number" id="us-codex" min="1" max="30">
+          </div>
+        </div>
+        <div class="btn-row"><button class="btn-p" onclick="saveUsage()">儲存</button></div>
+        <p class="hint">不需要重啟服務；最晚在目前這輪刷新結束後（依原本間隔）套用新值。範圍 1-30 分鐘。</p>
+      </div>
+    </div>
+  </div>
+
   <div class="acc-item" id="acc-general">
     <div class="acc-head" onclick="toggle('general')">
       <span class="acc-ic">⚙️</span>一般設定
@@ -556,6 +579,10 @@ async function loadCfg(){
     document.getElementById('mq-heartbeat').value=mq.heartbeat_timeout_sec??180;
     var pr=c.printer||{};
     document.getElementById('pr-serial').value=pr.serial||'';
+    var cu=c.claude_usage||{}, cxu=c.codex_usage||{};
+    var clampMin=function(sec){return Math.min(30, Math.max(1, Math.round((sec??600)/60)));};
+    document.getElementById('us-claude').value=clampMin(cu.poll_interval_seconds);
+    document.getElementById('us-codex').value=clampMin(cxu.poll_interval_seconds);
     document.getElementById('g-tz').value=c.timezone||'Asia/Taipei';
   }catch(e){console.error('loadCfg',e)}
 }
@@ -740,6 +767,16 @@ async function savePrinter(){
     await put('/settings/printer',body);
     await loadPrinterStatus();
     toast('Bambu 印表機設定已儲存',true);
+  }catch(e){toast('儲存失敗：'+e.message,false);}
+}
+async function saveUsage(){
+  try{
+    var body={
+      claude_poll_interval_seconds:Math.round(+document.getElementById('us-claude').value*60),
+      codex_poll_interval_seconds:Math.round(+document.getElementById('us-codex').value*60)
+    };
+    await put('/settings/usage',body);
+    toast('AI 工具用量設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
 async function saveGeneral(){

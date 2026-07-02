@@ -12,8 +12,7 @@ _CREDS_RETRY_INTERVAL = 60
 
 
 async def _codex_usage_loop(service: CodexUsageService, settings) -> None:
-    poll_interval = max(60, settings.codex_usage.poll_interval_seconds)
-    logger.info("Codex usage collection started (poll_interval=%ds)", poll_interval)
+    logger.info("Codex usage collection started (poll_interval=%ds)", settings.codex_usage.poll_interval_seconds)
 
     while True:
         if not service.load_credentials():
@@ -43,4 +42,4 @@ async def _codex_usage_loop(service: CodexUsageService, settings) -> None:
         except Exception as exc:
             logger.warning("Codex usage loop error: %s", exc)
 
-        await asyncio.sleep(poll_interval)
+        await asyncio.sleep(max(60, min(1800, settings.codex_usage.poll_interval_seconds)))

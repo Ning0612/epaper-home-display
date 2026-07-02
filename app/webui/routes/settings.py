@@ -16,7 +16,8 @@ from app.webui.config_helpers import _save_to_config
 from app.services.voice import VoiceService as _VoiceService
 from app.webui.models import (
     _LocationBody, _WeatherBody, _DisplayBody,
-    _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _MQTTBody, _PrinterBody, _GeneralBody, _AuthBody,
+    _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _MQTTBody, _PrinterBody, _UsagePollBody,
+    _GeneralBody, _AuthBody,
 )
 from app.webui.routes.auth import _pwd_ctx, _pw_version
 from app.webui.templates.settings import _SETTINGS_HTML
@@ -141,6 +142,35 @@ def create_settings_router(
 
         for k, v in patch.items():
             setattr(settings.weather, k, v)
+        return {"ok": True}
+
+    @router.put("/settings/usage")
+    async def set_usage(body: _UsagePollBody):
+        patch = body.model_dump(exclude_none=True)
+        config_patch: dict = {}
+        if "claude_poll_interval_seconds" in patch:
+            v = patch["claude_poll_interval_seconds"]
+            if not (60 <= v <= 1800):
+                raise HTTPException(400, detail="claude_poll_interval_seconds must be 60-1800 (1-30 minutes)")
+            config_patch["claude_usage"] = {"poll_interval_seconds": v}
+        if "codex_poll_interval_seconds" in patch:
+            v = patch["codex_poll_interval_seconds"]
+            if not (60 <= v <= 1800):
+                raise HTTPException(400, detail="codex_poll_interval_seconds must be 60-1800 (1-30 minutes)")
+            config_patch["codex_usage"] = {"poll_interval_seconds": v}
+        if not config_patch:
+            return {"ok": True}
+
+        try:
+            _save_to_config(config_patch)
+        except Exception as exc:
+            logger.error("Failed to persist usage settings: %s", exc)
+            raise HTTPException(500, detail="Failed to persist settings")
+
+        if "claude_usage" in config_patch:
+            settings.claude_usage.poll_interval_seconds = config_patch["claude_usage"]["poll_interval_seconds"]
+        if "codex_usage" in config_patch:
+            settings.codex_usage.poll_interval_seconds = config_patch["codex_usage"]["poll_interval_seconds"]
         return {"ok": True}
 
     _ALLOWED_DISPLAY_MODELS = frozenset({"epd7in3e", "epd7in5_V2", "mock"})
