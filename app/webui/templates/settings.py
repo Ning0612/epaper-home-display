@@ -313,25 +313,12 @@ _SETTINGS_CONTENT = r"""
         </div>
       </div>
       <div class="card">
-        <div class="row2">
-          <div class="f">
-            <label>Host</label>
-            <input type="text" id="pr-host" placeholder="留空停用">
-          </div>
-          <div class="f">
-            <label>Port</label>
-            <input type="number" id="pr-port" min="1" max="65535">
-          </div>
-        </div>
         <div class="f">
-          <label>Serial</label>
-          <input type="text" id="pr-serial" placeholder="印表機序號">
-        </div>
-        <div class="f">
-          <label>Access Code</label>
-          <input type="password" id="pr-code" placeholder="重新輸入以更新">
+          <label>Serial <span class="hint">留空則使用 data/bambu_creds.json 裡自動偵測到的序號</span></label>
+          <input type="text" id="pr-serial" placeholder="印表機序號（可留空）">
         </div>
         <div class="btn-row"><button class="btn-p" onclick="savePrinter()">儲存</button></div>
+        <p class="hint">帳號連線改走 Bambu 雲端 MQTT，無法在此頁面設定。請在筆電執行 <code>python tools/bambu_auth.py</code> 登入後，將 <code>data/bambu_creds.json</code> 複製到 Pi。</p>
       </div>
     </div>
   </div>
@@ -568,10 +555,7 @@ async function loadCfg(){
     document.getElementById('mq-pass').placeholder=mq.password_set?'已設定，重新輸入以更新':'重新輸入以更新';
     document.getElementById('mq-heartbeat').value=mq.heartbeat_timeout_sec??180;
     var pr=c.printer||{};
-    document.getElementById('pr-host').value=pr.host||'';
-    document.getElementById('pr-port').value=pr.port??8883;
     document.getElementById('pr-serial').value=pr.serial||'';
-    document.getElementById('pr-code').placeholder=pr.access_code_set?'已設定，重新輸入以更新':'重新輸入以更新';
     document.getElementById('g-tz').value=c.timezone||'Asia/Taipei';
   }catch(e){console.error('loadCfg',e)}
 }
@@ -752,16 +736,8 @@ async function saveMqtt(){
 }
 async function savePrinter(){
   try{
-    var body={
-      host:document.getElementById('pr-host').value.trim(),
-      port:+document.getElementById('pr-port').value,
-      serial:document.getElementById('pr-serial').value.trim()
-    };
-    var code=document.getElementById('pr-code').value;
-    if(code!=='') body.access_code=code;
+    var body={serial:document.getElementById('pr-serial').value.trim()};
     await put('/settings/printer',body);
-    document.getElementById('pr-code').value='';
-    document.getElementById('pr-code').placeholder='已設定，重新輸入以更新';
     await loadPrinterStatus();
     toast('Bambu 印表機設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}

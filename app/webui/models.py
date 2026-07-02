@@ -63,10 +63,7 @@ class _MQTTBody(BaseModel):
 
 
 class _PrinterBody(BaseModel):
-    host: str | None = None
-    port: int | None = None
     serial: str | None = None
-    access_code: str | None = None
 
 
 class _GeneralBody(BaseModel):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import ssl
+import os
 import threading
 from datetime import datetime
 
@@ -16,33 +16,72 @@ from app.state import state
 
 logger = logging.getLogger(__name__)
 
+BAMBULAB_CLOUD_MQTT_HOST = "us.mqtt.bambulab.com"
+BAMBULAB_CLOUD_MQTT_PORT = 8883
+
 
 class BambuMQTTService:
     def __init__(self, config: PrinterConfig) -> None:
         self._config = config
         self._loop: asyncio.AbstractEventLoop | None = None
         self._lock = threading.Lock()
+        self._serial = ""
         self._client: mqtt.Client | None = self._build_client(config)
 
-    def _is_configured(self, config: PrinterConfig) -> bool:
-        return bool(config.host and config.serial and config.access_code)
-
     def _report_topic(self) -> str:
-        return f"device/{self._config.serial}/report"
+        return f"device/{self._serial}/report"
 
     def _request_topic(self) -> str:
-        return f"device/{self._config.serial}/request"
+        return f"device/{self._serial}/request"
+
+    def _load_credentials(self, config: PrinterConfig) -> dict[str, str] | None:
+        creds_path = config.creds_path
+        if not os.path.exists(creds_path):
+            logger.info("Bambu credentials not found at %s, skipping printer MQTT", creds_path)
+            return None
+        try:
+            with open(creds_path, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.info("Failed to load Bambu credentials from %s: %s", creds_path, exc)
+            return None
+        if not isinstance(raw, dict):
+            logger.info("Bambu credentials file %s is not a JSON object, skipping printer MQTT", creds_path)
+            return None
+
+        access_token = raw.get("access_token")
+        uid = raw.get("uid")
+        serial = config.serial or raw.get("serial")
+        if isinstance(access_token, str):
+            access_token = access_token.strip()
+        if isinstance(uid, str):
+            uid = uid.strip()
+        if isinstance(serial, str):
+            serial = serial.strip()
+        if not all(isinstance(value, str) and value for value in (access_token, uid, serial)):
+            logger.info(
+                "Bambu credentials in %s must include access_token, uid, and serial; skipping printer MQTT",
+                creds_path,
+            )
+            return None
+        return {
+            "access_token": access_token,
+            "uid": uid,
+            "serial": serial,
+        }
 
     def _build_client(self, config: PrinterConfig) -> mqtt.Client | None:
-        if not self._is_configured(config):
+        creds = self._load_credentials(config)
+        if creds is None:
+            self._serial = ""
             return None
+        self._serial = creds["serial"]
         client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
-            client_id=f"epaper-bambu-{config.serial}",
+            client_id=f"epaper-bambu-{self._serial}",
         )
-        client.username_pw_set("bblp", config.access_code)
-        client.tls_set(cert_reqs=ssl.CERT_NONE)
-        client.tls_insecure_set(True)
+        client.username_pw_set(f"u_{creds['uid']}", creds["access_token"])
+        client.tls_set()
         client.on_connect = self._on_connect
         client.on_message = self._on_message
         client.on_disconnect = self._on_disconnect
@@ -53,11 +92,15 @@ class BambuMQTTService:
             self._loop = loop
             if self._client is None:
                 state.printer_broker_connected = False
-                logger.info("Bambu printer not configured, skipping connection")
+                logger.info("Bambu printer cloud MQTT not configured, skipping connection")
                 return
-            self._client.connect_async(self._config.host, self._config.port)
+            self._client.connect_async(BAMBULAB_CLOUD_MQTT_HOST, BAMBULAB_CLOUD_MQTT_PORT)
             self._client.loop_start()
-            logger.info("Bambu printer MQTT connecting to %s:%d", self._config.host, self._config.port)
+            logger.info(
+                "Bambu printer cloud MQTT connecting to %s:%d",
+                BAMBULAB_CLOUD_MQTT_HOST,
+                BAMBULAB_CLOUD_MQTT_PORT,
+            )
 
     def stop(self) -> None:
         with self._lock:
@@ -68,7 +111,7 @@ class BambuMQTTService:
             state.printer_broker_connected = False
 
     def update_config(self, config: PrinterConfig) -> None:
-        """Reconnect using new Bambu printer LAN MQTT settings."""
+        """Reconnect using new Bambu printer cloud MQTT settings."""
         with self._lock:
             loop = self._loop
             old_client = self._client
@@ -83,11 +126,15 @@ class BambuMQTTService:
             if loop is not None:
                 self._loop = loop
                 if self._client is None:
-                    logger.info("Bambu printer not configured, skipping connection")
+                    logger.info("Bambu printer cloud MQTT not configured, skipping connection")
                     return
-                self._client.connect_async(config.host, config.port)
+                self._client.connect_async(BAMBULAB_CLOUD_MQTT_HOST, BAMBULAB_CLOUD_MQTT_PORT)
                 self._client.loop_start()
-                logger.info("Bambu printer MQTT reconnecting to %s:%d", config.host, config.port)
+                logger.info(
+                    "Bambu printer cloud MQTT reconnecting to %s:%d",
+                    BAMBULAB_CLOUD_MQTT_HOST,
+                    BAMBULAB_CLOUD_MQTT_PORT,
+                )
 
     # NOTE: `client is not self._client` is a best-effort guard against stale
     # callbacks from a client already replaced by update_config(). It closes the
@@ -112,7 +159,11 @@ class BambuMQTTService:
             )
         else:
             state.printer_broker_connected = False
-            logger.warning("Bambu printer MQTT connect failed rc=%d", rc)
+            logger.warning(
+                "Bambu printer MQTT connect failed rc=%d. "
+                "Bambu credentials may have expired; rerun tools/bambu_auth.py and update data/bambu_creds.json",
+                rc,
+            )
 
     def _on_disconnect(self, client: mqtt.Client, userdata, rc: int) -> None:
         if client is not self._client:

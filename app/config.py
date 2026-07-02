@@ -174,10 +174,8 @@ class MQTTConfig:
 
 @dataclass
 class PrinterConfig:
-    host: str = ""
-    port: int = 8883
     serial: str = ""
-    access_code: str = ""
+    creds_path: str = "data/bambu_creds.json"
 
 
 @dataclass

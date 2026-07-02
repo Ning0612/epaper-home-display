@@ -64,9 +64,6 @@ def create_settings_router(
         mq = d.get("mqtt", {})
         password = mq.pop("password", "")
         mq["password_set"] = bool(password)
-        pr = d.get("printer", {})
-        access_code = pr.pop("access_code", "")
-        pr["access_code_set"] = bool(access_code)
         wu = d.get("webui", {})
         wu.pop("password_hash", None)
         wu.pop("session_secret", None)
@@ -362,10 +359,6 @@ def create_settings_router(
     @router.put("/settings/printer")
     async def set_printer(body: _PrinterBody):
         patch = body.model_dump(exclude_none=True)
-        if "host" in patch:
-            patch["host"] = patch["host"].strip()
-        if "port" in patch and not (1 <= patch["port"] <= 65535):
-            raise HTTPException(400, detail="port must be 1..65535")
         if "serial" in patch:
             serial = patch["serial"].strip()
             if serial and re.fullmatch(r"[A-Za-z0-9_-]{1,32}", serial) is None:
