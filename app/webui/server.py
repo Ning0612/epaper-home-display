@@ -22,11 +22,13 @@ from app.webui.routes.wifi import create_wifi_router
 
 if TYPE_CHECKING:
     from app.config import Settings
+    from app.services.mqtt_client import MQTTService
 
 
 def create_app(
     settings: "Settings",
     weather_service: WeatherService,
+    mqtt_service: "MQTTService",
     display_queue: "asyncio.Queue | None" = None,
 ) -> FastAPI:
     if not settings.webui.session_secret:
@@ -46,7 +48,7 @@ def create_app(
 
     app.include_router(create_auth_router(settings))
     app.include_router(create_read_only_router())
-    app.include_router(create_settings_router(settings, weather_service))
+    app.include_router(create_settings_router(settings, weather_service, mqtt_service))
     app.include_router(create_desk_router(settings))
     app.include_router(create_environment_router(settings))
     app.include_router(create_images_router(settings, display_queue))

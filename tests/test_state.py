@@ -36,6 +36,12 @@ def test_stub_usage_fields_default_to_none():
     assert s.codex_usage_week is None
     assert s.codex_5h_reset is None
     assert s.codex_7d_reset is None
+    assert s.hydra_current_ml is None
+    assert s.hydra_goal_ml is None
+    assert s.hydra_pct is None
+    assert s.hydra_updated_at is None
+    assert s.hydra_broker_connected is False
+    assert s.hydra_device_online is False
 
 
 def test_independent_instances_do_not_share_forecast():

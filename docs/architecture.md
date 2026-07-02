@@ -60,7 +60,8 @@ epaper-home-display/
 │   ├── logic/
 │   │   ├── presence.py      # 占用偵測（純函數，光線 → OCCUPIED/UNOCCUPIED）
 │   │   ├── desk_session.py  # 桌面工作時段狀態機（純函數）
-│   │   └── reminder.py      # 天氣提醒生成（純函數，用於 AI 語音提醒）
+│   │   ├── reminder.py      # 天氣提醒生成（純函數，用於 AI 語音提醒）
+│   │   └── hydration.py     # HydraCup MQTT payload 解析（純函數，parse_status）
 │   ├── sensors/
 │   │   ├── dht22.py         # DHT22 溫濕度（Real + Mock）
 │   │   ├── light_sensor.py  # MCP3008 ADC + 光敏電阻（Real + Mock）
@@ -72,7 +73,8 @@ epaper-home-display/
 │   │   ├── notification_manager.py  # 通知協調（裝置上線、時段結束、每日摘要）
 │   │   ├── claude_usage.py  # Claude OAuth API 客戶端（token 刷新、使用量解析）
 │   │   ├── codex_usage.py   # Codex OAuth API 客戶端（token 刷新、使用量解析）
-│   │   └── wifi_monitor.py  # WiFi 狀態監測（client/ap/unknown，讀 /tmp/epaper-ap-mode.json）
+│   │   ├── wifi_monitor.py  # WiFi 狀態監測（client/ap/unknown，讀 /tmp/epaper-ap-mode.json）
+│   │   └── mqtt_client.py   # HydraCup MQTT 訂閱服務（paho-mqtt，見下方「HydraCup MQTT 資料流」）
 │   ├── loops/               # asyncio 協程（由 main.py 以 gather 並行執行）
 │   │   ├── sensor.py        # 感測器讀取循環（30 秒）
 │   │   ├── presence.py      # 占用計分循環（60 秒）
@@ -128,6 +130,15 @@ epaper-home-display/
 DHT22 ──────────────────────────────────────────────────────────┐
 光線感測器 ──────────────────────────── app/sensors/ ──► state.py ──► renderer.py ──► epaper.py ──► 硬體
 ```
+
+### HydraCup MQTT 資料流
+
+```
+esp32-hydracup ──► Mosquitto broker (Pi, :1883) ──► app/services/mqtt_client.py（paho-mqtt，獨立背景執行緒）
+    ──► app/logic/hydration.py::parse_status()（純函數）──► state.py（hydra_*）──► renderer_cards.py::_draw_card_hydra()
+```
+
+`MQTTService` 不是 `asyncio.gather()` 中的協程——paho-mqtt 用自己的 `loop_start()` 背景執行緒處理網路 I/O，收到訊息後透過 `asyncio.run_coroutine_threadsafe()` 把 dispatch 丟回主 event loop 更新 `state`。`.start(loop)` 在 `app/main.py` 的 `try` 區塊內、`await asyncio.gather(...)` 之前呼叫；`.stop()` 在 `finally` 區塊呼叫。完整協議規格（topic、payload schema、QoS、發布時機）見 [docs/hydracup-mqtt-protocol.md](hydracup-mqtt-protocol.md)。
 
 ### 顯示更新觸發條件
 
@@ -245,6 +256,12 @@ else:                    → UNOCCUPIED (score = 0.0)
 | `claude_7d_reset` | str \| None | Claude 7d 剩餘時間（如 `"2d 3h"`）|
 | `codex_5h_reset` | str \| None | Codex 5h 重置時間（HH:MM 格式）|
 | `codex_7d_reset` | str \| None | Codex 7d 剩餘時間（如 `"2d 3h"`）|
+| `hydra_current_ml` | int \| None | HydraCup 今日目前喝水量（毫升）|
+| `hydra_goal_ml` | int \| None | HydraCup 今日目標飲水量（毫升）|
+| `hydra_pct` | float \| None | HydraCup 完成比例。語意上是 0.0–1.0 的分數；payload 直接提供的 `pct` 欄位限制在 -10.0～10.0 之間（超出視為無效並改用下一項 fallback），缺失時 fallback 為 `current_ml / goal_ml`（兩者各自上限 9999，故 fallback 值理論上可超出 -10.0～10.0）；顯示時 `_draw_card_hydra()` 一律 clamp 到 0%–100% |
+| `hydra_updated_at` | datetime \| None | 最後一次收到 `hydracup/status` 的時間（epaper-display 端收到時間，非裝置端時間戳）|
+| `hydra_broker_connected` | bool | epaper-display 與 MQTT broker 的連線狀態 |
+| `hydra_device_online` | bool | 由 `hydracup/availability`（含 LWT）回報的 HydraCup 裝置線上狀態 |
 | `display_page` | Literal["dashboard", "ap_mode"] | 目前顯示頁面 |
 | `wifi_mode` | Literal["client", "ap", "unknown"] | WiFi 模式 |
 | `ap_ssid` | str | AP 熱點 SSID（AP 模式下顯示）|
@@ -318,7 +335,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/desk` | HTML 桌面工作時段介面 |
 | `/environment` | HTML 環境溫濕度分析介面（日/月/年圖表）|
 | `/health` | 健康檢查（`{"status": "ok"}`，不需認證）|
-| `/state` | AgentState 部分欄位快照（感測器、天氣、AI 使用量）|
+| `/state` | AgentState 部分欄位快照（感測器、天氣、AI 使用量、HydraCup 喝水資料）|
 | `/logs/env` | 環境日誌（溫濕度、光線）最近 50 筆 |
 | `/logs/presence` | 占用度日誌最近 50 筆 |
 | `/logs/events` | 系統事件日誌最近 50 筆 |

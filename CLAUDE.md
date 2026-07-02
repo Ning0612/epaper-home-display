@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ePaper Home Display** running on Raspberry Pi Zero 2W with a Waveshare 7.3" e-Paper display (epd7in3e, 7-color ACeP), DHT22 sensor, light sensor, button, and buzzer/USB speaker.
 
-Originally a course final project that integrated with a separate agent ("Agent 1") over MQTT for doorbell/face-recognition security alerts. That integration has been removed from `main` — the historical final-project state is preserved on the `archive/final-project` branch. `main` now only covers standalone functionality (local sensors, e-Paper, weather, WebUI, image carousel, Claude/Codex usage display).
+Originally a course final project that integrated with a separate agent ("Agent 1") over MQTT for doorbell/face-recognition security alerts. That integration has been removed from `main` — the historical final-project state is preserved on the `archive/final-project` branch. `main` now covers standalone functionality (local sensors, e-Paper, weather, WebUI, image carousel, Claude/Codex usage display) plus a new, unrelated MQTT integration with [esp32-hydracup](https://github.com/Ning0612/esp32-hydracup) (a smart water cup) for displaying daily water-drinking progress — see [docs/hydracup-mqtt-protocol.md](docs/hydracup-mqtt-protocol.md).
 
 ---
 
@@ -99,7 +99,8 @@ Hardware access is strictly separated from business logic:
 | Layer | Location | Rule |
 |-------|----------|-------|
 | Hardware drivers | `app/sensors/`, `app/display/`, `app/services/voice.py` | GPIO, SPI, I2C access only here |
-| Business logic | `app/logic/` | No hardware imports; receives data via function args |
+| Network services | `app/services/` (weather, MQTT, Discord, usage polling) | External I/O only; writes to `state.py`, never decides display behavior |
+| Business logic | `app/logic/` | No hardware/network imports; receives data via function args |
 | State | `app/state.py` | Single source of truth for shared mutable state |
 | WebUI | `app/webui/server.py` | Monitoring/config only, no decision logic |
 
@@ -115,6 +116,13 @@ DHT22/light → app/sensors/ → app/state.py → app/display/renderer.py → ep
 light_raw < bright_threshold → OCCUPIED  (score = 1.0)
 light_raw ≥ bright_threshold → UNOCCUPIED (score = 0.0)
 ```
+
+**HydraCup MQTT → State → Display:**
+```
+esp32-hydracup → Mosquitto broker (Pi, :1883) → app/services/mqtt_client.py (paho-mqtt, background thread)
+  → app/logic/hydration.py (parse_status, pure) → app/state.py (hydra_*) → renderer_cards.py::_draw_card_hydra()
+```
+`MQTTService.start()`/`.stop()` are wired in `app/main.py` around the `asyncio.gather()` call — paho-mqtt runs its own background thread (`loop_start()`), so it is not itself a gathered coroutine. Full protocol spec: [docs/hydracup-mqtt-protocol.md](docs/hydracup-mqtt-protocol.md).
 
 ### e-Paper Update Timing
 
@@ -171,7 +179,7 @@ Do not use: desktop GUI frameworks, browser automation, anything requiring a mon
 
 ## Configuration
 
-Read all runtime values from config file or environment variables. Never hard-code:
+Read all runtime values from config file or environment variables. Never hard-code (shorthand names below — actual nested YAML keys are in `config.example.yaml`):
 
 ```
 openweathermap_api_key
@@ -180,6 +188,7 @@ timezone
 dht22_gpio / button_gpio / light_sensor_config
 epaper_model
 webui_host / webui_port
+mqtt.broker_host / mqtt.username / mqtt.password
 ```
 
 Reference file: `config.example.yaml`

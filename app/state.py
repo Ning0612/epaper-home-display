@@ -37,6 +37,12 @@ class AgentState:
     codex_usage_week: float | None = None
     codex_5h_reset: str | None = None
     codex_7d_reset: str | None = None
+    hydra_current_ml: int | None = None
+    hydra_goal_ml: int | None = None
+    hydra_pct: float | None = None
+    hydra_updated_at: datetime | None = None
+    hydra_broker_connected: bool = False
+    hydra_device_online: bool = False
 
     display_page: Literal["dashboard", "ap_mode"] = "dashboard"
 

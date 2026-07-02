@@ -241,6 +241,34 @@ Access token 約 1 小時後過期，服務會自動透過 refresh_token 更新�
 
 ---
 
+## HydraCup MQTT
+
+Dashboard 上的 Water 卡片顯示 [esp32-hydracup](https://github.com/Ning0612/esp32-hydracup) 智慧水杯透過 MQTT 推送的喝水資料。完整協議規格見 [docs/hydracup-mqtt-protocol.md](hydracup-mqtt-protocol.md)。
+
+**可透過 WebUI 設定**（`/settings` 頁面「HydraCup MQTT 設定」區塊，或直接呼叫 `PUT /settings/mqtt`，見 [docs/webui.md](webui.md)）：儲存後會讓執行中的服務立即用新設定斷線重連，不需重啟。頁面同時顯示目前的 broker 連線狀態與 HydraCup 裝置線上狀態（讀自 `GET /state` 的 `hydra_broker_connected`／`hydra_device_online`）。也可以跳過 WebUI，直接編輯下方的 `config.yaml`：
+
+```yaml
+mqtt:
+  broker_host: "localhost"          # Mosquitto broker 位址（區網 IP 或 hostname）
+  broker_port: 1883
+  client_id: "epaper-home-display"
+  username: ""                 # 部署上必填：broker 已設定 allow_anonymous false，留空會連線失敗（程式碼本身不強制）
+  password: ""                 # 部署上必填：broker 已設定 allow_anonymous false，留空會連線失敗（程式碼本身不強制）
+  heartbeat_timeout_sec: 180   # HydraCup 心跳逾時秒數（建議設為裝置端心跳間隔的 3 倍）
+```
+
+**broker 帳號建立**（Pi 上手動執行，需 sudo）：
+
+```bash
+ssh pi@epaper-display.local
+sudo mosquitto_passwd -b /etc/mosquitto/passwd epaper-home-display <password>
+sudo systemctl restart mosquitto
+```
+
+**heartbeat_timeout_sec 說明**：epaper-display 被動訂閱 `hydracup/status`，不會主動輪詢。若距離上次收到訊息超過此秒數，或 `hydracup/availability` 回報裝置離線，Water 卡片會改用灰階樣式呈現既有數值（不清空），提示資料可能已過期。
+
+---
+
 ## 圖片輪播
 
 ```yaml
@@ -357,6 +385,14 @@ wifi:
 claude_usage:
   creds_path: "data/claude_creds.json"
   poll_interval_seconds: 600
+
+mqtt:
+  broker_host: "localhost"
+  broker_port: 1883
+  client_id: "epaper-home-display"
+  username: ""
+  password: ""
+  heartbeat_timeout_sec: 180
 
 codex_usage:
   creds_path: "data/codex_creds.json"

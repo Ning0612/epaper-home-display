@@ -16,13 +16,14 @@ from app.webui.config_helpers import _save_to_config
 from app.services.voice import VoiceService as _VoiceService
 from app.webui.models import (
     _LocationBody, _WeatherBody, _DisplayBody,
-    _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _GeneralBody, _AuthBody,
+    _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _MQTTBody, _GeneralBody, _AuthBody,
 )
 from app.webui.routes.auth import _pwd_ctx, _pw_version
 from app.webui.templates.settings import _SETTINGS_HTML
 
 if TYPE_CHECKING:
     from app.config import Settings
+    from app.services.mqtt_client import MQTTService
     from app.services.weather import WeatherService
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,11 @@ _ALLOWED_PLAYERS = frozenset({"aplay", "mpg123", "mpg321", "omxplayer", "paplay"
 _ALLOWED_TTS_ENGINES = frozenset({"espeak-ng", "none"})
 
 
-def create_settings_router(settings: "Settings", weather_service: "WeatherService") -> APIRouter:
+def create_settings_router(
+    settings: "Settings",
+    weather_service: "WeatherService",
+    mqtt_service: "MQTTService",
+) -> APIRouter:
     router = APIRouter()
 
     @router.get("/settings", response_class=HTMLResponse)
@@ -54,6 +59,9 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         dc = d.get("discord", {})
         webhook = dc.pop("webhook_url", "")
         dc["webhook_set"] = bool(webhook)
+        mq = d.get("mqtt", {})
+        password = mq.pop("password", "")
+        mq["password_set"] = bool(password)
         wu = d.get("webui", {})
         wu.pop("password_hash", None)
         wu.pop("session_secret", None)
@@ -307,6 +315,43 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         ):
             if key in discord_patch:
                 setattr(settings.discord, key, discord_patch[key])
+        return {"ok": True}
+
+    @router.put("/settings/mqtt")
+    async def set_mqtt(body: _MQTTBody):
+        patch = body.model_dump(exclude_none=True)
+        if "broker_host" in patch:
+            broker_host = patch["broker_host"].strip()
+            if not broker_host:
+                raise HTTPException(400, detail="broker_host must not be empty")
+            patch["broker_host"] = broker_host
+        if "broker_port" in patch and not (1 <= patch["broker_port"] <= 65535):
+            raise HTTPException(400, detail="broker_port must be 1..65535")
+        if "client_id" in patch:
+            client_id = patch["client_id"].strip()
+            if not client_id:
+                raise HTTPException(400, detail="client_id must not be empty")
+            patch["client_id"] = client_id
+        if "heartbeat_timeout_sec" in patch and not (10 <= patch["heartbeat_timeout_sec"] <= 3600):
+            raise HTTPException(400, detail="heartbeat_timeout_sec must be 10..3600")
+        if not patch:
+            return {"ok": True}
+
+        try:
+            _save_to_config({"mqtt": patch})
+        except Exception as exc:
+            logger.error("Failed to persist MQTT settings: %s", exc)
+            raise HTTPException(500, detail="Failed to persist settings")
+
+        for k, v in patch.items():
+            setattr(settings.mqtt, k, v)
+        try:
+            mqtt_service.update_config(settings.mqtt)
+        except Exception as exc:
+            # Settings are already persisted and applied in memory — treat a live
+            # reconnect failure as best-effort (surfaced later via hydra_broker_connected
+            # on /state) rather than reporting the whole save as failed.
+            logger.warning("MQTT settings saved but live reconnect failed: %s", exc)
         return {"ok": True}
 
     @router.put("/settings/general")

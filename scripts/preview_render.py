@@ -31,6 +31,12 @@ def _make_state() -> AgentState:
     st.codex_usage_week = 0.73
     st.codex_5h_reset = "16:45"
     st.codex_7d_reset = "5d 0h"
+    st.hydra_current_ml = 1450
+    st.hydra_goal_ml = 2000
+    st.hydra_pct = 0.725
+    st.hydra_updated_at = datetime.now()
+    st.hydra_broker_connected = True
+    st.hydra_device_online = True
 
     # Current weather — 22°C (black, normal range)
     st.weather_current = {

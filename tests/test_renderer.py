@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 
 os.environ.setdefault("RPI_MOCK", "1")
 
@@ -80,6 +81,32 @@ def test_draw_progress_bar_out_of_range_no_exception():
 
 def test_render_with_all_usage_none(settings):
     s = AgentState()
+    img = render_dashboard(s, settings)
+    assert img.size == (800, 480)
+
+
+def test_render_without_hydra_data(settings):
+    img = render_dashboard(AgentState(), settings)
+    assert img.size == (800, 480)
+
+
+def test_render_with_hydra_data(settings):
+    s = AgentState()
+    s.hydra_current_ml = 1450
+    s.hydra_goal_ml = 2000
+    s.hydra_pct = 0.725
+    s.hydra_updated_at = datetime.now()
+    s.hydra_broker_connected = True
+    s.hydra_device_online = True
+    img = render_dashboard(s, settings)
+    assert img.size == (800, 480)
+
+
+def test_render_hydra_device_online_but_no_status_yet(settings):
+    # availability arrived (device_online=True) but status topic never did (current_ml=None)
+    s = AgentState()
+    s.hydra_broker_connected = True
+    s.hydra_device_online = True
     img = render_dashboard(s, settings)
     assert img.size == (800, 480)
 

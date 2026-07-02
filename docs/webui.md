@@ -139,7 +139,7 @@ GET /health
 GET /state
 ```
 
-回傳 `AgentState` 的**部分欄位** JSON 快照，包含感測器讀值、占用狀態、天氣快取與 AI 使用量。
+回傳 `AgentState` 的**部分欄位** JSON 快照，包含感測器讀值、占用狀態、天氣快取、AI 使用量與 HydraCup 喝水資料。
 
 **回應範例：**
 ```json
@@ -164,6 +164,12 @@ GET /state
   "codex_usage_week": 0.25,
   "codex_5h_reset": "21:58",
   "codex_7d_reset": "1d 22h",
+  "hydra_current_ml": 1450,
+  "hydra_goal_ml": 2000,
+  "hydra_pct": 0.725,
+  "hydra_updated_at": "2026-05-29T09:55:00",
+  "hydra_broker_connected": true,
+  "hydra_device_online": true,
   "started_at": "2026-05-29T08:00:00"
 }
 ```
@@ -232,19 +238,20 @@ GET /settings/config
 
 回傳目前生效的設定值。**敏感欄位以遮罩處理，不回傳原始值。**
 
-**回應範例：**
+**回應範例**（混合展示已設定／未設定情境，非預設值；`mqtt` 未設定時預設 `username: ""`、`password_set: false`）：
 ```json
 {
   "weather": {"api_key_set": true, "lat": 25.05, "lon": 121.53, "units": "metric", "fetch_interval_seconds": 600},
   "display": {"model": "epd7in3e", "dashboard_interval_minutes": 5, "full_refresh_every": 10},
   "sensors": {"light": {"bright_threshold": 500}, ...},
   "discord": {"webhook_set": false},
+  "mqtt": {"broker_host": "localhost", "broker_port": 1883, "client_id": "epaper-home-display", "username": "epaper-home-display", "password_set": true, "heartbeat_timeout_sec": 180},
   "webui": {"host": "0.0.0.0", "port": 8000},
   "timezone": "Asia/Taipei"
 }
 ```
 
-> **遮罩規則**：`weather.api_key` 替換為 `api_key_set`（boolean）；`discord.webhook_url` 替換為 `webhook_set`（boolean）；`webui.password_hash` 與 `webui.session_secret` 直接移除，不出現於回應中。
+> **遮罩規則**：`weather.api_key` 替換為 `api_key_set`（boolean）；`discord.webhook_url` 替換為 `webhook_set`（boolean）；`mqtt.password` 替換為 `password_set`（boolean）；`webui.password_hash` 與 `webui.session_secret` 直接移除，不出現於回應中。
 
 ---
 
@@ -404,6 +411,35 @@ Content-Type: application/json
 ```
 
 所有欄位均可選，僅更新提供的欄位。`discord_webhook_url` 設為空字串 `""` 可停用 Discord 通知。
+
+---
+
+### 更新 HydraCup MQTT 設定
+
+```
+PUT /settings/mqtt
+Content-Type: application/json
+
+{
+  "broker_host": "localhost",
+  "broker_port": 1883,
+  "client_id": "epaper-home-display",
+  "username": "epaper-home-display",
+  "password": "your-password",
+  "heartbeat_timeout_sec": 180
+}
+```
+
+| 欄位 | 類型 | 範圍 | 說明 |
+|------|------|------|------|
+| `broker_host` | string | 非空字串 | Mosquitto broker 位址 |
+| `broker_port` | int | 1–65535 | Broker port |
+| `client_id` | string | 非空字串 | MQTT client ID |
+| `username` | string | 無限制 | Broker 登入帳號；**允許設為空字串**（代表匿名連線嘗試，沿用 `MQTTService` 既有邏輯，API 層不強制非空）|
+| `password` | string | 無限制 | Broker 登入密碼；**留空（不提供此欄位）= 不變更既有密碼**，比照 `weather.api_key`／`discord.webhook_url` 的既有模式。與這兩者一致，API 層本身不阻止顯式傳入空字串來清空密碼——保護僅存在於 WebUI 前端（密碼欄位留白就不會加進請求體）|
+| `heartbeat_timeout_sec` | int | 10–3600 | 過期判斷秒數 |
+
+所有欄位均可選，僅更新提供的欄位。**儲存後會立即讓執行中的 `MQTTService` 用新設定斷線重連**（不需重啟服務），行為與其他大部分 `PUT /settings/*` 端點「儲存即生效」一致。若即時重連失敗（例如帳密錯誤），端點仍回傳 `{"ok": true}`（設定已正確持久化），連線是否成功由 `GET /state` 的 `hydra_broker_connected` 反映。
 
 ---
 

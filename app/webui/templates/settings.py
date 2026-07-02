@@ -252,6 +252,53 @@ _SETTINGS_CONTENT = r"""
     </div>
   </div>
 
+  <div class="acc-item" id="acc-mqtt">
+    <div class="acc-head" onclick="toggle('mqtt')">
+      <span class="acc-ic">📡</span>HydraCup MQTT 設定
+      <span class="acc-chev">▾</span>
+    </div>
+    <div class="acc-body">
+      <div class="card" id="mqtt-status-card">
+        <div class="info">
+          <div class="ik">Broker 連線</div><div class="iv" id="mq-st-broker">—</div>
+          <div class="ik">HydraCup 裝置</div><div class="iv" id="mq-st-device">—</div>
+          <div class="ik">最後更新</div><div class="iv" id="mq-st-updated">—</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row2">
+          <div class="f">
+            <label>Broker Host</label>
+            <input type="text" id="mq-host" placeholder="localhost">
+          </div>
+          <div class="f">
+            <label>Broker Port</label>
+            <input type="number" id="mq-port" min="1" max="65535">
+          </div>
+        </div>
+        <div class="f">
+          <label>Client ID</label>
+          <input type="text" id="mq-cid" placeholder="epaper-home-display">
+        </div>
+        <div class="row2">
+          <div class="f">
+            <label>Username</label>
+            <input type="text" id="mq-user" placeholder="">
+          </div>
+          <div class="f">
+            <label>Password</label>
+            <input type="password" id="mq-pass" placeholder="重新輸入以更新">
+          </div>
+        </div>
+        <div class="f">
+          <label>心跳逾時秒數 <span class="hint">距離上次收到 HydraCup 資料超過此秒數視為過期</span></label>
+          <input type="number" id="mq-heartbeat" min="10" max="3600">
+        </div>
+        <div class="btn-row"><button class="btn-p" onclick="saveMqtt()">儲存</button></div>
+      </div>
+    </div>
+  </div>
+
   <div class="acc-item" id="acc-general">
     <div class="acc-head" onclick="toggle('general')">
       <span class="acc-ic">⚙️</span>一般設定
@@ -352,6 +399,7 @@ function toggle(name){
       else setTimeout(function(){lmap.invalidateSize();},50);
     }
     if(name==='wifi') loadWifi();
+    if(name==='mqtt') loadMqttStatus();
     if(name==='presence') startLightPoll();
   }
 }
@@ -474,6 +522,13 @@ async function loadCfg(){
     document.getElementById('n-min').value=dc.session_end_min_minutes??5;
     document.getElementById('n-daily').checked=dc.notify_daily_summary!==false;
     document.getElementById('n-time').value=dc.daily_summary_time||'23:00';
+    var mq=c.mqtt||{};
+    document.getElementById('mq-host').value=mq.broker_host||'localhost';
+    document.getElementById('mq-port').value=mq.broker_port??1883;
+    document.getElementById('mq-cid').value=mq.client_id||'epaper-home-display';
+    document.getElementById('mq-user').value=mq.username||'';
+    document.getElementById('mq-pass').placeholder=mq.password_set?'已設定，重新輸入以更新':'重新輸入以更新';
+    document.getElementById('mq-heartbeat').value=mq.heartbeat_timeout_sec??180;
     document.getElementById('g-tz').value=c.timezone||'Asia/Taipei';
   }catch(e){console.error('loadCfg',e)}
 }
@@ -493,6 +548,21 @@ async function loadWifi(){
     card.innerHTML='<div class="info">'+rows+'</div>';
   }catch(e){
     card.innerHTML='<div style="color:var(--muted);font-size:.85rem">無法取得 WiFi 資訊</div>';
+  }
+}
+
+async function loadMqttStatus(){
+  try{
+    var r=await fetch('/state');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    var d=await r.json();
+    document.getElementById('mq-st-broker').textContent=d.hydra_broker_connected?'已連線':'未連線';
+    document.getElementById('mq-st-device').textContent=d.hydra_device_online?'上線':'離線';
+    document.getElementById('mq-st-updated').textContent=d.hydra_updated_at||'—';
+  }catch(e){
+    document.getElementById('mq-st-broker').textContent='無法取得';
+    document.getElementById('mq-st-device').textContent='無法取得';
+    document.getElementById('mq-st-updated').textContent='無法取得';
   }
 }
 
@@ -604,6 +674,24 @@ async function saveNotif(){
     toast('✓ 通知設定已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
+async function saveMqtt(){
+  try{
+    var body={
+      broker_host:document.getElementById('mq-host').value.trim(),
+      broker_port:+document.getElementById('mq-port').value,
+      client_id:document.getElementById('mq-cid').value.trim(),
+      username:document.getElementById('mq-user').value,
+      heartbeat_timeout_sec:+document.getElementById('mq-heartbeat').value
+    };
+    var pass=document.getElementById('mq-pass').value;
+    if(pass!=='') body.password=pass;
+    await put('/settings/mqtt',body);
+    document.getElementById('mq-pass').value='';
+    document.getElementById('mq-pass').placeholder='已設定，重新輸入以更新';
+    await loadMqttStatus();
+    toast('HydraCup MQTT 設定已儲存',true);
+  }catch(e){toast('儲存失敗：'+e.message,false);}
+}
 async function saveGeneral(){
   try{
     await put('/settings/general',{timezone:document.getElementById('g-tz').value.trim()});
@@ -627,6 +715,7 @@ async function saveAuth(){
 }
 
 loadCfg();
+loadMqttStatus();
 initMap();
 </script>
 """

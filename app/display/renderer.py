@@ -11,6 +11,7 @@ from app.display.renderer_cards import (
     _draw_card_image,
     _draw_card_indoor,
     _draw_card_usage,
+    _draw_card_hydra,
 )
 
 # Re-export symbols referenced directly by tests
@@ -34,5 +35,6 @@ def render_dashboard(
     _draw_card_image(img, draw, state)
     _draw_card_indoor(draw, state, color=color)
     _draw_card_usage(draw, state, color=color)
+    _draw_card_hydra(draw, state, settings, color=color)
 
     return img

@@ -37,6 +37,12 @@ def create_read_only_router() -> APIRouter:
             "codex_usage_week": state.codex_usage_week,
             "codex_5h_reset": state.codex_5h_reset,
             "codex_7d_reset": state.codex_7d_reset,
+            "hydra_current_ml": state.hydra_current_ml,
+            "hydra_goal_ml": state.hydra_goal_ml,
+            "hydra_pct": state.hydra_pct,
+            "hydra_updated_at": state.hydra_updated_at.isoformat() if state.hydra_updated_at else None,
+            "hydra_broker_connected": state.hydra_broker_connected,
+            "hydra_device_online": state.hydra_device_online,
         })
 
     @router.get("/logs/env")

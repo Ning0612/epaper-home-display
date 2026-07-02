@@ -53,6 +53,15 @@ class _NotificationsBody(BaseModel):
     daily_summary_time: str | None = None
 
 
+class _MQTTBody(BaseModel):
+    broker_host: str | None = None
+    broker_port: int | None = None
+    client_id: str | None = None
+    username: str | None = None
+    password: str | None = None
+    heartbeat_timeout_sec: int | None = None
+
+
 class _GeneralBody(BaseModel):
     timezone: str | None = None
 

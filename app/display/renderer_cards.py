@@ -12,6 +12,7 @@ from app.display.renderer_constants import (
     IMAGE_X, IMAGE_Y, IMAGE_W, IMAGE_H,
     INDOOR_X, INDOOR_Y, INDOOR_W, INDOOR_H,
     USAGE_X, USAGE_Y, USAGE_W, USAGE_H,
+    HYDRA_X, HYDRA_Y, HYDRA_W, HYDRA_H,
     _WX_TOP_H, _WEEKDAYS,
 )
 from app.display.renderer_utils import (
@@ -20,9 +21,12 @@ from app.display.renderer_utils import (
 )
 
 if TYPE_CHECKING:
+    from app.config import Settings
     from app.state import AgentState
 
 logger = logging.getLogger(__name__)
+
+_STALE_FILL = (160, 160, 160)
 
 
 def _draw_card_weather(
@@ -242,3 +246,43 @@ def _draw_card_usage(draw: ImageDraw.ImageDraw, state: "AgentState", *, color: b
     _cx_text(draw, "Codex", ix, iw, sep_y + 3, _font(13, bold=True))
     _draw_usage_row(draw, ix, sep_y + 19, "5h", state.codex_usage_5h, state.codex_5h_reset, iw, _max_rw, color=color)
     _draw_usage_row(draw, ix, sep_y + 35, "7d", state.codex_usage_week, state.codex_7d_reset, iw, _max_rw, color=color)
+
+
+def _draw_card_hydra(
+    draw: ImageDraw.ImageDraw,
+    state: "AgentState",
+    settings: "Settings",
+    *,
+    color: bool = True,
+) -> None:
+    draw.rectangle(
+        [(HYDRA_X, HYDRA_Y), (HYDRA_X + HYDRA_W - 1, HYDRA_Y + HYDRA_H - 1)],
+        outline=FG, width=1,
+    )
+    ix, iy = HYDRA_X + PAD, HYDRA_Y + PAD
+    iw = HYDRA_W - 2 * PAD
+    ih = HYDRA_H - 2 * PAD
+
+    updated_at = state.hydra_updated_at
+    is_stale = False
+    if updated_at is not None:
+        now = datetime.now(updated_at.tzinfo) if updated_at.tzinfo is not None else datetime.now()
+        is_stale = (now - updated_at).total_seconds() > settings.mqtt.heartbeat_timeout_sec
+    muted = is_stale or not state.hydra_device_online or state.hydra_current_ml is None
+    fill = _STALE_FILL if muted else FG
+    bar_fill = _STALE_FILL if muted else (0, 0, 255) if color else FG
+
+    if state.hydra_current_ml is None or state.hydra_goal_ml is None:
+        amount_str = "--/--ml"
+    else:
+        amount_str = f"{state.hydra_current_ml}/{state.hydra_goal_ml}ml"
+    pct = state.hydra_pct
+    pct_str = "--%" if pct is None else f"{max(0, min(100, int(round(pct * 100))))}%"
+
+    content_h = 14 + 5 + 16 + 5 + 20 + 7 + 12
+    sy = iy + max(0, (ih - content_h) // 2)
+
+    _cx_text(draw, "Water", ix, iw, sy, _font(14, bold=True), fill=fill)
+    _cx_text(draw, amount_str, ix, iw, sy + 19, _font(16, bold=True), fill=fill)
+    _cx_text(draw, pct_str, ix, iw, sy + 40, _font(20, bold=True), fill=fill)
+    _draw_progress_bar(draw, ix + 4, sy + 67, iw - 8, 12, pct or 0.0, fill=bar_fill)

@@ -163,6 +163,16 @@ class CodexUsageConfig:
 
 
 @dataclass
+class MQTTConfig:
+    broker_host: str = "localhost"
+    broker_port: int = 1883
+    client_id: str = "epaper-home-display"
+    username: str = ""
+    password: str = ""
+    heartbeat_timeout_sec: int = 180
+
+
+@dataclass
 class Settings:
     weather: WeatherConfig = field(default_factory=WeatherConfig)
     sensors: SensorsConfig = field(default_factory=SensorsConfig)
@@ -175,6 +185,7 @@ class Settings:
     wifi: WifiConfig = field(default_factory=WifiConfig)
     claude_usage: ClaudeUsageConfig = field(default_factory=ClaudeUsageConfig)
     codex_usage: CodexUsageConfig = field(default_factory=CodexUsageConfig)
+    mqtt: MQTTConfig = field(default_factory=MQTTConfig)
     timezone: str = "Asia/Taipei"
 
 
