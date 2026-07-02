@@ -18,7 +18,6 @@ from app.webui.routes.environment import create_environment_router
 from app.webui.routes.images import create_images_router
 from app.webui.routes.read_only import create_read_only_router
 from app.webui.routes.settings import create_settings_router
-from app.webui.routes.mqtt import create_mqtt_router
 from app.webui.routes.wifi import create_wifi_router
 
 if TYPE_CHECKING:
@@ -46,12 +45,11 @@ def create_app(
     )
 
     app.include_router(create_auth_router(settings))
-    app.include_router(create_read_only_router(settings))
+    app.include_router(create_read_only_router())
     app.include_router(create_settings_router(settings, weather_service))
     app.include_router(create_desk_router(settings))
     app.include_router(create_environment_router(settings))
     app.include_router(create_images_router(settings, display_queue))
-    app.include_router(create_mqtt_router(settings))
     app.include_router(create_wifi_router(settings))
 
     @app.get("/")

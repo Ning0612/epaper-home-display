@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 
 @dataclass
@@ -21,21 +21,6 @@ class AgentState:
     weather_forecast: list[dict] = field(default_factory=list)
     weather_fetched_at: datetime | None = None
 
-    last_door_event: dict | None = None
-    last_face_event: dict | None = None
-    last_face_event_at: datetime | None = None
-    last_alert: dict | None = None
-    last_alert_received_at: datetime | None = None
-    last_alarm_decision: str | None = None
-    alert_face_event: dict | None = None
-    security_status: dict | None = None
-    alert_wake_event: Any = None  # asyncio.Event; set by mqtt_client when alert accepted
-
-    mqtt_connected: bool = False
-    mqtt_last_rx_by_topic: dict = field(default_factory=dict)
-    mqtt_rx_log: list = field(default_factory=list)  # newest first, max 50
-    mqtt_tx_log: list = field(default_factory=list)  # newest first, max 20
-
     display_busy: bool = False
     active_reminder: str | None = None
 
@@ -53,13 +38,7 @@ class AgentState:
     codex_5h_reset: str | None = None
     codex_7d_reset: str | None = None
 
-    display_page: Literal["dashboard", "alert", "ap_mode"] = "dashboard"
-    last_snapshot_image: Any = None          # PIL Image | None — used by e-paper renderer
-    last_camera_frame_bytes: bytes | None = None  # raw JPEG — served directly to WebUI
-    last_camera_frame_at: datetime | None = None
-    alert_page_started_at: datetime | None = None
-    alert_last_triggered_at: datetime | None = None
-    alert_dismissed_at: datetime | None = None
+    display_page: Literal["dashboard", "ap_mode"] = "dashboard"
 
     wifi_mode: Literal["client", "ap", "unknown"] = "unknown"
     ap_ssid: str = ""

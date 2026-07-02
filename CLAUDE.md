@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ePaper Home Display** running on Raspberry Pi Zero 2W with a Waveshare 7.3" e-Paper display (epd7in3e, 7-color ACeP), DHT22 sensor, light sensor, button, and buzzer/USB speaker.
 
-Operates independently from Agent 1 and communicates via MQTT.
+Originally a course final project that integrated with a separate agent ("Agent 1") over MQTT for doorbell/face-recognition security alerts. That integration has been removed from `main` — the historical final-project state is preserved on the `archive/final-project` branch. `main` now only covers standalone functionality (local sensors, e-Paper, weather, WebUI, image carousel, Claude/Codex usage display).
 
 ---
 
@@ -85,7 +85,6 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scr
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_light'
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_button'
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_speaker'
-ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_mqtt'
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_weather'
 ```
 
@@ -111,11 +110,6 @@ Hardware access is strictly separated from business logic:
 DHT22/light → app/sensors/ → app/state.py → app/display/renderer.py → epaper.py → hardware
 ```
 
-**MQTT In → Logic → MQTT Out:**
-```
-Agent1 publishes home/security/* → app/services/mqtt_client.py → app/logic/ → publish home/home_state/*
-```
-
 **Presence Score (app/logic/presence.py):**
 ```
 light_raw < bright_threshold → OCCUPIED  (score = 1.0)
@@ -124,22 +118,15 @@ light_raw ≥ bright_threshold → UNOCCUPIED (score = 0.0)
 
 ### e-Paper Update Timing
 
-The display is slow — never block MQTT callbacks or WebUI handlers for it:
+The display is slow — never block WebUI handlers for it:
 
 - Normal dashboard: wall-clock aligned to `dashboard_interval_minutes` boundaries (default every 5 min). Trigger second is auto-derived per model: `epd7in3e`→40 (full refresh ~20s), `epd7in5_V2`→57 (fast refresh ~0.3s). Not user-configurable.
 - Weather/environment: every 10 minutes
-- Security alert: immediately via display_queue; MQTT camera frames only update `state.last_snapshot_image` (no display_queue enqueue — alert page renders on wall-clock schedule and picks up the latest snapshot)
 - Refresh cadence: every `full_refresh_every` (default 10) successful writes is a full refresh (init, clears ghosting); others use init_fast (partial). Note: `epd7in3e` has no init_fast — every write is a full refresh.
 
-### MQTT Topics
+### Buttons
 
-Subscribes to (JSON, QoS 1): `home/security/door`, `home/security/face`, `home/security/alert`, `home/security/status`
-
-Subscribes to (raw binary, QoS 0): `home/security/camera` (JPEG frames, max 1 MB — NOT JSON, NOT logged to mqtt_rx_log)
-
-Publishes to: `home/home_state/presence`, `home/home_state/alarm_decision`, `home/home_state/alarm_command`, `home/display/status`
-
-All JSON payloads must include `agent` and `timestamp` fields. `home/home_state/alarm_command` is published by Button 3 (TRIGGER_ALARM) and Button 4 (CANCEL_ALARM) via payload key `alarm_decision`.
+GPIO wiring still has 4 physical buttons (`sensors.button.gpio_pins`, at least 4 entries required), but only Button 1 (GPIO 5) is bound to a handler (`_handle_btn_dashboard`: force OCCUPIED + switch to dashboard). Buttons 2–4 are reserved pins left over from the retired Agent 1 integration — no callback is registered for them.
 
 ### Mock Pattern for Local Testing
 
@@ -163,8 +150,8 @@ Run after every display-related edit:
 ./.venv/Scripts/python.exe -m scripts.preview_render
 ```
 
-Saves `preview_dashboard.png`, `preview_alert.png`, `preview_apmode.png` in `docs/images/`.
-Mock data includes: indoor sensors, Claude/Codex usage with reset times, current weather + 4-day forecast, Agent1 events.
+Saves `preview_dashboard.png`, `preview_apmode.png` in `docs/images/`.
+Mock data includes: indoor sensors, Claude/Codex usage with reset times, current weather + 4-day forecast.
 To adjust mock data, edit `scripts/preview_render.py`.
 
 Open and visually inspect the saved PNGs. Check: layout intact, text readable, no clipped elements, correct image mode (RGB). Do not skip this step even for small tweaks.
@@ -175,7 +162,6 @@ Open and visually inspect the saved PNGs. Check: layout intact, text readable, n
 
 - **Runtime**: Python 3, systemd service, SQLite, `.venv` virtual environment
 - **Web**: FastAPI (WebUI only)
-- **MQTT**: paho-mqtt
 - **Display**: Pillow (image rendering) + Waveshare Python driver (SPI transport)
 - **Tests**: pytest with mocked hardware
 
@@ -188,7 +174,6 @@ Do not use: desktop GUI frameworks, browser automation, anything requiring a mon
 Read all runtime values from config file or environment variables. Never hard-code:
 
 ```
-mqtt_broker_host / mqtt_broker_port
 openweathermap_api_key
 discord_webhook_url
 timezone
@@ -233,9 +218,8 @@ Do not add features until the service starts cleanly after each deploy.
 4. Light sensor produces usable state
 5. Button input works
 6. Weather API returns data
-7. MQTT pub/sub works with Agent 1
-8. Presence score logic correct
-9. e-Paper dashboard renders all data
-10. WebUI shows current state
-11. SQLite logs all event types
-12. systemd starts epaper-home-display on boot
+7. Presence score logic correct
+8. e-Paper dashboard renders all data
+9. WebUI shows current state
+10. SQLite logs all event types
+11. systemd starts epaper-home-display on boot

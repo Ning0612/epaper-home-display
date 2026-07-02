@@ -99,7 +99,7 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/pip install a
 
 # 4. 複製設定檔並填入金鑰與 IP
 ssh pi@epaper-display.local 'cp ~/epaper-home-display/config.example.yaml ~/epaper-home-display/config.yaml'
-# 接著編輯 config.yaml，填入 mqtt.broker_host、weather.api_key 等
+# 接著編輯 config.yaml，填入 weather.api_key 等
 
 # 5. 跑單元測試確認邏輯層正常
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m pytest --tb=short'
@@ -173,9 +173,6 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scr
 # 喇叭 / USB 音箱
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_speaker'
 
-# MQTT 連線
-ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_mqtt'
-
 # 天氣 API
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_weather'
 ```
@@ -232,7 +229,6 @@ ssh pi@epaper-display.local 'journalctl -t epaper-auto-update -n 50 --no-pager'
 | 服務無法啟動 | `journalctl -u epaper-home-display -n 50` 看錯誤訊息 |
 | 硬體測試失敗 | 確認接線，再確認 `.venv/bin/pip install -r requirements.txt` 有跑過 |
 | 單元測試匯入 GPIO 錯誤 | 檢查 `tests/conftest.py` 的 mock 是否正確覆蓋硬體模組 |
-| MQTT 無法連線 | 確認 `config.yaml` 的 `mqtt.broker_host` 設定正確 |
 | `Failed to add edge detection` | Pi OS Trixie/Bookworm 需要 lgpio，執行下方修復步驟 |
 
 ### Pi OS Trixie / Bookworm：lgpio 修復

@@ -138,10 +138,6 @@ _SHELL = r"""<!DOCTYPE html>
         <span class="nav-ic">🌡️</span>
         <span class="nav-lbl">溫溼度分析</span>
       </a>
-      <a href="/mqtt" class="nav-a__MQTT_A__" title="MQTT 監控">
-        <span class="nav-ic">📡</span>
-        <span class="nav-lbl">MQTT 監控</span>
-      </a>
       <div class="sb-section">管理</div>
       <a href="/images" class="nav-a__IMAGES_A__" title="圖片輪播">
         <span class="nav-ic">🖼️</span>
@@ -199,7 +195,6 @@ function closeSidebar(){
 def _make_shell(page_id: str, title: str, content: str, extra_head: str = "") -> str:
     desk_a     = " active" if page_id == "desk"        else ""
     env_a      = " active" if page_id == "environment" else ""
-    mqtt_a     = " active" if page_id == "mqtt"        else ""
     images_a   = " active" if page_id == "images"      else ""
     settings_a = " active" if page_id == "settings"    else ""
     return (
@@ -209,7 +204,6 @@ def _make_shell(page_id: str, title: str, content: str, extra_head: str = "") ->
         .replace("__CONTENT__", content)
         .replace("__DESK_A__", desk_a)
         .replace("__ENV_A__", env_a)
-        .replace("__MQTT_A__", mqtt_a)
         .replace("__IMAGES_A__", images_a)
         .replace("__SETTINGS_A__", settings_a)
     )

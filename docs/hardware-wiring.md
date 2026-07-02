@@ -14,7 +14,7 @@
        DHT22  7 ● ○  8
          GND  9 ○ ○  10
               11 ○ ○  12  ← Pin 11 = GPIO 17（電子紙 RST，勿用）
-  B3 (GPIO 27) 13 ● ○  14 GND  ← B3 重新觸發告警
+  B3 (GPIO 27) 13 ● ○  14 GND  ← B3 保留接腳（未綁定功能）
   B4 (GPIO 22) 15 ● ○  16
               17 ○ ○  18  ← 電子紙 BUSY (GPIO 24)
               19     ← SPI MOSI  (GPIO 10)
@@ -27,7 +27,7 @@
               26     ← SPI CE1   (GPIO  7) ← MCP3008 CS
               ...
   B1 (GPIO  5) 29 ●  ← B1 強制 OCCUPIED + 切 Dashboard
-  B2 (GPIO  6) 31 ●  ← B2 切換至 Alert 頁面
+  B2 (GPIO  6) 31 ●  ← B2 保留接腳（未綁定功能）
 ```
 
 ---
@@ -169,16 +169,16 @@ MCP3008 是 10-bit SPI ADC，將類比光敏電阻訊號轉為數位值。
 
 ---
 
-## 4. 按鈕（4 個）
+## 4. 按鈕（4 個接腳，1 個作用中）
 
-系統使用 4 個獨立按鈕，每個按鈕對應一個 GPIO（gpiozero，內建上拉）。按下時讀 LOW，不需外部電阻。
+硬體接線維持 4 個獨立按鈕，每個按鈕對應一個 GPIO（gpiozero，內建上拉）。按下時讀 LOW，不需外部電阻。目前軟體僅處理 B1，B2–B4 接腳保留但未綁定任何 callback（曾用於已移除的 Agent 1／告警整合功能）。
 
 | 按鈕 | GPIO (BCM) | Pi 腳位 | 功能 |
 |------|-----------|---------|------|
 | B1 | GPIO 5 | Pin 29 | 強制切換為 OCCUPIED + 切回 Dashboard |
-| B2 | GPIO 6 | Pin 31 | 切換至 Alert 頁面 |
-| B3 | GPIO 27 | Pin 13 | 重新觸發告警（MQTT publish + 播放 alert.wav；**僅在 Alert 頁面時有效**）|
-| B4 | GPIO 22 | Pin 15 | 取消告警（MQTT publish CANCEL_ALARM；**僅在 Alert 頁面時有效**）|
+| B2 | GPIO 6 | Pin 31 | 保留接腳，未綁定功能 |
+| B3 | GPIO 27 | Pin 13 | 保留接腳，未綁定功能 |
+| B4 | GPIO 22 | Pin 15 | 保留接腳，未綁定功能 |
 
 **共用接線**：每個按鈕一端接對應 GPIO，另一端接 GND（任意 GND 腳位均可）。
 

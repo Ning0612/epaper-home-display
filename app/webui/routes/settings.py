@@ -15,7 +15,7 @@ from starlette.requests import Request
 from app.webui.config_helpers import _save_to_config
 from app.services.voice import VoiceService as _VoiceService
 from app.webui.models import (
-    _LocationBody, _WeatherBody, _MQTTBody, _DisplayBody,
+    _LocationBody, _WeatherBody, _DisplayBody,
     _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _GeneralBody, _AuthBody,
 )
 from app.webui.routes.auth import _pwd_ctx, _pw_version
@@ -57,9 +57,6 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         wu = d.get("webui", {})
         wu.pop("password_hash", None)
         wu.pop("session_secret", None)
-        m = d.get("mqtt", {})
-        mqtt_pw = m.pop("password", "")
-        m["password_set"] = bool(mqtt_pw)
         return JSONResponse(d)
 
     @router.get("/settings/wifi")
@@ -135,30 +132,6 @@ def create_settings_router(settings: "Settings", weather_service: "WeatherServic
         for k, v in patch.items():
             setattr(settings.weather, k, v)
         return {"ok": True}
-
-    @router.put("/settings/mqtt")
-    async def set_mqtt(body: _MQTTBody):
-        patch = body.model_dump(exclude_none=True)
-        if "broker_host" in patch and not patch["broker_host"].strip():
-            raise HTTPException(400, detail="broker_host must not be empty")
-        if "broker_port" in patch and not (1 <= patch["broker_port"] <= 65535):
-            raise HTTPException(400, detail="broker_port must be 1–65535")
-        if "username" in patch:
-            patch["username"] = patch["username"].strip()
-            if not patch["username"]:
-                patch["password"] = ""
-        if not patch:
-            return {"ok": True}
-
-        try:
-            _save_to_config({"mqtt": patch})
-        except Exception as exc:
-            logger.error("Failed to persist MQTT settings: %s", exc)
-            raise HTTPException(500, detail="Failed to persist settings")
-
-        for k, v in patch.items():
-            setattr(settings.mqtt, k, v)
-        return {"ok": True, "restart_required": True}
 
     _ALLOWED_DISPLAY_MODELS = frozenset({"epd7in3e", "epd7in5_V2", "mock"})
 

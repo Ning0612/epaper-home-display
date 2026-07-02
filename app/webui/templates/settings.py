@@ -74,43 +74,6 @@ _SETTINGS_CONTENT = r"""
     </div>
   </div>
 
-  <div class="acc-item" id="acc-mqtt">
-    <div class="acc-head" onclick="toggle('mqtt')">
-      <span class="acc-ic">🔗</span>MQTT 設定
-      <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
-      <div class="card">
-        <div class="f">
-          <label>Broker Host</label>
-          <input type="text" id="m-host" placeholder="192.168.1.100">
-        </div>
-        <div class="row2">
-          <div class="f">
-            <label>Port <span class="hint">（1–65535）</span></label>
-            <input type="number" id="m-port" min="1" max="65535">
-          </div>
-          <div class="f">
-            <label>Client ID</label>
-            <input type="text" id="m-client" placeholder="epaper-home-display">
-          </div>
-        </div>
-        <hr>
-        <div class="row2">
-          <div class="f">
-            <label>使用者名稱 <span class="hint">（無驗證可留空）</span></label>
-            <input type="text" id="m-user" placeholder="mqttuser">
-          </div>
-          <div class="f">
-            <label>密碼</label>
-            <input type="password" id="m-pass" placeholder="輸入密碼">
-          </div>
-        </div>
-        <div class="btn-row"><button class="btn-p" onclick="saveMQTT()">儲存</button></div>
-      </div>
-    </div>
-  </div>
-
   <div class="acc-item" id="acc-display">
     <div class="acc-head" onclick="toggle('display')">
       <span class="acc-ic">🖥️</span>顯示器設定
@@ -485,12 +448,6 @@ async function loadCfg(){
       document.getElementById('v-lon').textContent=mapLon;
       if(lmap && lmk){lmap.setView([mapLat,mapLon]);lmk.setLatLng([mapLat,mapLon]);}
     }
-    var m=c.mqtt||{};
-    document.getElementById('m-host').value=m.broker_host||'';
-    document.getElementById('m-port').value=m.broker_port??1883;
-    document.getElementById('m-client').value=m.client_id||'';
-    document.getElementById('m-user').value=m.username||'';
-    document.getElementById('m-pass').placeholder=m.password_set?'（已設定，重新輸入以更新）':'輸入密碼';
     var d=c.display||{};
     document.getElementById('d-model').value=d.model||'epd7in3e';
     document.getElementById('d-interval').value=String(d.dashboard_interval_minutes??5);
@@ -561,24 +518,6 @@ async function saveWeather(){
     document.getElementById('w-key').value='';
     document.getElementById('w-key').placeholder='（已設定，重新輸入以更新）';
     toast('✓ 天氣設定已儲存',true);
-  }catch(e){toast('儲存失敗：'+e.message,false);}
-}
-async function saveMQTT(){
-  try{
-    var body={
-      broker_host:document.getElementById('m-host').value.trim(),
-      broker_port:+document.getElementById('m-port').value,
-      client_id:document.getElementById('m-client').value.trim(),
-      username:document.getElementById('m-user').value.trim()
-    };
-    var pw=document.getElementById('m-pass').value;
-    if(pw) body.password=pw;
-    await put('/settings/mqtt',body);
-    if(pw){
-      document.getElementById('m-pass').value='';
-      document.getElementById('m-pass').placeholder='（已設定，重新輸入以更新）';
-    }
-    toast('✓ MQTT 已儲存（需重啟服務生效）',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
 async function saveDisplay(){

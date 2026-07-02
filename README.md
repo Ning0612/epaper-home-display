@@ -3,13 +3,12 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Raspberry Pi](https://img.shields.io/badge/Raspberry_Pi-Zero_2W-C51A4A?style=flat-square&logo=raspberry-pi&logoColor=white)](https://www.raspberrypi.com/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![MQTT](https://img.shields.io/badge/MQTT-Paho_2.1%2B-3C5280?style=flat-square&logo=eclipse-mosquitto&logoColor=white)](https://www.eclipse.org/paho/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL_mode-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Pillow](https://img.shields.io/badge/Pillow-10.4%2B-FFD43B?style=flat-square&logo=python&logoColor=black)](https://python-pillow.org/)
 [![asyncio](https://img.shields.io/badge/asyncio-9_coroutines-4B8BBE?style=flat-square&logo=python&logoColor=white)](https://docs.python.org/3/library/asyncio.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 七色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測、安全偵測與天氣資訊，並與 Agent 1 透過 MQTT 協同工作。
+以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 七色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測與天氣資訊，並顯示 Claude / Codex AI 使用量與自訂圖片輪播。
 
 ## 畫面預覽
 
@@ -17,13 +16,7 @@
 
 ![儀表板預覽](docs/images/preview_dashboard.png)
 
-主畫面，每分鐘自動更新。左側顯示日期時間、天氣（即時 + 4 天預報）；右下角為室內溫濕度、Agent 1 安全狀態、Claude / Codex AI 使用量進度條（附重置時間）；右側為圖片輪播區。
-
-### 安全告警（Alert）
-
-![告警頁預覽](docs/images/preview_alert.png)
-
-收到 `home/security/alert` 時立即切換至此頁面，顯示攝影機快照（優先使用 MQTT camera feed；若無新鮮畫面且有設定 `snapshot_url` 則以 HTTP 備援）、門狀態、最後辨識人臉與告警訊息。超過 `alert_page_timeout_sec`（預設 120 秒）後自動返回儀表板。
+主畫面，每分鐘自動更新。左側顯示日期時間、天氣（即時 + 4 天預報）；右下角為室內溫濕度＋在場狀態（HOME/AWAY）、Claude / Codex AI 使用量進度條（附重置時間）；右側為圖片輪播區。
 
 ### WiFi 設定模式（AP Mode）
 
@@ -40,14 +33,13 @@ Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並�
 - **天氣面板**：即時天氣 + 5 天預報（OpenWeatherMap），含天氣圖示與溫度
 - **室內環境**：DHT22 溫濕度 + 光線感測器（MCP3008 ADC）
 - **家庭占用偵測**：純光線感測，燈亮 → OCCUPIED，燈暗 → UNOCCUPIED
-- **安全整合**：接收 Agent 1 的門鈴、人臉、告警 MQTT 事件，輸出 TRIGGER_ALARM / NO_ACTION / CANCEL_ALARM 決策
 - **AI 使用量顯示**：直接透過 OAuth 向 Anthropic 與 OpenAI API 輪詢 Claude / Codex 5h 及 7d 使用量，顯示於 e-Paper 面板底部
 - **圖片輪播**：上傳自訂圖片，支援裁切、旋轉、翻轉、Floyd-Steinberg dithering，顯示於 e-Paper 面板
 - **桌面工作時段**：自動追蹤在場時段、記錄每日統計、離場時推送 Discord 摘要
-- **WebUI 設定介面**：密碼保護的瀏覽器設定介面，支援互動地圖選點、MQTT 設定、圖片管理
+- **WebUI 設定介面**：密碼保護的瀏覽器設定介面，支援互動地圖選點、圖片管理
 - **Discord 通知**：裝置上線、桌面時段結束、每日統計推送
-- **音效提醒**：天氣提醒播報（aplay + USB 音箱）
-- **事件日誌**：SQLite 記錄環境、門、人臉、告警、圖片、工作時段、通知等事件（AI 使用量僅快取於記憶體，不持久化）
+- **音效播放**：aplay + USB 音箱（目前為 dormant，僅供 WebUI 手動測試，未被任何自動事件觸發）
+- **事件日誌**：SQLite 記錄環境、圖片、工作時段、通知等事件（AI 使用量僅快取於記憶體，不持久化）
 
 ---
 
@@ -59,7 +51,7 @@ Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並�
 | 顯示器 | Waveshare 7.3" e-Paper (E) | 800×480，七色（黑、白、紅、黃、藍、綠、橙）|
 | 溫濕度感測器 | DHT22 | GPIO 4（BCM） |
 | 光線感測器 | 光敏電阻 + MCP3008 ADC | SPI CE1（GPIO 7） |
-| 按鈕（×4）| 任意常開按鈕 | GPIO 5（B1）/ 6（B2）/ 27（B3）/ 22（B4）|
+| 按鈕（×4，1 個作用中）| 任意常開按鈕 | GPIO 5（B1，作用中）/ 6（B2）/ 27（B3）/ 22（B4，接腳保留未綁定）|
 | 音效輸出 | USB 音箱 / USB 喇叭 | micro USB OTG 轉接 |
 
 ---
@@ -95,7 +87,7 @@ python3 -m venv .venv
 
 # 複製設定檔並填入必要金鑰
 cp config.example.yaml config.yaml
-nano config.yaml   # 至少填入 mqtt.broker_host 和 weather.api_key
+nano config.yaml   # 至少填入 weather.api_key
 
 # 安裝並啟動 systemd 服務
 sudo cp systemd/epaper-home-display.service /etc/systemd/system/
@@ -132,7 +124,6 @@ scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 | [docs/development.md](docs/development.md) | 本機開發環境、測試、mock 機制、擴充指南 |
 | [docs/deploy-and-test.md](docs/deploy-and-test.md) | Pi 首次部署、日常更新、SSH 金鑰設定、硬體測試 |
 | [docs/hardware-wiring.md](docs/hardware-wiring.md) | 完整硬體接線圖與 GPIO 腳位說明 |
-| [docs/mqtt-protocol.md](docs/mqtt-protocol.md) | MQTT 主題清單與 JSON 訊息格式規範 |
 | [docs/webui.md](docs/webui.md) | WebUI 設定介面完整使用說明與 REST API 參考 |
 | [tools/README.md](tools/README.md) | Claude / Codex OAuth 憑證設定工具說明 |
 | [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) | 第三方元件授權聲明（weather icons / Waveshare driver / DejaVu fonts）|
@@ -146,26 +137,24 @@ scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 ─────────────               ──────────────────────────────────────────────
 編輯程式碼                   app/main.py（asyncio 9 協程）
 跑單元測試（mock）              ├── _sensor_loop()         → DHT22, 光線（每 30 秒）
-git push                        ├── _presence_loop()       → 占用計分, 告警決策（每 60 秒）
+git push                        ├── _presence_loop()       → 占用計分（每 60 秒）
                                 ├── _display_loop()        → e-Paper 更新（牆鐘 :57）
-Agent 1（MQTT）                 ├── _weather_loop()        → OpenWeatherMap（每 600 秒）
-─────────────                   ├── _claude_usage_loop()   → Claude 使用量（每 600 秒）
+                                ├── _weather_loop()        → OpenWeatherMap（每 600 秒）
+                                ├── _claude_usage_loop()   → Claude 使用量（每 600 秒）
                                 ├── _codex_usage_loop()    → Codex 使用量（每 600 秒）
                                 ├── _notification_loop()   → Discord 排程通知
                                 ├── _wifi_monitor_loop()   → WiFi 模式監測（每 10 秒）
                                 └── server.serve()         → FastAPI WebUI（:8000）
-home/security/*  →
+
                                 app/ 層架構：
-← home/home_state/presence        sensors/ → display/ → logic/ → services/ → storage/
-← home/home_state/alarm_decision
-← home/home_state/alarm_command
-← home/display/status
+                                   sensors/ → display/ → logic/ → services/ → storage/
                                                 ↕
                                            state.py（全局狀態）
 
                                 SQLite（data/*.db）
-                                └── 10 張資料表：環境、門、人臉、告警、
-                                        圖片、桌面時段、通知等
+                                └── 10 張資料表：環境、圖片、桌面時段、通知等
+                                        （另有 3 張已退役的 Agent 1 整合遺留 schema，
+                                         程式碼不再寫入，僅保留避免刪除既有歷史資料）
 ```
 
 ---
@@ -174,20 +163,13 @@ home/security/*  →
 
 - **Python 3.11+**（開發與 Pi）
 - **Pi OS Bookworm / Trixie**（部署目標）；Windows / macOS / Linux（開發端）
-- **MQTT Broker**（如 Mosquitto，建議部署在區域網路內）
 - **OpenWeatherMap API Key**（免費方案即可，每日 1000 次請求限額）
-
----
-
-## 相關專案
-
-- **Agent 1**：門鈴攝影機 + 人臉辨識端，透過 MQTT 發布安全事件至本專案
 
 ---
 
 ## 課程資訊
 
-本專案為期末作業，實作與驗證課程所學物聯網系統整合設計概念，涵蓋嵌入式 Linux、感測器驅動、MQTT 事件驅動架構與異步服務設計。
+本專案原為期末作業，實作與驗證課程所學物聯網系統整合設計概念，涵蓋嵌入式 Linux、感測器驅動與異步服務設計。期末繳交版本保存於 `archive/final-project` 分支；`main` 分支後續移除了課程要求的 Agent 1（門鈴攝影機 + 人臉辨識，MQTT 協同）整合，僅保留獨立自主的功能。
 
 | 項目 | 說明 |
 |------|------|

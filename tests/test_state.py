@@ -12,10 +12,6 @@ def test_default_values():
     assert s.weather_current is None
     assert s.weather_forecast == []
     assert s.weather_fetched_at is None
-    assert s.last_door_event is None
-    assert s.last_face_event is None
-    assert s.last_alert is None
-    assert s.security_status is None
     assert s.display_busy is False
     assert s.active_reminder is None
     assert s.started_at is not None

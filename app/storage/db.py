@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS weather_logs (
     data_json TEXT
 );
 
+-- door_events / face_events / alarm_decisions: legacy schema from the retired Agent 1
+-- (MQTT/FaceGuard) integration. No code writes to these anymore; kept only so any
+-- pre-existing historical rows on deployed Pis are not dropped.
 CREATE TABLE IF NOT EXISTS door_events (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     ts       TEXT NOT NULL,

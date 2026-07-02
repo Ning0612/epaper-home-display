@@ -9,15 +9,6 @@ import yaml
 
 
 @dataclass
-class MQTTConfig:
-    broker_host: str = "localhost"
-    broker_port: int = 1883
-    client_id: str = "epaper-home-display"
-    username: str = ""
-    password: str = ""
-
-
-@dataclass
 class WeatherConfig:
     api_key: str = ""
     lat: float = 25.05       # Taipei default
@@ -147,14 +138,6 @@ class ImagesConfig:
     carousel_mode: str = "sequential"      # "sequential" | "random"
 
 
-@dataclass
-class OutdoorAgentConfig:
-    snapshot_url: str = ""                   # e.g. "http://faceguard.local/snapshot"
-    snapshot_timeout_sec: float = 2.5
-    alert_page_enabled: bool = True
-    alert_page_timeout_sec: int = 120        # return to dashboard after N seconds with no new alert
-
-
 _AP_STATUS_FILE = "/tmp/epaper-ap-mode.json"        # shared constant with wifi_manager.sh
 _WIFI_SCAN_CACHE_FILE = "/tmp/epaper-wifi-scan-cache.txt"  # pre-scan cache written before AP starts
 
@@ -181,7 +164,6 @@ class CodexUsageConfig:
 
 @dataclass
 class Settings:
-    mqtt: MQTTConfig = field(default_factory=MQTTConfig)
     weather: WeatherConfig = field(default_factory=WeatherConfig)
     sensors: SensorsConfig = field(default_factory=SensorsConfig)
     display: DisplayConfig = field(default_factory=DisplayConfig)
@@ -190,7 +172,6 @@ class Settings:
     storage: StorageConfig = field(default_factory=StorageConfig)
     webui: WebUIConfig = field(default_factory=WebUIConfig)
     images: ImagesConfig = field(default_factory=ImagesConfig)
-    outdoor_agent: OutdoorAgentConfig = field(default_factory=OutdoorAgentConfig)
     wifi: WifiConfig = field(default_factory=WifiConfig)
     claude_usage: ClaudeUsageConfig = field(default_factory=ClaudeUsageConfig)
     codex_usage: CodexUsageConfig = field(default_factory=CodexUsageConfig)

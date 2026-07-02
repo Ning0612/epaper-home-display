@@ -43,8 +43,8 @@ async def _check_and_update(display_queue: asyncio.Queue, settings: "Settings") 
     state.ap_ip = ip
 
     if new_mode == "ap":
-        # Always enforce ap_mode page while in AP — this repairs the page if an
-        # MQTT alert or other event changed display_page away from ap_mode.
+        # Always enforce ap_mode page while in AP — this repairs the page if some
+        # other event changed display_page away from ap_mode.
         if state.display_page != "ap_mode":
             prev_page = state.display_page
             state.display_page = "ap_mode"

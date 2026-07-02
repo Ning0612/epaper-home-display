@@ -109,10 +109,7 @@ display:
 | 測試檔案 | 涵蓋模組 | 測試數量 |
 |---------|---------|---------|
 | `test_presence.py` | `app/logic/presence.py` | 6+ 個測試案例 |
-| `test_alarm_decision.py` | `app/logic/alarm_decision.py` | 決策樹所有路徑 |
 | `test_reminder.py` | `app/logic/reminder.py` | 各提醒觸發條件 |
-| `test_door_reminder.py` | `app/logic/door_reminder.py` | 開門提醒文字生成（天氣情境、無資料備援）|
-| `test_face_handler.py` | `app/services/mqtt_client.py`（face dispatch）| vote_result 正規化、sentinel 處理、known 推導 |
 | `test_voice_config.py` | `app/services/voice.py`（設定解析）| 語音設定驗證 |
 | `test_renderer.py` | `app/display/renderer.py` | 圖像渲染（Pillow mock）|
 | `test_state.py` | `app/state.py` | 狀態初始化與更新 |
@@ -123,13 +120,13 @@ display:
 
 > **注意**：`tests/conftest.py` 為全域測試前置設定，強制設定 `RPI_MOCK=1` 環境變數，確保所有測試均使用 mock 硬體，不需也不應在 Pi 以外的環境安裝 GPIO 套件。
 
-> **測試覆蓋缺口**：以下新增模組目前尚無直接測試，邊界條件未受回歸保護：`app/services/wifi_monitor.py`（AP 狀態檔損壞、nmcli 失敗）、`app/services/snapshot_client.py`（逾時、大檔案拒絕）、`app/display/renderer_alert.py`、`app/display/renderer_apmode.py`、`app/webui/routes/wifi.py`（未認證 WiFi API 行為）。有意新增測試覆蓋時可優先補上這些模組。
+> **測試覆蓋缺口**：以下模組目前尚無直接測試，邊界條件未受回歸保護：`app/services/wifi_monitor.py`（AP 狀態檔損壞、nmcli 失敗）、`app/display/renderer_apmode.py`、`app/webui/routes/wifi.py`（未認證 WiFi API 行為）。有意新增測試覆蓋時可優先補上這些模組。
 
 ---
 
 ## 本機執行主服務（無硬體）
 
-使用 mock 配置可在筆電上執行完整服務（但不連 MQTT 和真實硬體）：
+使用 mock 配置可在筆電上執行完整服務（但不連真實硬體）：
 
 1. 建立 `config.local.yaml`：
 
@@ -143,8 +140,6 @@ sensors:
     use_mock: true
 display:
   use_mock: true
-mqtt:
-  broker_host: "localhost"
 weather:
   api_key: "your_api_key_here"
 ```
@@ -186,12 +181,6 @@ def compute_something():
 ```
 
 純函數可獨立進行單元測試，不需要 mock 任何外部依賴。
-
-### 新增 MQTT 主題
-
-1. 在 `app/services/mqtt_client.py` 的 `_dispatch()` 方法中新增 topic 處理
-2. 在 `app/storage/logs.py` 新增對應的日誌函數
-3. 更新 `docs/mqtt-protocol.md`
 
 ### 修改顯示佈局
 
@@ -238,7 +227,7 @@ weather:
 RPI_MOCK=1  # 強制所有硬體使用 mock
 ```
 
-> **注意**：`RPI_MOCK=1` 以外的設定（MQTT broker、Weather API key 等）**不支援**透過環境變數覆蓋，請使用 `config.local.yaml`。
+> **注意**：`RPI_MOCK=1` 以外的設定（Weather API key 等）**不支援**透過環境變數覆蓋，請使用 `config.local.yaml`。
 
 ---
 
@@ -265,10 +254,6 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && git pull && sudo system
 ### 測試時出現 `ImportError: No module named 'RPi'`
 
 確認 `tests/conftest.py` 正確設定 `RPI_MOCK=1`，且 mock 模組有覆蓋所有硬體引入。
-
-### 本機執行時出現 `MQTT connection refused`
-
-MQTT Broker 在本機未執行是正常的。設定 `config.local.yaml` 指向實際的 Broker，或接受連線失敗後服務仍繼續運行的行為。
 
 ### `config.yaml` 不存在
 
