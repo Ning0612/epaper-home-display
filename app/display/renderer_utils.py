@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from datetime import datetime, date, timezone
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -176,65 +176,3 @@ def _cx_text(
     draw.text((col_x + (col_w - tw) // 2, y), text, font=font, fill=fill)
 
 
-_DOOR_PREFIX = "DOOR_"
-_DECISION_COLOR_LABEL: dict[str, str] = {
-    "TRIGGER_ALARM": "RED",
-    "NO_ACTION":     "WARN",
-    "CANCEL_ALARM":  "GREEN",
-}
-# Sentinels that mean "no face detected" → display "NONE"
-_NO_FACE_IDS = frozenset({"none", "no_face", ""})
-
-
-def fmt_door(event: dict | None) -> str:
-    """DOOR_OPEN → OPEN, DOOR_CLOSED → CLOSED, None → N/A."""
-    if not event:
-        return "N/A"
-    raw = str(event.get("state") or event.get("door_state") or "?")
-    return (raw[len(_DOOR_PREFIX):] if raw.startswith(_DOOR_PREFIX) else raw)[:8]
-
-
-def fmt_face(event: dict | None) -> str:
-    """Known name, Unknown (detected/unrecognized), or None (no face detected)."""
-    if not event:
-        return "None"
-    vote = str(event.get("vote_result") or "").strip().upper()
-    if vote == "KNOWN_CONFIRMED":
-        name = str(event.get("user_name") or "").strip()
-        return name[:8] if name else "Known"
-    if vote == "UNKNOWN_CONFIRMED":
-        return "Unknown"
-    if vote == "NONE":
-        return "None"
-    # Legacy fallback: no vote_result field (pre-FaceGuard protocol events)
-    identity = str(event.get("identity") or "").strip()
-    known = event.get("known")
-    if not identity or identity.lower() in _NO_FACE_IDS:
-        return "None"
-    if known is False or identity.lower() == "unknown":
-        return "Unknown"
-    return identity[:8]
-
-
-def fmt_alarm(decision: str | None) -> str:
-    """TRIGGER_ALARM → RED, NO_ACTION → WARN, CANCEL_ALARM → GREEN, None → NONE."""
-    if decision is None:
-        return "NONE"
-    return _DECISION_COLOR_LABEL.get(decision, decision[:5])
-
-
-_MQTT_STATUS_TOPIC = "home/security/status"
-_MQTT_STATUS_TIMEOUT_SECS = 180
-
-
-def is_mqtt_status_online(state: Any, now: datetime) -> bool:
-    """Return False if home/security/status has not been received within 3 minutes."""
-    try:
-        entry = state.mqtt_last_rx_by_topic.get(_MQTT_STATUS_TOPIC)
-        if not entry:
-            return False
-        last = datetime.fromisoformat(entry["received_at"])
-        delta = (now - last).total_seconds()
-        return 0 <= delta <= _MQTT_STATUS_TIMEOUT_SECS
-    except (AttributeError, KeyError, ValueError, TypeError):
-        return False

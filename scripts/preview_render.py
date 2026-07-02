@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from app.config import load_settings
 from app.state import AgentState
 from app.display.renderer import render_dashboard
-from app.display.renderer_alert import render_alert_page
 from app.display.renderer_apmode import render_ap_mode_page
 from app.display.image_processor import quantize_to_epaper_palette
 
@@ -57,13 +56,6 @@ def _make_state() -> AgentState:
         for i in range(4)
     ]
 
-    # Agent1 events (normalized format after mqtt_client processing)
-    st.last_door_event = {"state": "CLOSED", "door_state": "CLOSED"}
-    st.last_face_event = {"identity": "lance", "user_name": "lance", "known": True}
-    st.last_alert = {"agent": "agent1", "type": "motion"}
-    st.last_alarm_decision = "IGNORE"
-    st.alert_face_event = {"identity": "lance", "user_name": "lance", "known": True}
-
     return st
 
 
@@ -76,7 +68,6 @@ if __name__ == "__main__":
     os.makedirs(out_dir, exist_ok=True)
 
     quantize_to_epaper_palette(render_dashboard(st, s)).save(os.path.join(out_dir, "preview_dashboard.png"))
-    quantize_to_epaper_palette(render_alert_page(st, s)).save(os.path.join(out_dir, "preview_alert.png"))
     quantize_to_epaper_palette(render_ap_mode_page(st, s)).save(os.path.join(out_dir, "preview_apmode.png"))
 
-    print("Saved: docs/images/preview_dashboard.png  preview_alert.png  preview_apmode.png")
+    print("Saved: docs/images/preview_dashboard.png  preview_apmode.png")

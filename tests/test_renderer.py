@@ -14,7 +14,6 @@ from app.display.renderer import (
     _load_weather_icon,
     _draw_progress_bar,
 )
-from app.display.renderer_alert import render_alert_page
 from app.display.renderer_apmode import render_ap_mode_page
 
 
@@ -58,9 +57,6 @@ def test_render_full_state(settings):
             "pop": 0.1,
         },
     ]
-    s.last_door_event = {"state": "CLOSED", "timestamp": "2099-01-01T18:30:00"}
-    s.last_face_event = {"identity": "lance", "timestamp": "2099-01-01T18:29:00"}
-    s.last_alert = {"level": "YELLOW"}
     s.claude_usage_5h = 0.62
     s.claude_usage_week = 0.41
     s.codex_usage_5h = None
@@ -93,12 +89,6 @@ def test_render_long_reminder(settings):
     s.active_reminder = "A" * 100
     img = render_dashboard(s, settings)
     assert img.size == (800, 480)
-
-
-def test_render_alert_page_is_rgb(empty_state, settings):
-    img = render_alert_page(empty_state, settings)
-    assert img.size == (800, 480)
-    assert img.mode == "RGB"
 
 
 def test_render_ap_mode_page_is_rgb(empty_state, settings):

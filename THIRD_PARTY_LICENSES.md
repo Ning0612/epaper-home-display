@@ -60,7 +60,6 @@ Installed via `pip install -r requirements.txt`; not bundled in this repository.
 |---------|-------------|---------|-------|
 | fastapi | ≥0.115 | MIT | Web framework |
 | uvicorn[standard] | ≥0.30 | BSD-3-Clause | ASGI server |
-| **paho-mqtt** | ≥2.1 | **EPL-2.0 OR EDL-1.0** | See note below |
 | pyyaml | ≥6.0 | MIT | Config parsing |
 | pillow | ≥10.4 | HPND (permissive) | Image rendering |
 | aiohttp | ≥3.9 | Apache-2.0 | Async HTTP client |
@@ -68,11 +67,6 @@ Installed via `pip install -r requirements.txt`; not bundled in this repository.
 | passlib[bcrypt] | ≥1.7.4 | BSD-2-Clause (passlib) + Apache-2.0 (bcrypt) | Password hashing |
 | python-multipart | ≥0.0.9 | Apache-2.0 | File upload parsing |
 | itsdangerous | ≥2.1 | BSD-3-Clause | Session signing |
-
-> **paho-mqtt dual license**: paho-mqtt 2.x is released under EPL-2.0 OR EDL-1.0.
-> This project uses it under the **EDL-1.0 (Eclipse Distribution License 1.0)** — a
-> BSD-3-Clause-compatible permissive license — to avoid EPL copyleft obligations.
-> If you modify and redistribute paho-mqtt itself, you must honour the chosen license.
 
 ### 3.2 Pi-only Hardware Packages
 
@@ -191,7 +185,6 @@ bundled; their respective terms of service apply independently.
 | Waveshare e-Paper driver | ✅ `.py` | MIT | Bundled |
 | DejaVu fonts | ❌ gitignored | Bitstream Vera | Install separately (`apt`) |
 | fastapi, uvicorn, PyYAML, Pillow … | ❌ pip | MIT / Apache-2.0 / BSD | Install via pip |
-| paho-mqtt | ❌ pip | EPL-2.0 **or** EDL-1.0 | Install via pip — use EDL side |
 | passlib + bcrypt | ❌ pip | BSD-2-Clause + Apache-2.0 | Install via pip |
 | Outfit, JetBrains Mono, DM Sans, DM Mono | ❌ CDN | OFL-1.1 | Google Fonts CDN |
 | Leaflet.js 1.9.4 | ❌ CDN | BSD-2-Clause | unpkg CDN |

@@ -41,16 +41,6 @@ ssh pi@epaper-display.local
 | **單位** | `metric`（°C）或 `imperial`（°F）|
 | **更新間隔** | 天氣資料刷新頻率（秒），最小建議 300 秒 |
 
-### MQTT 設定
-
-| 欄位 | 說明 |
-|------|------|
-| **Broker Host** | MQTT Broker IP 或 hostname |
-| **Port** | MQTT 埠號（預設 1883）|
-| **Client ID** | 本服務的 MQTT 客戶端識別碼 |
-| **Username** | Broker 帳號（留空表示不使用認證）|
-| **Password** | Broker 密碼 |
-
 ### 顯示器設定
 
 | 欄位 | 說明 |
@@ -71,8 +61,10 @@ ssh pi@epaper-display.local
 
 | 欄位 | 說明 |
 |------|------|
-| **啟用** | 是否播放音效提醒 |
+| **啟用** | 是否啟用音效功能 |
 | **播放指令** | 音效播放器指令（Pi 上使用 `aplay`）|
+
+> **目前狀態**：語音功能為 dormant，沒有自動事件會觸發播放；此頁面的「測試音效」按鈕可手動觸發播放以驗證設定。
 
 ### 通知設定
 
@@ -115,7 +107,7 @@ scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 
 ## REST API 參考
 
-以下為完整的 REST API 端點。以下端點**不需認證**（公開存取）：`/health`、`/login`、`/logout`、`/wifi`、`/api/wifi/scan`、`/api/wifi/connect`。其餘端點均需 Session cookie（含 `/api/preview/alert`）。
+以下為完整的 REST API 端點。以下端點**不需認證**（公開存取）：`/health`、`/login`、`/logout`、`/wifi`、`/api/wifi/scan`、`/api/wifi/connect`。其餘端點均需 Session cookie。
 
 ### 認證端點
 
@@ -147,7 +139,7 @@ GET /health
 GET /state
 ```
 
-回傳 `AgentState` 的**部分欄位** JSON 快照，包含感測器讀值、占用狀態、天氣快取、安全事件與 AI 使用量。**不含** MQTT 連線狀態（`mqtt_connected`）、收發日誌（`mqtt_rx_log`、`mqtt_tx_log`）、`last_alarm_decision`、`last_camera_frame_at` 等欄位；如需 MQTT 狀態，請使用 `GET /api/mqtt/status`。
+回傳 `AgentState` 的**部分欄位** JSON 快照，包含感測器讀值、占用狀態、天氣快取與 AI 使用量。
 
 **回應範例：**
 ```json
@@ -161,14 +153,9 @@ GET /state
   "weather_current": {"main": "Clear", "temp": 28.0},
   "weather_forecast": [...],
   "weather_fetched_at": "2026-05-29T10:00:00",
-  "last_door_event": {"state": "closed", "timestamp": "2026-05-29T10:30:00"},
-  "last_face_event": null,
-  "last_alert": null,
-  "security_status": null,
   "active_reminder": null,
   "display_busy": false,
   "display_page": "dashboard",
-  "alert_last_triggered_at": null,
   "claude_usage_5h": 0.42,
   "claude_usage_week": 0.0,
   "claude_5h_reset": "18:40",
@@ -181,7 +168,7 @@ GET /state
 }
 ```
 
-> **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。重置時間欄位：5h 為 `HH:MM` 格式，7d 為 `"Xd Xh"` 剩餘時間字串（API 未回傳時為 `"--:--"`）。`display_page` 值為 `"dashboard"`、`"alert"` 或 `"ap_mode"`。
+> **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。重置時間欄位：5h 為 `HH:MM` 格式，7d 為 `"Xd Xh"` 剩餘時間字串（API 未回傳時為 `"--:--"`）。`display_page` 值為 `"dashboard"` 或 `"ap_mode"`。
 
 ---
 
@@ -248,7 +235,6 @@ GET /settings/config
 **回應範例：**
 ```json
 {
-  "mqtt": {"broker_host": "192.168.1.100", "broker_port": 1883, "client_id": "epaper-home-display", "username": "myuser", "password_set": true},
   "weather": {"api_key_set": true, "lat": 25.05, "lon": 121.53, "units": "metric", "fetch_interval_seconds": 600},
   "display": {"model": "epd7in3e", "dashboard_interval_minutes": 5, "full_refresh_every": 10},
   "sensors": {"light": {"bright_threshold": 500}, ...},
@@ -258,7 +244,7 @@ GET /settings/config
 }
 ```
 
-> **遮罩規則**：`weather.api_key` 替換為 `api_key_set`（boolean）；`discord.webhook_url` 替換為 `webhook_set`（boolean）；`mqtt.password` 替換為 `password_set`（boolean，表示目前是否已設密碼）；`webui.password_hash` 與 `webui.session_secret` 直接移除，不出現於回應中。
+> **遮罩規則**：`weather.api_key` 替換為 `api_key_set`（boolean）；`discord.webhook_url` 替換為 `webhook_set`（boolean）；`webui.password_hash` 與 `webui.session_secret` 直接移除，不出現於回應中。
 
 ---
 
@@ -311,45 +297,7 @@ POST /api/wifi/connect      # 連接指定 WiFi 網路（AP 模式限定）
 
 ---
 
-### 告警頁面預覽
-
-```
-GET /api/preview/alert
-```
-
-回傳目前告警頁面的 PNG 截圖（**需 Session cookie 認證**）。供 WebUI 或開發者確認告警版面渲染效果，不觸發實際 e-Paper 刷新。
-
-**回應：** `Content-Type: image/png`，800×480 PNG 圖像。
-
----
-
-### MQTT 監控
-
-```
-GET /mqtt                       # MQTT 監控頁面（HTML）
-GET /api/mqtt/status            # MQTT 連線狀態 JSON
-GET /api/mqtt/camera/latest     # 最新攝影機畫面（JPEG）
-```
-
-**`GET /api/mqtt/status` 回應：**
-```json
-{
-  "connected": true,
-  "broker_host": "192.168.1.100",
-  "broker_port": 1883,
-  "last_rx": {"home/security/door": {...}, ...},
-  "rx_log": [...],
-  "tx_log": [...],
-  "camera_frame_at": "2026-06-05T09:00:00",
-  "camera_available": true
-}
-```
-
-**`GET /api/mqtt/camera/latest`**：回傳最新 MQTT camera frame 的原始 JPEG（`Content-Type: image/jpeg`，`Cache-Control: no-store`）。若尚未收到任何 camera frame 則回傳 HTTP 204（無內容）。
-
----
-
-> **所有 PUT 端點的回應格式**：成功時回傳 `{"ok": true}`（位置更新額外附上 `lat`/`lon`；MQTT 設定額外附上 `"restart_required": true`）；Pydantic 驗證失敗回傳 HTTP 422；持久化失敗回傳 HTTP 500。
+> **所有 PUT 端點的回應格式**：成功時回傳 `{"ok": true}`（位置更新額外附上 `lat`/`lon`）；Pydantic 驗證失敗回傳 HTTP 422；持久化失敗回傳 HTTP 500。
 
 ### 更新天氣位置
 
@@ -384,32 +332,6 @@ Content-Type: application/json
 ```
 
 所有欄位可選，僅更新提供的欄位。
-
----
-
-### 更新 MQTT 設定
-
-```
-PUT /settings/mqtt
-Content-Type: application/json
-
-{
-  "broker_host": "192.168.1.100",
-  "broker_port": 1883,
-  "client_id": "epaper-home-display",
-  "username": "myuser",
-  "password": "mypassword"
-}
-```
-
-所有欄位均可選，僅更新提供的欄位。`username` 設為空字串時，`password` 會同步清空。
-
-**回應：**
-```json
-{"ok": true, "restart_required": true}
-```
-
-> MQTT 設定寫入後需重啟服務才生效：`sudo systemctl restart epaper-home-display`。
 
 ---
 
@@ -759,11 +681,6 @@ GET /api/desk/sessions?limit=20
 
 **生效時機**：
 - **立即生效（記憶體更新）**：天氣（含地點）、顯示器、在場偵測、語音、Discord 通知、時區、密碼。下次觸發渲染或排程執行時即採用新值，無需重啟。
-- **需重啟服務才生效**：MQTT 設定（`broker_host` / `broker_port` / `client_id` / `username` / `password`）。設定已寫入 YAML，但現有的 MQTT 連線不會自動重建，需手動重啟：
-
-```bash
-ssh pi@epaper-display.local 'sudo systemctl restart epaper-home-display'
-```
 
 ---
 

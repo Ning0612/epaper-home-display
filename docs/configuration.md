@@ -8,7 +8,7 @@
 config.local.yaml > config.yaml > 程式碼預設值
 ```
 
-> **注意**：目前唯一支援的環境變數覆蓋是 `RPI_MOCK=1`（強制所有硬體使用 mock）。一般設定項目（MQTT、天氣等）請透過 `config.local.yaml` 或 WebUI 設定，不支援透過環境變數覆蓋。
+> **注意**：目前唯一支援的環境變數覆蓋是 `RPI_MOCK=1`（強制所有硬體使用 mock）。一般設定項目（天氣等）請透過 `config.local.yaml` 或 WebUI 設定，不支援透過環境變數覆蓋。
 
 ## 快速建立設定檔
 
@@ -17,21 +17,7 @@ cp config.example.yaml config.yaml
 ```
 
 接著編輯 `config.yaml`，至少填入以下必填欄位：
-- `mqtt.broker_host`
 - `weather.api_key`
-
----
-
-## MQTT
-
-```yaml
-mqtt:
-  broker_host: "192.168.1.100"   # 必填：MQTT Broker IP 或 hostname
-  broker_port: 1883               # 可選，預設 1883
-  client_id: "epaper-home-display" # 可選，MQTT 客戶端識別碼
-  username: ""                    # 可選：Broker 帳號（空字串表示不使用認證）
-  password: ""                    # 可選：Broker 密碼
-```
 
 ---
 
@@ -78,11 +64,7 @@ sensors:
 ```yaml
 sensors:
   button:
-    gpio_pins: [5, 6, 27, 22]  # [B1 dashboard, B2 alert-page, B3 trigger-alarm, B4 cancel-alarm]
-                                # B1=GPIO 5（強制 OCCUPIED + 切換 Dashboard）
-                                # B2=GPIO 6（切換至 Alert 頁面）
-                                # B3=GPIO 27（重新觸發告警：MQTT publish + 音效；僅在 Alert 頁面時有效）
-                                # B4=GPIO 22（取消告警：MQTT publish CANCEL_ALARM；僅在 Alert 頁面時有效）
+    gpio_pins: [5, 6, 27, 22]  # B1=GPIO 5（強制 OCCUPIED + 切換 Dashboard）；B2–B4 為硬體保留接腳，目前未綁定任何功能
     use_mock: false
 ```
 
@@ -121,7 +103,7 @@ voice:
   sounds_dir: "assets/sounds"  # 音效檔案目錄
   volume: 80             # 播放音量 0–100（透過 ALSA amixer sset 設定）
   alsa_mixer_control: "PCM"  # ALSA 控制項名稱（常見：PCM / Master）；留空跳過音量設定
-  tts_engine: "espeak-ng"    # "espeak-ng"（開門提醒語音合成）| "none"（停用 TTS）
+  tts_engine: "espeak-ng"    # "espeak-ng"（文字轉語音）| "none"（停用 TTS）
   tts_language: "zh"         # espeak-ng 語音識別碼（zh / zh-TW / en 等）
   tts_speed: 130             # 語速（words per minute），建議 110–150
 ```
@@ -129,6 +111,8 @@ voice:
 **volume / alsa_mixer_control 說明**：每次播放前自動以 `amixer sset <alsa_mixer_control> <volume>%` 設定音量。不同 Pi 音訊設定的控制項名稱不同，可用 `amixer scontrols` 查詢可用名稱；`alsa_mixer_control` 留空則跳過音量設定（使用系統目前音量）。
 
 **tts_engine 說明**：`espeak-ng` 需在 Pi 安裝套件（`sudo apt install espeak-ng espeak-ng-data`）。`none` 停用 TTS 但仍正常播放 `assets/sounds/` 中的預錄音檔。
+
+> **目前狀態**：語音功能目前為 dormant——沒有任何自動事件會觸發播放，僅能透過 WebUI 設定頁的「測試音效」按鈕手動觸發（呼叫 `POST /settings/voice/test`）。保留此功能是為了未來可能的語音提醒擴充。
 
 ---
 
@@ -198,26 +182,6 @@ sensors:
 | 光線讀值 ≥ bright_threshold | UNOCCUPIED |
 
 **顯示行為**：人不在時 e-Paper 暫停更新；偵測到剛回家（光線變暗）時立即觸發一次更新，後續恢復固定觸發秒節奏。
-
----
-
-## 外部攝影機快照
-
-`outdoor_agent` 區段設定告警頁面與攝影機畫面整合。告警頁面優先使用 MQTT camera feed（`home/security/camera`）；若無新鮮 MQTT frame（5 秒內），且設定了 `snapshot_url`，才以 HTTP GET 擷取快照作為備援。
-
-```yaml
-outdoor_agent:
-  snapshot_url: "http://faceguard.local/snapshot"  # 外部 Agent 快照端點（HTTP GET，回傳 JPEG）
-  snapshot_timeout_sec: 2.5  # 擷取超時秒數，網路慢時可適度放寬
-  alert_page_enabled: true   # 是否啟用告警頁面（false = 仍顯示一般儀表板）
-  alert_page_timeout_sec: 120   # 告警頁面顯示秒數，超時後自動回到儀表板
-```
-
-**行為說明**：
-- 收到 `home/security/alert` 後立即切換至告警頁面（需 `alert_page_enabled: true`）
-- 告警頁面渲染時才取得畫面：優先用新鮮 MQTT camera frame，無新鮮畫面時若有設定 `snapshot_url` 才以 HTTP 備援；取得失敗時靜默降級顯示無圖像
-- 超出 `alert_page_timeout_sec` 後自動切回儀表板頁面
-- `alert_page_enabled: false` 時，MQTT callback 仍會短暫設定 `display_page = "alert"`，但 display loop 的 `_is_alert_active()` 判斷失敗，實際上不會渲染告警頁面（`/state` 端點可能短暫顯示 `display_page: "alert"`）；`snapshot_url` 已不再是啟用條件，MQTT camera feed 可在無 HTTP 快照的情況下供圖
 
 ---
 
@@ -312,8 +276,6 @@ display:
   use_mock: true
 weather:
   api_key: "my_dev_api_key"
-mqtt:
-  broker_host: "192.168.1.xxx"
 ```
 
 ---
@@ -321,13 +283,6 @@ mqtt:
 ## 完整 config.example.yaml
 
 ```yaml
-mqtt:
-  broker_host: "192.168.1.100"
-  broker_port: 1883
-  client_id: "epaper-home-display"
-  # username: ""
-  # password: ""
-
 weather:
   api_key: "your_openweathermap_api_key"
   lat: 25.05
@@ -346,7 +301,7 @@ sensors:
     bright_threshold: 500
     use_mock: false
   button:
-    gpio_pins: [5, 6, 27, 22]  # [B1 dashboard, B2 alert-page, B3 trigger-alarm, B4 cancel-alarm]
+    gpio_pins: [5, 6, 27, 22]  # B1 dashboard；B2–B4 保留接腳，未綁定功能
     use_mock: false
 
 display:
@@ -392,12 +347,6 @@ images:
   carousel_enabled: false
   carousel_interval_refreshes: 10   # 每 N 次 dashboard 刷新換圖
   carousel_mode: "sequential"
-
-outdoor_agent:
-  snapshot_url: "http://faceguard.local/snapshot"
-  snapshot_timeout_sec: 2.5
-  alert_page_enabled: true
-  alert_page_timeout_sec: 120
 
 wifi:
   ap_ssid: "EpaperSetup"

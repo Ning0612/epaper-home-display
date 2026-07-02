@@ -11,14 +11,12 @@ from app.display.renderer_constants import (
     WEATHER_X, WEATHER_Y, WEATHER_W, WEATHER_H,
     IMAGE_X, IMAGE_Y, IMAGE_W, IMAGE_H,
     INDOOR_X, INDOOR_Y, INDOOR_W, INDOOR_H,
-    AGENT1_X, AGENT1_Y, AGENT1_W, AGENT1_H,
     USAGE_X, USAGE_Y, USAGE_W, USAGE_H,
     _WX_TOP_H, _WEEKDAYS,
 )
 from app.display.renderer_utils import (
     _font, _cx_text, _paste_icon, _draw_progress_bar,
     _pick_daily_forecast, _weather_item, _temp_color, _usage_color,
-    fmt_door, fmt_face, fmt_alarm, is_mqtt_status_online,
 )
 
 if TYPE_CHECKING:
@@ -157,42 +155,16 @@ def _draw_card_indoor(draw: ImageDraw.ImageDraw, state: "AgentState", *, color: 
 
     temp_str = f"{state.temperature:.1f}°" if state.temperature is not None else "--°"
     hum_str = f"{state.humidity:.0f}%" if state.humidity is not None else "--%"
+    mode_map = {"OCCUPIED": "HOME", "UNOCCUPIED": "AWAY", "UNKNOWN": "?"}
+    mode_str = mode_map.get(state.presence, state.presence[:6])
 
-    content_h = 14 + 5 + 17 + 5 + 17
+    content_h = 14 + 5 + 17 + 5 + 17 + 5 + 14
     sy = iy + max(0, (ih - content_h) // 2)
 
     _cx_text(draw, "Indoor", ix, iw, sy, _font(14, bold=True))
     _cx_text(draw, temp_str, ix, iw, sy + 19, _font(17, bold=True), fill=_temp_color(state.temperature, color))
     _cx_text(draw, hum_str, ix, iw, sy + 41, _font(17, bold=True))
-
-
-def _draw_card_agent1(draw: ImageDraw.ImageDraw, state: "AgentState", now: datetime) -> None:
-    draw.rectangle(
-        [(AGENT1_X, AGENT1_Y), (AGENT1_X + AGENT1_W - 1, AGENT1_Y + AGENT1_H - 1)],
-        outline=FG, width=1,
-    )
-    ix, iy = AGENT1_X + PAD, AGENT1_Y + PAD
-    iw = AGENT1_W - 2 * PAD
-    ih = AGENT1_H - 2 * PAD
-
-    if not is_mqtt_status_online(state, now):
-        door_st = face_id = alarm_st = "Disconn"
-    else:
-        door_st = fmt_door(state.last_door_event)
-        face_id = fmt_face(state.last_face_event)
-        alarm_st = fmt_alarm(state.last_alarm_decision)
-    mode_map = {"OCCUPIED": "HOME", "UNOCCUPIED": "AWAY", "UNKNOWN": "?"}
-    mode_str = mode_map.get(state.presence, state.presence[:6])
-
-    line_h = 18
-    content_h = 14 + 4 + 4 * line_h
-    sy = iy + max(0, (ih - content_h) // 2)
-
-    _cx_text(draw, "Agent 1", ix, iw, sy, _font(14, bold=True))
-    _cx_text(draw, f"D:{door_st}", ix, iw, sy + 20, _font(14, bold=True))
-    _cx_text(draw, f"F:{face_id}", ix, iw, sy + 20 + line_h, _font(14, bold=True))
-    _cx_text(draw, f"A:{alarm_st}", ix, iw, sy + 20 + 2 * line_h, _font(14, bold=True))
-    _cx_text(draw, f"M:{mode_str}", ix, iw, sy + 20 + 3 * line_h, _font(14, bold=True))
+    _cx_text(draw, mode_str, ix, iw, sy + 63, _font(14, bold=True))
 
 
 def _draw_usage_row(

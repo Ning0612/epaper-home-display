@@ -7,17 +7,13 @@ import socket
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime as _DateTime
+from typing import Callable
 
 import uvicorn
 
 from app.config import load_settings
 from app.display.epaper import create_epaper
-from app.loops.button import (
-    _handle_btn_dashboard,
-    _handle_btn_alert_page,
-    _handle_btn_trigger_alarm,
-    _handle_btn_cancel_alarm,
-)
+from app.loops.button import _handle_btn_dashboard
 from app.loops.claude_usage import _claude_usage_loop
 from app.loops.codex_usage import _codex_usage_loop
 from app.loops.display import _display_loop
@@ -31,7 +27,6 @@ from app.sensors.light_sensor import create_light_sensor
 from app.services.claude_usage import ClaudeUsageService
 from app.services.codex_usage import CodexUsageService
 from app.services.discord import DiscordService
-from app.services.mqtt_client import MQTTService, make_done_callback
 from app.services.notification_manager import NotificationManager
 from app.services.voice import VoiceService
 from app.services.weather import WeatherService
@@ -43,6 +38,17 @@ from app.storage._log_images import get_unconfirmed_images, delete_image_record
 from app.webui.server import create_app
 
 logger = logging.getLogger(__name__)
+
+
+def make_done_callback(context: str) -> Callable[[asyncio.Future], None]:
+    """Return a Future done-callback that logs errors under the given context label."""
+    def _cb(f: asyncio.Future) -> None:
+        if f.cancelled():
+            return
+        exc = f.exception()
+        if exc:
+            logger.error("%s error: %s", context, exc)
+    return _cb
 
 
 async def main() -> None:
@@ -82,34 +88,12 @@ async def main() -> None:
     notification_manager = NotificationManager(discord_service, settings.discord)
 
     loop = asyncio.get_running_loop()
-    state.alert_wake_event = asyncio.Event()
-    mqtt_service = MQTTService(settings.mqtt, display_queue, voice_service)
-    mqtt_service.start(loop)
 
     def _on_btn_0():
         f = asyncio.run_coroutine_threadsafe(_handle_btn_dashboard(display_queue), loop)
         f.add_done_callback(make_done_callback("Button 1"))
 
-    def _on_btn_1():
-        f = asyncio.run_coroutine_threadsafe(_handle_btn_alert_page(display_queue), loop)
-        f.add_done_callback(make_done_callback("Button 2"))
-
-    def _on_btn_2():
-        f = asyncio.run_coroutine_threadsafe(
-            _handle_btn_trigger_alarm(voice_service, mqtt_service), loop
-        )
-        f.add_done_callback(make_done_callback("Button 3"))
-
-    def _on_btn_3():
-        f = asyncio.run_coroutine_threadsafe(
-            _handle_btn_cancel_alarm(mqtt_service), loop
-        )
-        f.add_done_callback(make_done_callback("Button 4"))
-
     button.register_callback(0, _on_btn_0)
-    button.register_callback(1, _on_btn_1)
-    button.register_callback(2, _on_btn_2)
-    button.register_callback(3, _on_btn_3)
 
     uvicorn_config = uvicorn.Config(
         create_app(settings, weather_service, display_queue),
@@ -145,8 +129,8 @@ async def main() -> None:
     try:
         await asyncio.gather(
             _sensor_loop(dht22, light, executor, settings),
-            _presence_loop(display_queue, mqtt_service, notification_manager, settings),
-            _display_loop(epaper, executor, display_queue, settings, mqtt_service),
+            _presence_loop(display_queue, notification_manager, settings),
+            _display_loop(epaper, executor, display_queue, settings),
             _weather_loop(weather_service, settings),
             _claude_usage_loop(claude_usage_service, settings),
             _codex_usage_loop(codex_usage_service, settings),
@@ -155,7 +139,6 @@ async def main() -> None:
             server.serve(),
         )
     finally:
-        mqtt_service.stop()
         executor.shutdown(wait=False)
         await log_system_event("INFO", "main", "ePaper Home Display stopped")
 

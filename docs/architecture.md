@@ -23,7 +23,7 @@ Claude Code 在**筆電**上運行。Raspberry Pi 只是部署和硬體測試目
 ├─────────────────────────────────────────┤
 │  Business Logic (app/logic/)            │  純函數，無硬體/網路依賴
 ├─────────────────────────────────────────┤
-│  Services (app/services/)               │  MQTT, 天氣 API, 音效, Discord
+│  Services (app/services/)               │  天氣 API, 音效, Discord
 ├─────────────────────────────────────────┤
 │  Hardware Drivers (app/sensors/,        │  GPIO, SPI, I2C — 只在此層
 │                    app/display/)        │
@@ -51,7 +51,6 @@ epaper-home-display/
 │   │   ├── epaper.py        # e-Paper 驅動包裝（importlib 動態載入 waveshare_epd.{model}；Real + Mock）
 │   │   ├── renderer.py      # 主渲染入口（800×480 Pillow RGB 圖像）
 │   │   ├── renderer_cards.py   # 各卡片繪製函數（儀表板）
-│   │   ├── renderer_alert.py   # 告警頁面渲染（安全事件 + 快照）
 │   │   ├── renderer_apmode.py  # WiFi AP 熱點引導頁面渲染
 │   │   ├── renderer_constants.py  # 解析度、顏色（RGB）、版面常數
 │   │   ├── renderer_utils.py    # 天氣圖示、進度條等工具函數
@@ -60,21 +59,17 @@ epaper-home-display/
 │   │                            # 因此自訂圖片量化只使用六個有效色（黑/白/紅/黃/藍/綠）
 │   ├── logic/
 │   │   ├── presence.py      # 占用偵測（純函數，光線 → OCCUPIED/UNOCCUPIED）
-│   │   ├── alarm_decision.py  # 安全告警決策引擎（純函數）
 │   │   ├── desk_session.py  # 桌面工作時段狀態機（純函數）
-│   │   ├── reminder.py      # 天氣提醒生成（純函數，用於 AI 語音提醒）
-│   │   └── door_reminder.py # 開門天氣提醒文字生成（純函數，門開時 TTS 播報）
+│   │   └── reminder.py      # 天氣提醒生成（純函數，用於 AI 語音提醒）
 │   ├── sensors/
 │   │   ├── dht22.py         # DHT22 溫濕度（Real + Mock）
 │   │   ├── light_sensor.py  # MCP3008 ADC + 光敏電阻（Real + Mock）
-│   │   └── button.py        # 4 鍵 GPIO 按鈕（gpiozero MultiButton / MockButton）
+│   │   └── button.py        # 4 接腳 GPIO 按鈕（gpiozero MultiButton / MockButton）；僅 Button 1 綁定功能，2–4 保留接腳未綁定
 │   ├── services/
-│   │   ├── mqtt_client.py   # Paho MQTT Pub/Sub
 │   │   ├── weather.py       # OpenWeatherMap API（aiohttp）
-│   │   ├── voice.py         # aplay 音效播放
+│   │   ├── voice.py         # aplay 音效播放（目前未被任何事件觸發，供 WebUI 手動測試音效使用）
 │   │   ├── discord.py       # Discord Webhook 通知
 │   │   ├── notification_manager.py  # 通知協調（裝置上線、時段結束、每日摘要）
-│   │   ├── snapshot_client.py  # 外部攝影機快照擷取（aiohttp，共享 session）
 │   │   ├── claude_usage.py  # Claude OAuth API 客戶端（token 刷新、使用量解析）
 │   │   ├── codex_usage.py   # Codex OAuth API 客戶端（token 刷新、使用量解析）
 │   │   └── wifi_monitor.py  # WiFi 狀態監測（client/ap/unknown，讀 /tmp/epaper-ap-mode.json）
@@ -103,7 +98,7 @@ epaper-home-display/
 │       ├── config_helpers.py  # config.local.yaml 讀寫工具
 │       └── routes/
 │           ├── auth.py      # 登入/登出（Session cookie）
-│           ├── read_only.py # /health, /state, /logs/*, /api/preview/alert
+│           ├── read_only.py # /health, /state, /logs/*
 │           ├── settings.py  # 設定 PUT 端點
 │           ├── wifi.py      # AP 熱點入口（/wifi portal、/api/wifi/scan、/api/wifi/connect，不需認證）
 │           ├── desk.py      # 桌面工作時段 REST API
@@ -134,29 +129,14 @@ DHT22 ────────────────────────�
 光線感測器 ──────────────────────────── app/sensors/ ──► state.py ──► renderer.py ──► epaper.py ──► 硬體
 ```
 
-### MQTT 入站 → 邏輯 → 出站
-
-```
-Agent1 / 攝影機發布：
-  home/security/door    ──┐
-  home/security/face    ──┤
-  home/security/alert   ──┼──► mqtt_client.py ──► state.py ──► logic/ ──► 發布：
-  home/security/status  ──┤                                              home/home_state/presence       每 60 秒
-  home/security/camera  ──┘ (raw JPEG, binary)  → state.last_snapshot_image     home/home_state/alarm_decision 決策改變時
-                                                 state.last_camera_frame_bytes  home/home_state/alarm_command  Button 3/4 按下時
-                                                 (WebUI /api/mqtt/camera/latest) home/display/status           每次 e-Paper 成功更新後
-```
-
 ### 顯示更新觸發條件
 
 ```
 牆鐘對齊（每 N 分鐘邊界，預設 5 分鐘）─────────────────────────┐
-MQTT 告警事件（立即） ───────────────────────────────────────────┤
 按鈕按下（立即） ───────────────────────────────────────────────┼──► display_queue ──► _display_loop ──► renderer ──► epaper
 wifi_connected 事件（AP 結束後） ───────────────────────────────┘
+presence_return 事件（UNOCCUPIED → OCCUPIED，立即）────────────┘
 ```
-
-> **MQTT camera frame**：只更新 `state.last_snapshot_image` / `last_camera_frame_bytes` / `last_camera_frame_at`，**不**放入 display_queue。Alert 頁面依牆鐘節奏排程，渲染時使用當下最新的快照。
 
 ---
 
@@ -167,8 +147,8 @@ wifi_connected 事件（AP 結束後） ─────────────�
 | 協程 | 觸發週期 | 職責 |
 |------|---------|------|
 | `_sensor_loop()` | 每 30 秒 | 讀 DHT22 + 光線感測器，更新 state |
-| `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 桌面時段管理 + 告警決策；偵測到回家時立即喚醒 display_queue |
-| `_display_loop()` | 牆鐘對齊（N 分鐘邊界，由 `dashboard_interval_minutes` 控制，預設每 5 分鐘）| 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖（每 `carousel_interval_refreshes` 次刷新換圖）；告警頁面快照刷新 |
+| `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 桌面時段管理；偵測到回家時立即喚醒 display_queue |
+| `_display_loop()` | 牆鐘對齊（N 分鐘邊界，由 `dashboard_interval_minutes` 控制，預設每 5 分鐘）| 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖（每 `carousel_interval_refreshes` 次刷新換圖）|
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
 | `_claude_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 Anthropic API 拉取 Claude 5h/7d 使用量；token 過期時自動刷新 |
 | `_codex_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 OpenAI WHAM API 拉取 Codex 5h/7d 使用量；token 過期時自動刷新 |
@@ -178,21 +158,18 @@ wifi_connected 事件（AP 結束後） ─────────────�
 
 **ThreadPoolExecutor**（3 個工作執行緒）用於阻擋性硬體 I/O（DHT22 感測、SPI 傳輸、e-Paper 驅動）。
 
-**MQTT 執行緒安全**：Paho MQTT 在背景執行緒執行 `loop_start()`，回調透過 `asyncio.run_coroutine_threadsafe()` 安全轉至主 asyncio 循環。MQTT 不是 `asyncio.gather()` 中的協程，而是由 `MQTTService.start()` 啟動的獨立執行緒。
-
-**按鈕**：gpiozero 按鈕回調在背景執行緒觸發，透過 `asyncio.run_coroutine_threadsafe()` 呼叫四個 async handler（`_handle_btn_dashboard` / `_handle_btn_alert_page` / `_handle_btn_trigger_alarm` / `_handle_btn_cancel_alarm`）。按鈕不是獨立的 asyncio 協程。
+**按鈕**：gpiozero 按鈕回調在背景執行緒觸發，透過 `asyncio.run_coroutine_threadsafe()` 呼叫 async handler `_handle_btn_dashboard`（Button 1，切到 dashboard 並設為 OCCUPIED）。Button 2–4 的 GPIO 接腳仍保留（`sensors.button.gpio_pins` 至少 4 個），但目前未綁定任何 callback。按鈕不是獨立的 asyncio 協程。
 
 ---
 
 ## e-Paper 更新策略
 
-電子紙刷新很慢，絕不可阻擋 MQTT 回調或 WebUI 處理程式：
+電子紙刷新很慢，絕不可阻擋 WebUI 處理程式：
 
 | 更新類型 | 觸發 | 說明 |
 |---------|------|------|
 | 一般更新 | 牆鐘 N 分鐘邊界（僅 OCCUPIED）| 在邊界前 `(60 - trigger_second)` 秒觸發；trigger_second 由 model 推導（epd7in3e→40, epd7in5_V2→57）|
 | 完整更新（`init`）| 每 `full_refresh_every` 次更新 | 驅動有 `init_fast()` 時才有意義；`epd7in3e` 驅動每次均為完整刷新 |
-| 告警立即更新 | MQTT 告警事件（`home/security/alert`）| 透過 display_queue；camera frame 只更新 state 欄位，不觸發 display_queue |
 | 回家立即更新 | 光線變暗（UNOCCUPIED→OCCUPIED）| `_presence_loop` 偵測到後立即觸發 |
 | AP 模式頁面 | 每 30 秒 | 靜態資訊頁，定期刷新時間戳 |
 | 人不在時 | — | `display_loop` 暫停，不做任何更新（wifi_connected 事件可繞過此限制）|
@@ -223,20 +200,6 @@ else:                    → UNOCCUPIED (score = 0.0)
 
 ---
 
-## 安全告警決策
-
-`app/logic/alarm_decision.py` 中的純函數 `compute_alarm_decision()`：
-
-```
-if presence ∈ {UNOCCUPIED, UNKNOWN} AND 最近無已知人臉  →  TRIGGER_ALARM
-elif presence == OCCUPIED AND 有已知人臉                →  CANCEL_ALARM
-else                                                    →  NO_ACTION
-```
-
-決策結果發布至 `home/home_state/alarm_decision`，鍵名為 `alarm_decision`（非 `decision`）。
-
----
-
 ## 天氣提醒生成
 
 `app/logic/reminder.py` 判斷條件：
@@ -247,27 +210,6 @@ else                                                    →  NO_ACTION
 | 溫度下降 > 5°C | 帶夾克 |
 | 室內濕度 > 80% | 開除濕機 |
 | 室內溫度 > 30°C | 開冷氣 |
-
----
-
-## 開門天氣提醒
-
-`app/logic/door_reminder.py` 中的純函數 `generate_door_exit_text()`，由 MQTT 客戶端在偵測到 `closed → open` 門狀態轉換時呼叫，觸發條件與文字格式如下：
-
-**格式**：`[現在 X度，天氣][，warning1][，warning2]`（最多兩項提醒；天氣簡報固定前置）
-
-| 判斷條件（按優先度）| 提醒文字 |
-|----------|---------|
-| 未來 ~12 小時有雨（pop ≥ 0.6 或 OWM 代碼屬雨）| `記得帶雨傘` |
-| feels_like < 15°C | `今天比較冷，記得穿外套` |
-| 目前溫度 > 30°C | `外面很熱，注意防曬` |
-| 未來 12 小時溫度下降 > 5°C | `稍後溫度會下降，帶件外套` |
-
-**門控保護**：
-- 冷卻 60 秒（防止門彈跳重複觸發）
-- 15 秒內有任何人臉事件（known 或 unknown），不播報（表示有人在門口，非離家）
-- 無人臉 sentinel（`"NONE"` / `"no_face"`）到達且門為開啟狀態時，重試播報
-- 無天氣資料時播報固定備援文字：`出門注意安全`
 
 ---
 
@@ -288,17 +230,6 @@ else                                                    →  NO_ACTION
 | `weather_current` | dict \| None | 目前天氣 JSON |
 | `weather_forecast` | list[dict] | 5 天預報列表 |
 | `weather_fetched_at` | datetime \| None | 最後 fetch 時間 |
-| `last_door_event` | dict \| None | 最近門事件（含正規化後的 `state` 與 `door_state` 欄位）|
-| `last_face_event` | dict \| None | 最近人臉事件（身份統一寫入 `identity` 與 `user_name`）|
-| `last_face_event_at` | datetime \| None | 最近有效人臉事件的時間戳（無人臉 sentinel 到達時設為 `None`，供開門提醒門控使用）|
-| `last_alert` | dict \| None | 最近安全告警 |
-| `last_alarm_decision` | str \| None | 最近告警決策字串（`"TRIGGER_ALARM"` / `"NO_ACTION"` / `"CANCEL_ALARM"`）|
-| `alert_face_event` | dict \| None | 告警觸發當下的人臉事件快照（與 `last_face_event` 解耦，避免後續人臉更新影響告警頁面）|
-| `security_status` | dict \| None | Agent 1 狀態心跳（`home/security/status` payload）|
-| `mqtt_connected` | bool | Paho MQTT 連線狀態（`on_connect` / `on_disconnect` 回調更新）|
-| `mqtt_last_rx_by_topic` | dict | 各 JSON 訂閱主題最後收到的訊息（key=topic）；camera binary 不計入 |
-| `mqtt_rx_log` | list | 最近 50 筆收到的 JSON MQTT 訊息（newest first）；camera binary 不計入 |
-| `mqtt_tx_log` | list | 最近 20 筆發出的 MQTT 訊息（newest first）|
 | `display_busy` | bool | e-Paper 忙碌標誌 |
 | `active_reminder` | str \| None | 當前提醒文本 |
 | `custom_image_path` | str \| None | 當前顯示的圖片路徑 |
@@ -314,13 +245,7 @@ else                                                    →  NO_ACTION
 | `claude_7d_reset` | str \| None | Claude 7d 剩餘時間（如 `"2d 3h"`）|
 | `codex_5h_reset` | str \| None | Codex 5h 重置時間（HH:MM 格式）|
 | `codex_7d_reset` | str \| None | Codex 7d 剩餘時間（如 `"2d 3h"`）|
-| `display_page` | Literal["dashboard", "alert", "ap_mode"] | 目前顯示頁面 |
-| `last_snapshot_image` | Any（PIL Image \| None）| 最後取得的攝影機影像（MQTT camera feed 或 HTTP snapshot；型別標注為 Any，實際為 PIL Image，僅記憶體，不序列化）|
-| `last_camera_frame_bytes` | bytes \| None | 最後一次 MQTT camera frame 的原始 JPEG bytes（供 WebUI `GET /api/mqtt/camera/latest` 直接轉發，不需重新編碼）|
-| `last_camera_frame_at` | datetime \| None | 最後一次收到 MQTT camera frame 的時間戳（用於判斷影像新鮮度：5 秒內視為新鮮，優先於 HTTP snapshot）|
-| `alert_page_started_at` | datetime \| None | 告警頁面首次進入時間（由 MQTT callback 設定，僅在非 alert 狀態時更新）|
-| `alert_last_triggered_at` | datetime \| None | 最後一次告警觸發時間（**用於超時計算**：超過 `alert_page_timeout_sec` 後切回儀表板）|
-| `alert_dismissed_at` | datetime \| None | 最後一次告警頁面關閉時間（用於 180 秒冷卻計算，防止快速重複觸發）|
+| `display_page` | Literal["dashboard", "ap_mode"] | 目前顯示頁面 |
 | `wifi_mode` | Literal["client", "ap", "unknown"] | WiFi 模式 |
 | `ap_ssid` | str | AP 熱點 SSID（AP 模式下顯示）|
 | `ap_password` | str | AP 熱點密碼（AP 模式下顯示）|
@@ -360,9 +285,9 @@ SQLite（WAL 模式）位於 `data/epaper-home-display.db`：
 |-------|------|
 | `indoor_env_logs` | 溫濕度、光線定期紀錄 |
 | `presence_logs` | 占用狀態與計分紀錄 |
-| `door_events` | 門狀態事件（來自 MQTT）|
-| `face_events` | 人臉辨識事件（來自 MQTT）|
-| `alarm_decisions` | 告警決策紀錄 |
+| `door_events` | *(legacy)* 已退役的 Agent 1 整合遺留 schema，程式碼不再寫入，僅保留避免刪除既有歷史資料 |
+| `face_events` | *(legacy)* 同上 |
+| `alarm_decisions` | *(legacy)* 同上 |
 | `system_events` | 系統級事件（info / warning / error）|
 | `weather_logs` | 天氣資料快取 |
 | `desk_sessions` | 桌面工作時段記錄（start/end/duration）|
@@ -392,22 +317,18 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/images` | HTML 圖片管理介面 |
 | `/desk` | HTML 桌面工作時段介面 |
 | `/environment` | HTML 環境溫濕度分析介面（日/月/年圖表）|
-| `/mqtt` | HTML MQTT 監控介面（顯示連線狀態、收發日誌、攝影機畫面）|
 | `/health` | 健康檢查（`{"status": "ok"}`，不需認證）|
-| `/state` | AgentState 部分欄位快照（感測器、天氣、安全事件、AI 使用量；不含 MQTT 連線狀態與日誌，見 `/api/mqtt/status`）|
+| `/state` | AgentState 部分欄位快照（感測器、天氣、AI 使用量）|
 | `/logs/env` | 環境日誌（溫濕度、光線）最近 50 筆 |
 | `/logs/presence` | 占用度日誌最近 50 筆 |
 | `/logs/events` | 系統事件日誌最近 50 筆 |
 | `/api/env/current` | 目前溫濕度 + 今日極值（min/max/avg）|
 | `/api/env/chart?scale=day\|month\|year&ref=...` | 環境歷史圖表資料（日/月/年聚合）|
 | `/api/env/years` | 資料庫中有資料的年份清單 |
-| `/settings/config` | 讀取配置（`api_key`→`api_key_set`、`webhook_url`→`webhook_set`、`mqtt.password`→`password_set` 遮罩為 boolean；`password_hash`/`session_secret` 移除）|
+| `/settings/config` | 讀取配置（`api_key`→`api_key_set`、`webhook_url`→`webhook_set` 遮罩為 boolean；`password_hash`/`session_secret` 移除）|
 | `/settings/wifi` | 取得 WiFi 連線資訊（SSID、IP、訊號強度）|
 | `/wifi` | AP 熱點入口網站（`wifi.py`，不需認證）|
 | `/api/wifi/scan` | 掃描周邊 WiFi 網路（GET，AP 模式限定，不需認證）|
-| `/api/preview/alert` | 回傳告警頁面的 PNG 預覽（debug 用，**需認證**）|
-| `/api/mqtt/status` | MQTT 連線狀態 JSON（含收發日誌、最後 camera frame 時間戳）|
-| `/api/mqtt/camera/latest` | 最新 MQTT camera frame（JPEG，204 表示無可用畫面）|
 
 **WiFi AP 管理端點（POST，不需認證）**
 
@@ -421,7 +342,6 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 |------|------|
 | `/settings/location` | 更新天氣位置（`lat`, `lon`）|
 | `/settings/weather` | 更新天氣設定 |
-| `/settings/mqtt` | 更新 MQTT 連線 |
 | `/settings/display` | 更新 e-Paper 參數 |
 | `/settings/presence` | 更新光線閾值（`bright_threshold`）|
 | `/settings/voice` | 更新語音設定 |
@@ -452,7 +372,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | GET | `/api/desk/history` | 近 24 小時時間軸 + 近 30 天每日統計 |
 | GET | `/api/desk/sessions` | 最近 N 筆時段記錄（預設 20 筆）|
 
-所有 PUT /settings/* 端點變更會原子化寫入 `config.local.yaml`，並同時更新記憶體中的設定物件。**天氣、顯示器、在場偵測、語音、Discord 通知、時區、密碼**等設定立即生效（下次排程執行時採用新值）。**MQTT** 設定雖寫入 YAML，但現有連線不會自動重建，需重啟服務才生效。
+所有 PUT /settings/* 端點變更會原子化寫入 `config.local.yaml`，並同時更新記憶體中的設定物件，**天氣、顯示器、在場偵測、語音、Discord 通知、時區、密碼**等設定立即生效（下次排程執行時採用新值）。
 
 ---
 
