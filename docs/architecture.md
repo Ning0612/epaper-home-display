@@ -109,7 +109,7 @@ epaper-home-display/
 │           └── images.py    # 圖片上傳/裁切/確認/輪播管理
 ├── tests/                   # pytest 單元測試（mock 硬體）
 ├── scripts/                 # Pi 硬體獨立測試腳本
-├── lib/waveshare_epd/       # Waveshare 驅動（已內建：epd7in3e.py + epdconfig.py）
+├── lib/waveshare_epd/       # Waveshare 驅動（已內建：epdconfig.py + epd7in3e.py + epd7in5_V2.py）
 ├── systemd/                 # systemd 服務單元
 ├── tools/
 │   ├── claude_auth.py       # Claude OAuth 初次授權工具（在筆電執行）

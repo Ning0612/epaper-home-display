@@ -74,7 +74,7 @@ ssh pi@epaper-display.local 'sudo raspi-config'
 
 ### 1-4. 驅動說明
 
-驅動已內建於 repo 的 `lib/waveshare_epd/` 目錄中（`epd7in3e.py` 與 `epdconfig.py`），**無需手動下載**。`epaper.py` 以 `importlib` 動態載入對應驅動（依 `config.yaml` 中的 `display.model`）。
+驅動已內建於 repo 的 `lib/waveshare_epd/` 目錄中（`epdconfig.py`、`epd7in3e.py` 與 `epd7in5_V2.py`），**無需手動下載**。`epaper.py` 以 `importlib` 動態載入對應驅動（依 `config.yaml` 中的 `display.model`）。
 
 ### 1-5. Pi OS Trixie / Bookworm：lgpio 設定
 

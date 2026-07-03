@@ -8,7 +8,7 @@
 [![asyncio](https://img.shields.io/badge/asyncio-9_coroutines-4B8BBE?style=flat-square&logo=python&logoColor=white)](https://docs.python.org/3/library/asyncio.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 七色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測與天氣資訊，並顯示 Claude / Codex AI 使用量與自訂圖片輪播。
+以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 七色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測、天氣資訊與 MQTT 裝置狀態，並顯示 Claude / Codex AI 使用量、飲水 / 3D 列印進度與自訂圖片輪播。
 
 ## 畫面預覽
 
@@ -32,8 +32,10 @@ Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並�
 
 - **天氣面板**：即時天氣 + 5 天預報（OpenWeatherMap），含天氣圖示與溫度
 - **室內環境**：DHT22 溫濕度 + 光線感測器（MCP3008 ADC）
-- **家庭占用偵測**：純光線感測，燈亮 → OCCUPIED，燈暗 → UNOCCUPIED
+- **家庭占用偵測**：純光線感測，燈亮 → OCCUPIED，燈暗 → UNOCCUPIED；無人在場時暫停面板更新，偵測到回家時立即喚醒顯示更新
 - **AI 使用量顯示**：直接透過 OAuth 向 Anthropic 與 OpenAI API 輪詢 Claude / Codex 5h 及 7d 使用量，顯示於 e-Paper 面板底部
+- **HydraCup 飲水進度**：透過本機 Mosquitto MQTT broker 接收 esp32-hydracup 每日飲水量，顯示目前飲水量 / 目標量與剩餘量（協定見 `docs/hydracup-mqtt-protocol.md`）
+- **Bambu Lab 3D 印表機進度**：透過 Bambu Lab 官方雲端 MQTT（獨立於本機 Mosquitto，不需 LAN Only Mode）取得任務名稱、進度百分比與剩餘時間，顯示於儀表板（協定見 `docs/bambu-mqtt-protocol.md`）
 - **圖片輪播**：上傳自訂圖片，支援裁切、旋轉、翻轉、Floyd-Steinberg dithering，顯示於 e-Paper 面板
 - **桌面工作時段**：自動追蹤在場時段、記錄每日統計、離場時推送 Discord 摘要
 - **WebUI 設定介面**：密碼保護的瀏覽器設定介面，支援互動地圖選點、圖片管理
@@ -48,7 +50,7 @@ Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並�
 | 元件 | 型號 | 說明 |
 |------|------|------|
 | 單板電腦 | Raspberry Pi Zero 2W | 運行主服務 |
-| 顯示器 | Waveshare 7.3" e-Paper (E) | 800×480，七色（黑、白、紅、黃、藍、綠、橙）|
+| 顯示器 | Waveshare 7.3" e-Paper (E) / Waveshare 7.5" e-Paper V2 | 透過 `display.model` 選擇 `epd7in3e`（800×480，七色：黑、白、紅、黃、藍、綠、橙）或 `epd7in5_V2`（800×480，黑白雙色，支援 dirty-region 局部刷新）；完整設定見 [docs/configuration.md](docs/configuration.md) |
 | 溫濕度感測器 | DHT22 | GPIO 4（BCM） |
 | 光線感測器 | 光敏電阻 + MCP3008 ADC | SPI CE1（GPIO 7） |
 | 按鈕（×4，1 個作用中）| 任意常開按鈕 | GPIO 5（B1，作用中）/ 6（B2）/ 27（B3）/ 22（B4，接腳保留未綁定）|
@@ -174,7 +176,7 @@ git push                        ├── _presence_loop()       → 占用計�
 | 項目 | 說明 |
 |------|------|
 | 課程 | EE5325701 物聯網系統應用與設計實務（Design and Application in Internet of Things）|
-| 學期 | 114-2（2025–2026 春季）|
+| 學期 | 114-2（2026 春季）|
 | 學生 | B11115024 王政甯 |
 
 ---
