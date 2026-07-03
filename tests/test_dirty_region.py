@@ -93,20 +93,20 @@ class TestComputeDirtyRegions:
 
 
 class TestPackMonoBuffer:
-    def test_all_black_image_packs_to_zero_bytes(self):
-        # No inversion here: epd7in5_V2.display_Partial() inverts internally
-        # before writing to 0x13, unlike getbuffer()/display() which expect
-        # pre-inverted bytes. pack_mono_buffer must hand back raw mode-1 bytes.
+    def test_all_black_image_packs_to_ff_bytes(self):
+        # Matches EPD.getbuffer(): hardware-verified on real epd7in5_V2 (a
+        # theoretical no-invert derivation looked right on paper but rendered
+        # partial refreshes with flipped black/white on the actual panel).
         img = Image.new("1", (16, 4), 0)
         buf = pack_mono_buffer(img)
         assert len(buf) == (16 // 8) * 4
-        assert all(b == 0x00 for b in buf)
+        assert all(b == 0xFF for b in buf)
 
-    def test_all_white_image_packs_to_ff_bytes(self):
+    def test_all_white_image_packs_to_zero_bytes(self):
         img = Image.new("1", (16, 4), 1)
         buf = pack_mono_buffer(img)
         assert len(buf) == (16 // 8) * 4
-        assert all(b == 0xFF for b in buf)
+        assert all(b == 0x00 for b in buf)
 
     def test_buffer_length_matches_dimensions(self):
         img = Image.new("RGB", (40, 10), (0, 0, 0))

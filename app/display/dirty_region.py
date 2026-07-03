@@ -23,13 +23,19 @@ def _align_box(box: tuple[int, int, int, int], width: int, height: int) -> tuple
 
 
 def pack_mono_buffer(image: Image.Image) -> bytearray:
-    # Deliberately NOT inverted like EPD.getbuffer(): display_Partial() in
-    # epd7in5_V2.py does `~Image[...]` internally before writing to 0x13, while
-    # display()/display_fast() send getbuffer()'s pre-inverted bytes straight
-    # through. Inverting here too would double-invert and flip black/white on
-    # every partial refresh.
+    # Matches EPD.getbuffer()'s inversion exactly (same convert("1") + XOR
+    # 0xFF). A theoretical trace through epd7in5_V2.display_Partial()'s
+    # internal `~Image[...]` suggested this should NOT be inverted here, but
+    # real epd7in5_V2 hardware showed the opposite: without this XOR, the
+    # partially-refreshed region rendered with black/white flipped relative
+    # to a full refresh of the same content. Partial mode's 0x13 register
+    # apparently doesn't share full-refresh mode's polarity, despite what the
+    # driver source alone implies — trust the hardware result, not the trace.
     img = image.convert("1")
-    return bytearray(img.tobytes("raw"))
+    buf = bytearray(img.tobytes("raw"))
+    for i in range(len(buf)):
+        buf[i] ^= 0xFF
+    return buf
 
 
 def _connected_components(dirty: list[list[bool]], rows: int, cols: int) -> list[list[tuple[int, int]]]:

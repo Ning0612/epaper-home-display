@@ -128,12 +128,10 @@ class TestRealEpaperWithPartialSupport:
 
         assert fake.calls == []
 
-    def test_partial_buffer_matches_full_refresh_ram_bytes(self):
-        # epd7in5_V2.display_Partial() does `~Image[...] & 0xFF` internally
-        # before writing to 0x13, while display()/display_fast() write
-        # getbuffer()'s pre-inverted bytes straight through. Both paths must
-        # leave the SAME bytes in panel RAM for the same visual content, or
-        # partial refreshes render inverted relative to full refreshes.
+    def test_partial_buffer_matches_getbuffer_convention(self):
+        # Hardware-verified on real epd7in5_V2: the buffer handed to
+        # display_Partial() must use the same inverted convention as
+        # EPD.getbuffer() (convert("1") then XOR 0xFF), not raw mode-1 bytes.
         fake = _FakeEpdPartial()
         epaper = _make_real_epaper(fake)
         base = _blank()
@@ -149,10 +147,9 @@ class TestRealEpaperWithPartialSupport:
         xs, ys, xe, ye = fake.partial_calls[0]
         sent_buf = fake.partial_buffers[0]
 
-        ram_bytes_via_partial = bytearray((~b) & 0xFF for b in sent_buf)
         raw_crop = changed.crop((xs, ys, xe, ye)).convert("1").tobytes("raw")
-        ram_bytes_via_full_refresh = bytearray(b ^ 0xFF for b in raw_crop)
-        assert ram_bytes_via_partial == ram_bytes_via_full_refresh
+        expected = bytearray(b ^ 0xFF for b in raw_crop)
+        assert sent_buf == expected
 
     def test_small_change_uses_partial_path(self):
         fake = _FakeEpdPartial()
