@@ -27,7 +27,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_STALE_FILL = (160, 160, 160)
+# Was a dithered gray (160,160,160); e-paper has no native gray, so
+# quantizing/converting it (Floyd-Steinberg) turned muted text and progress
+# bars into unreadable noise. Muted state is already conveyed by "--"
+# placeholders and "No active print", so solid FG loses no information.
+_STALE_FILL = FG
 
 
 def _draw_card_weather(
@@ -341,17 +345,27 @@ def _draw_card_water_printer(
     if updated_at is not None:
         now = datetime.now(updated_at.tzinfo) if updated_at.tzinfo is not None else datetime.now()
         is_stale = (now - updated_at).total_seconds() > settings.mqtt.heartbeat_timeout_sec
-    muted = is_stale or not state.hydra_device_online or state.hydra_current_ml is None
+    muted = (
+        is_stale
+        or not state.hydra_broker_connected
+        or not state.hydra_device_online
+        or state.hydra_current_ml is None
+    )
     fill = _STALE_FILL if muted else FG
     bar_fill = _STALE_FILL if muted else (0, 0, 255) if color else FG
 
-    if state.hydra_current_ml is None or state.hydra_goal_ml is None:
+    # muted also covers stale/offline cases where current_ml/goal_ml are still
+    # the last-known (non-None) values — those must not be shown as live data
+    # now that fill no longer dims them gray.
+    if muted or state.hydra_current_ml is None or state.hydra_goal_ml is None:
         amount_str = "--/--ml"
         goal_text = "--"
+        hydra_pct = None
     else:
         amount_str = f"{state.hydra_current_ml}/{state.hydra_goal_ml}ml"
         remaining = state.hydra_goal_ml - state.hydra_current_ml
         goal_text = "Goal!" if remaining <= 0 else f"{remaining}ml"
+        hydra_pct = state.hydra_pct
 
     printer_active = state.printer_broker_connected and state.printer_gcode_state in {"RUNNING", "PAUSE"}
     printer_fill = FG if printer_active else _STALE_FILL
@@ -383,7 +397,7 @@ def _draw_card_water_printer(
     _cx_text(draw, "HydraCup", ix, iw, sy, title_font, fill=fill)
     _cx_text(draw, amount_str, ix, iw, sy + 16, title_font, fill=fill)
     _draw_progress_row(
-        draw, ix, sy + 32, iw, state.hydra_pct, goal_text,
+        draw, ix, sy + 32, iw, hydra_pct, goal_text,
         fg=fill, bar_fill=bar_fill, pct_col_w=pct_col_w, bar_w=bar_w,
     )
 

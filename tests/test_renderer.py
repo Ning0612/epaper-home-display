@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 os.environ.setdefault("RPI_MOCK", "1")
 
@@ -146,6 +146,39 @@ def test_render_printer_offline_muted(settings):
     s.printer_task_name = "offline.3mf"
     s.printer_gcode_state = "RUNNING"
     s.printer_broker_connected = False
+    img = render_dashboard(s, settings)
+    assert img.size == (800, 480)
+
+
+def test_render_hydra_stale_with_last_known_value(settings):
+    # Regression check: hydra_current_ml/goal_ml can still be non-None (the
+    # last-known reading) while the connection is stale/offline. That must
+    # not render as if it were live data now that the muted state is no
+    # longer distinguished by a dithered gray fill (see renderer_cards.py
+    # _STALE_FILL) — the text itself has to fall back to placeholders.
+    s = AgentState()
+    s.hydra_current_ml = 1450
+    s.hydra_goal_ml = 2000
+    s.hydra_pct = 0.725
+    s.hydra_updated_at = datetime.now() - timedelta(hours=1)
+    s.hydra_device_online = True
+    s.hydra_broker_connected = True
+    img = render_dashboard(s, settings)
+    assert img.size == (800, 480)
+
+
+def test_render_hydra_broker_disconnected_with_last_known_value(settings):
+    # Regression check: broker_connected=False must mute even when the
+    # heartbeat timeout hasn't elapsed yet and device_online/current_ml still
+    # hold the last-known reading (mirrors printer_active's broker_connected
+    # check, which hydra's muted condition previously omitted).
+    s = AgentState()
+    s.hydra_current_ml = 1450
+    s.hydra_goal_ml = 2000
+    s.hydra_pct = 0.725
+    s.hydra_updated_at = datetime.now()
+    s.hydra_device_online = True
+    s.hydra_broker_connected = False
     img = render_dashboard(s, settings)
     assert img.size == (800, 480)
 
