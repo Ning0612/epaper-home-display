@@ -92,6 +92,8 @@ display:
 
 **full_refresh_every 說明**：每 N 次顯示更新強制執行一次完整刷新（init，清除鬼影）。設定值範圍 1–100。注意：`epd7in3e` 驅動無 `init_fast()` 方法，即使設為較大的 N，服務仍會在每次更新時 fallback 至完整刷新（init）。
 
+**epd7in5_V2 局部刷新說明**：非全刷新的更新在符合條件時（已有上一張成功顯示的畫面、畫面尺寸等於面板原生尺寸），不是單純「較快的全畫面刷新」，而是真正只刷新畫面中有變化的矩形區域（dirty-region，見 `app/display/dirty_region.py`）；跟上一次成功顯示的畫面完全相同時，該次更新會整個略過、不碰面板。條件不符時（例如開機後第一次更新、剛執行過 clear()）會 fallback 回原本的 init_fast 全畫面路徑。這個機制只在 `epd7in5_V2` 有效（`epd7in3e` 沒有對應的驅動 API，行為不受影響），無獨立設定項目，跟隨 `full_refresh_every` 的節奏自動啟用。
+
 ---
 
 ## 音效

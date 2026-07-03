@@ -49,6 +49,7 @@ epaper-home-display/
 │   ├── state.py             # 全局狀態（AgentState dataclass）
 │   ├── display/
 │   │   ├── epaper.py        # e-Paper 驅動包裝（importlib 動態載入 waveshare_epd.{model}；Real + Mock）
+│   │   ├── dirty_region.py  # 畫面 diff → 局部刷新矩形計算（純函數，僅 epd7in5_V2 用得到）
 │   │   ├── renderer.py      # 主渲染入口（800×480 Pillow RGB 圖像）
 │   │   ├── renderer_cards.py   # 各卡片繪製函數（儀表板）
 │   │   ├── renderer_apmode.py  # WiFi AP 熱點引導頁面渲染
@@ -186,6 +187,8 @@ presence_return 事件（UNOCCUPIED → OCCUPIED，立即）──────�
 | 人不在時 | — | `display_loop` 暫停，不做任何更新（wifi_connected 事件可繞過此限制）|
 
 > **注意**：`epd7in3e` 驅動無 `init_fast()` 方法，`epaper.py` 的 AttributeError fallback 會使每次更新均執行完整初始化。`full_refresh_every` 設定目前對 epd7in3e 面板效果等同於每次全刷新。
+
+**dirty-region 局部刷新（僅 `epd7in5_V2`）**：非全刷新的更新不再無條件送出整張畫面。`RealEpaper`（`app/display/epaper.py`）會保留上一次成功寫入面板的畫面（`self._last_image`），呼叫 `app/display/dirty_region.compute_dirty_regions()` 跟本次要顯示的畫面比對，只把有變化的矩形區域透過 `init_part()` + `display_Partial()` 送到面板；畫面完全沒有變化時整次略過面板寫入（連 init 都不呼叫）。演算法把畫面切成 40px 網格做 4-連通分群，最多回傳 6 個獨立矩形（`MAX_REGIONS`），超過就退化成單一涵蓋所有變化像素的矩形，避免過多 `display_Partial()` 呼叫各自的 busy-wait 開銷反而比全刷新慢（`init_part()` 每次 `display()` 只呼叫一次，region 迴圈只重複呼叫 `display_Partial()`）；X 軸座標會對齊 8 的倍數（面板以 byte 定址）。以下情況會直接 fall through 到既有的 init_fast/全刷新路徑，不進 dirty-region 分支：尚未有上一張畫面（開機後第一次、或剛執行過 `clear()`）、畫面尺寸不是面板原生的 `(width, height)`（`getbuffer()` 的 480x800 自動旋轉在 dirty-region 路徑沒有對應處理）、或驅動沒有 `display_Partial()`/`init_part()`（`epd7in3e` 恆不受影響）。`app/display/dirty_region.pack_mono_buffer()` 刻意不像 `getbuffer()` 一樣反相 bit：`epd7in5_V2.display_Partial()` 內部會自己對傳入 buffer 做 `~Image[...]` 反相後才寫入面板 RAM，而 `display()`/`display_fast()` 則是直接寫入 `getbuffer()` 已反相過的資料；若 `pack_mono_buffer()` 也預先反相會變成雙重反相，讓局部刷新區域黑白顛倒。
 
 **牆鐘對齊原理**：`dashboard_interval_minutes`（預設 5）決定多久刷新一次，`dashboard_trigger_second` 由 model 推導（不可手動設定）。系統在每個 N 分鐘邊界前提早 `(60 - trigger_second)` 秒觸發，讓面板完成刷新時剛好顯示正確時間。例如：epd7in3e 在 :40 觸發，全刷新約 20 秒，面板在 :00 顯示正確分鐘數。
 

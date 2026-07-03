@@ -122,8 +122,9 @@ def _maybe_advance_carousel(settings) -> None:
 async def _display_loop(
     epaper, executor: ThreadPoolExecutor, display_queue: asyncio.Queue, settings
 ) -> None:
-    # Every full_refresh_every-th update is a full refresh (clears ghosting); others use
-    # init_fast() for a faster partial update. max(1,...) guards against zero in YAML.
+    # The first update is a full refresh; then every full_refresh_every-th call
+    # after that is a full refresh again (clears ghosting). Others use init_fast()
+    # for a faster partial update. max(1,...) guards against zero in YAML.
     refresh_count = 0
     loop = asyncio.get_event_loop()
     # startup_wait_done: True once _wait_for_startup_data() has returned.
@@ -201,7 +202,8 @@ async def _display_loop(
                 await loop.run_in_executor(
                     executor, functools.partial(epaper.display, image, actual_full_refresh)
                 )
-                refresh_count += 1  # only advance cadence on successful panel write
+                refresh_count += 1  # advances once epaper.display() returns without raising, even if it
+                # skipped the panel write internally (e.g. a dirty-region no-op on an unchanged frame)
 
             startup_pending = False  # first render succeeded — clear boot gate
         except Exception as exc:

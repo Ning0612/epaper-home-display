@@ -8,6 +8,7 @@ from typing import Protocol
 from PIL import Image
 
 from app.config import DisplayConfig
+from app.display.dirty_region import compute_dirty_regions, pack_mono_buffer
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +27,38 @@ class EpaperDisplay(Protocol):
 class RealEpaper:
     def __init__(self, epd_module) -> None:
         self._epd = epd_module.EPD()
+        self._last_image: Image.Image | None = None
 
     def init(self) -> None:
         self._epd.init()
 
     def display(self, image: Image.Image, full_refresh: bool = False) -> None:
+        if (
+            not full_refresh
+            and self._last_image is not None
+            and hasattr(self._epd, "display_Partial")
+            and hasattr(self._epd, "init_part")
+            # getbuffer() auto-rotates 480x800 input to the panel's native
+            # 800x480 orientation; the dirty-region path crops/diffs in the
+            # image's own coordinate space and cannot replicate that, so it
+            # only applies when the image is already in panel-native size.
+            and image.size == (self._epd.width, self._epd.height)
+        ):
+            regions = compute_dirty_regions(self._last_image, image)
+            if regions is not None:
+                if not regions:
+                    logger.debug("Dirty-region diff empty, skipping panel write")
+                    return
+                self._epd.init_part()
+                for xs, ys, xe, ye in regions:
+                    buf = pack_mono_buffer(image.crop((xs, ys, xe, ye)))
+                    self._epd.display_Partial(buf, xs, ys, xe, ye)
+                self._epd.sleep()
+                self._last_image = image.copy()
+                logger.info("Partial refresh: %d region(s) %s", len(regions), regions)
+                return
+            # regions is None: no usable baseline (size mismatch) — fall through.
+
         # sleep() calls module_exit() which closes the SPI fd, so both paths
         # must call an init variant to reopen it before writing.
         use_fast = not full_refresh
@@ -55,6 +83,9 @@ class RealEpaper:
         else:
             self._epd.display(buf)
         self._epd.sleep()
+        # Only recorded once the whole write succeeds, so an exception mid-way
+        # leaves the next diff covering the incomplete update (self-healing).
+        self._last_image = image.copy()
 
     def sleep(self) -> None:
         self._epd.sleep()
@@ -63,6 +94,8 @@ class RealEpaper:
         self._epd.init()
         self._epd.Clear()
         self._epd.sleep()
+        # Panel content no longer matches any previously recorded frame.
+        self._last_image = None
 
 
 class MockEpaper:
