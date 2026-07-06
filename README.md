@@ -10,6 +10,17 @@
 
 以 Raspberry Pi Zero 2W 驅動 Waveshare 7.3" 七色 e-Paper 顯示器（epd7in3e）的智慧家庭狀態面板，整合溫濕度、光線感測、天氣資訊與 MQTT 裝置狀態，並顯示 Claude / Codex AI 使用量、飲水 / 3D 列印進度與自訂圖片輪播。
 
+## 實體照片
+
+![ePaper home display real setup](docs/demo/real_setup.jpg)
+
+## Demo 片段
+
+- [期末總 DEMO 影片](docs/demo/system-demo.mp4)
+- [電子紙資訊顯示 - 圖片切換](docs/demo/image-switch.mkv)
+- [電子紙 - 主動切監視器畫面 / 主動發警報 / 取消警報](docs/demo/active-monitor-alert-cancel.mkv)
+- [電子紙 - 收到警報自動切監視器畫面 / 選擇發警報 / 取消警報](docs/demo/auto-monitor-alert-cancel.mkv)
+
 ## 畫面預覽
 
 ### 儀表板（Dashboard）
