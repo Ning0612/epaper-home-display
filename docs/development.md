@@ -39,6 +39,16 @@ python -m venv .venv
 pytest
 ```
 
+### CI
+
+GitHub Actions 會在 push、pull request 與手動 workflow dispatch 時執行
+`.github/workflows/ci.yml`：
+
+- 安裝 `requirements.txt`
+- 執行 `pytest`
+
+CI 使用 mock 硬體測試，不需要 Raspberry Pi、GPIO、SPI 或 e-Paper 實機。
+
 ### 指定測試檔案
 
 ```bash
