@@ -27,6 +27,8 @@
   <img src="docs/demo/demo-preview.gif" alt="ePaper demo preview" width="560">
 </p>
 
+上方 GIF 是短預覽；完整影片請看下方 MP4 連結。
+
 完整 demo 影片：
 
 - [期末總 Demo 影片](docs/demo/system-demo.mp4)
