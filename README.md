@@ -18,9 +18,9 @@
 ## Demo 片段
 
 - [期末總 DEMO 影片](docs/demo/system-demo.mp4)
-- [電子紙資訊顯示 - 圖片切換](docs/demo/image-switch.mkv)
-- [電子紙 - 主動切監視器畫面 / 主動發警報 / 取消警報](docs/demo/active-monitor-alert-cancel.mkv)
-- [電子紙 - 收到警報自動切監視器畫面 / 選擇發警報 / 取消警報](docs/demo/auto-monitor-alert-cancel.mkv)
+- [電子紙資訊顯示 - 圖片切換](docs/demo/image-switch.mp4)
+- [電子紙 - 主動切監視器畫面 / 主動發警報 / 取消警報](docs/demo/active-monitor-alert-cancel.mp4)
+- [電子紙 - 收到警報自動切監視器畫面 / 選擇發警報 / 取消警報](docs/demo/auto-monitor-alert-cancel.mp4)
 
 ## 畫面預覽
 
