@@ -17,13 +17,19 @@
 
 ## 實體照片
 
-![ePaper home display real setup](docs/demo/real_setup.jpg)
+<p align="center">
+  <img src="docs/demo/real_setup.jpg" alt="ePaper home display real setup" width="720">
+</p>
 
 ## Demo 片段
 
-![ePaper demo preview](docs/demo/demo-preview.gif)
+<p align="center">
+  <img src="docs/demo/demo-preview.gif" alt="ePaper demo preview" width="560">
+</p>
 
-- [期末總 DEMO 影片](docs/demo/system-demo.mp4)
+完整 demo 影片：
+
+- [期末總 Demo 影片](docs/demo/system-demo.mp4)
 - [電子紙資訊顯示 - 圖片切換](docs/demo/image-switch.mp4)
 - [電子紙 - 主動切監視器畫面 / 主動發警報 / 取消警報](docs/demo/active-monitor-alert-cancel.mp4)
 - [電子紙 - 收到警報自動切監視器畫面 / 選擇發警報 / 取消警報](docs/demo/auto-monitor-alert-cancel.mp4)
