@@ -31,11 +31,14 @@ async def _codex_usage_loop(service: CodexUsageService, settings) -> None:
                 state.codex_usage_week = data.usage_7d
                 state.codex_5h_reset = data.reset_5h
                 state.codex_7d_reset = data.reset_7d
+                usage_5h = f"{data.usage_5h * 100:.0f}%" if data.usage_5h is not None else "N/A"
+                usage_7d = f"{data.usage_7d * 100:.0f}%" if data.usage_7d is not None else "N/A"
                 logger.info(
-                    "Codex usage: 5h=%.0f%% 7d=%.0f%% reset_5h=%s",
-                    data.usage_5h * 100,
-                    data.usage_7d * 100,
+                    "Codex usage: 5h=%s 7d=%s reset_5h=%s reset_7d=%s",
+                    usage_5h,
+                    usage_7d,
                     data.reset_5h,
+                    data.reset_7d,
                 )
         except _RateLimitedError:
             pass

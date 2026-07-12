@@ -18,8 +18,8 @@ _TOKEN_URL = "https://auth.openai.com/oauth/token"
 
 @dataclass
 class CodexUsageData:
-    usage_5h: float
-    usage_7d: float
+    usage_5h: float | None
+    usage_7d: float | None
     reset_5h: str
     reset_7d: str
 
@@ -184,20 +184,60 @@ def _parse_usage(body: dict) -> CodexUsageData | None:
         # Two wire formats observed in the wild; resolve each window independently
         rl = body.get("rate_limits") or {}
         rl2 = body.get("rate_limit") or {}
-        primary = rl.get("primary") or rl2.get("primary_window") or {}
-        secondary = rl.get("secondary") or rl2.get("secondary_window") or {}
 
-        p_pct = primary.get("used_percent")
-        s_pct = secondary.get("used_percent")
-        p_reset = primary.get("resets_at") or primary.get("reset_at")
-        s_reset = secondary.get("resets_at") or secondary.get("reset_at")
+        primary = rl.get("primary") or rl2.get("primary_window")
+        secondary = rl.get("secondary") or rl2.get("secondary_window")
 
-        reset_5h = _fmt_unix_local(p_reset) if isinstance(p_reset, (int, float)) else "--:--"
-        reset_7d = _fmt_unix_remaining(s_reset) if isinstance(s_reset, (int, float)) else "--:--"
+        # OpenAI has put weekly usage in primary_window while secondary_window was null.
+        windows: dict[str, dict | None] = {"short": None, "long": None}
+        classified_kinds: list[str | None] = []
+        for window, positional_kind in ((primary, "short"), (secondary, "long")):
+            if window is None:
+                classified_kinds.append(None)
+                continue
+            limit_window_seconds = window.get("limit_window_seconds")
+            # bool is an int subclass in Python — exclude it so a stray True/False
+            # value can't get misread as a real window duration.
+            is_duration = isinstance(limit_window_seconds, (int, float)) and not isinstance(
+                limit_window_seconds, bool
+            )
+            kind = positional_kind if not is_duration else (
+                "short" if limit_window_seconds <= 43200 else "long"
+            )
+            classified_kinds.append(kind)
+
+        if (
+            primary is not None
+            and secondary is not None
+            and classified_kinds[0] == classified_kinds[1]
+        ):
+            # Duration classification cannot resolve a same-kind collision; wire position
+            # preserves both windows more safely than allowing one to overwrite the other.
+            logger.warning(
+                "Codex usage window classification conflict: both windows classified as %s; "
+                "falling back to wire positions",
+                classified_kinds[0],
+            )
+            windows["short"] = primary
+            windows["long"] = secondary
+        else:
+            for window, kind in zip((primary, secondary), classified_kinds):
+                if window is not None and kind is not None:
+                    windows[kind] = window
+
+        short = windows["short"]
+        long = windows["long"]
+        short_pct = short.get("used_percent") if short is not None else None
+        long_pct = long.get("used_percent") if long is not None else None
+        short_reset = (short.get("resets_at") or short.get("reset_at")) if short is not None else None
+        long_reset = (long.get("resets_at") or long.get("reset_at")) if long is not None else None
+
+        reset_5h = _fmt_unix_local(short_reset) if isinstance(short_reset, (int, float)) else "--:--"
+        reset_7d = _fmt_unix_remaining(long_reset) if isinstance(long_reset, (int, float)) else "--:--"
 
         return CodexUsageData(
-            usage_5h=(float(p_pct) / 100.0) if p_pct is not None else 0.0,
-            usage_7d=(float(s_pct) / 100.0) if s_pct is not None else 0.0,
+            usage_5h=(float(short_pct) / 100.0) if short_pct is not None else None,
+            usage_7d=(float(long_pct) / 100.0) if long_pct is not None else None,
             reset_5h=reset_5h,
             reset_7d=reset_7d,
         )
