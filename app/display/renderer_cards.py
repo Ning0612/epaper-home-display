@@ -17,7 +17,7 @@ from app.display.renderer_constants import (
 from app.display.renderer_utils import (
     _font, _cx_text, _paste_icon, _draw_progress_bar, _ellipsize,
     _pick_daily_forecast, _weather_item, _temp_color, _usage_color,
-    _draw_thermometer_icon, _draw_droplet_icon,
+    _draw_mono_icon_left_aligned,
 )
 from app.logic.printer import format_remaining
 
@@ -56,8 +56,9 @@ def _draw_card_weather(
     time_y = dt_top + 46
 
     sensor_font = _font(22, bold=True)
-    icon_sz = 20
-    icon_gap = 6
+    temp_icon_sz = 20
+    hum_icon_sz = 30
+    icon_gap = 0
     row_gap = 8
     row_h = 28
     group_gap = 24
@@ -68,7 +69,8 @@ def _draw_card_weather(
     hum_bb = draw.textbbox((0, 0), hum_str, font=sensor_font)
     temp_w = temp_bb[2] - temp_bb[0]
     hum_w = hum_bb[2] - hum_bb[0]
-    sensor_w = icon_sz + icon_gap + max(temp_w, hum_w)
+    icon_col_w = max(temp_icon_sz, hum_icon_sz)
+    sensor_w = icon_col_w + icon_gap + max(temp_w, hum_w)
 
     # Shrink the clock font if needed so the (time + sensor block) group never
     # overflows the card — guards against wider fonts/strings in the future.
@@ -95,19 +97,32 @@ def _draw_card_weather(
     time_visible_center = time_y + (time_bb[1] + time_bb[3]) / 2
     sensor_y = int(time_visible_center - sensor_block_h / 2)
 
-    temp_color = _temp_color(state.temperature, color)
-    _draw_thermometer_icon(draw, sensor_x, sensor_y + (row_h - icon_sz) // 2, icon_sz, fill=temp_color)
-    draw.text(
-        (sensor_x + icon_sz + icon_gap, sensor_y + (row_h - 22) // 2),
-        temp_str, font=sensor_font, fill=temp_color,
-    )
+    def _draw_sensor_row(
+        row_y: int,
+        icon_name: str,
+        icon_size: int,
+        value: str,
+        fill: tuple[int, int, int],
+    ) -> None:
+        value_bb = draw.textbbox((0, 0), value, font=sensor_font)
+        value_h = value_bb[3] - value_bb[1]
+        icon_x = sensor_x
+        value_x = sensor_x + icon_col_w + icon_gap
+        value_y = int(row_y + (row_h - value_h) / 2 - value_bb[1])
+        value_center_y = value_y + (value_bb[1] + value_bb[3]) / 2
+        _draw_mono_icon_left_aligned(
+            img,
+            icon_name,
+            icon_x,
+            value_center_y,
+            icon_size,
+            fill=fill,
+        )
+        draw.text((value_x, value_y), value, font=sensor_font, fill=fill)
 
-    hum_y = sensor_y + row_h + row_gap
-    _draw_droplet_icon(draw, sensor_x, hum_y + (row_h - icon_sz) // 2, icon_sz, fill=FG)
-    draw.text(
-        (sensor_x + icon_sz + icon_gap, hum_y + (row_h - 22) // 2),
-        hum_str, font=sensor_font, fill=FG,
-    )
+    temp_color = _temp_color(state.temperature, color)
+    _draw_sensor_row(sensor_y, "Thermometer", temp_icon_sz, temp_str, temp_color)
+    _draw_sensor_row(sensor_y + row_h + row_gap, "Raindrop", hum_icon_sz, hum_str, FG)
 
     div_y = WEATHER_Y + PAD + _WX_TOP_H
     draw.line([(WEATHER_X + 1, div_y), (WEATHER_X + WEATHER_W - 2, div_y)], fill=FG, width=1)

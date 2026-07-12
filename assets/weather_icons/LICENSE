@@ -9,11 +9,22 @@ The modified and converted versions in this directory are distributed under
 the same license, as required by the OFL terms.
 
 Modifications made for this project:
-- Selected a subset of icons relevant to OpenWeatherMap condition categories
+- Selected a subset of icons relevant to OpenWeatherMap condition categories,
+  plus two non-weather glyphs (Thermometer, Raindrop) used for the indoor
+  temperature/humidity readout on the dashboard's clock card
 - Redrawn / adjusted SVG paths to fit a 64×64 pixel grid for e-Paper display
-- Exported SVG → PNG via Inkscape (assets/weather_icons/convert.bat)
+  (weather condition icons only; Thermometer.svg / Raindrop.svg are used
+  unmodified from the upstream wi-thermometer.svg / wi-raindrop.svg,
+  30×30 viewBox as in the original)
+- Exported SVG → PNG via Inkscape (assets/weather_icons/convert.bat) for the
+  weather condition icons; Thermometer.svg and Raindrop.svg were exported to
+  PNG via resvg (https://github.com/linebender/resvg) instead, same source
+  format and output size, tool substitution only
 - PNG files are loaded at runtime by Pillow and resized on-the-fly for rendering
   on the Waveshare 7.3" e-Paper (epd7in3e) display
+- Thermometer.png and Raindrop.png are loaded as alpha masks (not pasted as-is)
+  so the glyph can be tinted at runtime — see _load_mono_icon_mask() in
+  app/display/renderer_utils.py
 
 The icons in this directory use the name "epaper-weather-icons" to distinguish
 them from the original Weather Icons set, in accordance with OFL section 3.

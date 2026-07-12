@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import math
 from collections import Counter
 from datetime import datetime, date, timezone
 from typing import TypeAlias
@@ -67,6 +66,29 @@ def _paste_icon(img: Image.Image, main: str, size: int, x: int, y: int) -> bool:
     icon_img, alpha = asset
     img.paste(icon_img, (x, y), alpha)
     return True
+
+
+_MONO_MASK_CACHE: dict[tuple[str, int], Image.Image | None] = {}
+
+
+def _load_mono_icon_mask(name: str, size: int) -> Image.Image | None:
+    """Load a black-on-transparent glyph PNG and return its alpha channel as a paste mask."""
+    if size <= 0:
+        return None
+    key = (name, size)
+    if key in _MONO_MASK_CACHE:
+        return _MONO_MASK_CACHE[key]
+    path = f"assets/weather_icons/{name}.png"
+    try:
+        with Image.open(path) as raw:
+            raw.load()
+            mask = raw.convert("RGBA").resize((size, size), Image.LANCZOS).split()[3]
+    except (IOError, OSError, IndexError) as e:
+        logger.warning("mono icon load failed (%s): %s", path, e)
+        _MONO_MASK_CACHE[key] = None
+        return None
+    _MONO_MASK_CACHE[key] = mask
+    return mask
 
 
 def _draw_progress_bar(
@@ -194,53 +216,66 @@ def _temp_color(temp: float | None, color: bool = True) -> tuple[int, int, int]:
 
 
 def _draw_thermometer_icon(
-    draw: ImageDraw.ImageDraw, x: int, y: int, size: int, fill: tuple[int, int, int] = FG,
+    img: Image.Image, x: int, y: int, size: int, fill: tuple[int, int, int] = FG,
 ) -> None:
-    """Draw a hollow (outline) thermometer glyph inside the [x, x+size] x [y, y+size] box."""
-    if size <= 0:
+    """Paste a thermometer glyph (assets/weather_icons/Thermometer.png) tinted with `fill`."""
+    mask = _load_mono_icon_mask("Thermometer", size)
+    if mask is None:
         return
-    cx = x + size / 2
-    bulb_r = size * 0.28
-    bulb_cy = y + size - bulb_r
-    stem_w = size * 0.30
-    stem_top = y + size * 0.05
-    lw = max(1, round(size * 0.09))
-    half_w = stem_w / 2
-
-    # Stop the stem's side lines where they meet the bulb circle so the
-    # outline reads as a clean capsule-on-circle, not a line crossing
-    # through the middle of the bulb.
-    inset = bulb_r * bulb_r - half_w * half_w
-    stem_bottom = bulb_cy - math.sqrt(inset) if inset > 0 else bulb_cy
-
-    draw.line([(cx - half_w, stem_bottom), (cx - half_w, stem_top + half_w)], fill=fill, width=lw)
-    draw.line([(cx + half_w, stem_bottom), (cx + half_w, stem_top + half_w)], fill=fill, width=lw)
-    draw.arc([cx - half_w, stem_top, cx + half_w, stem_top + stem_w], 180, 360, fill=fill, width=lw)
-    draw.ellipse([cx - bulb_r, bulb_cy - bulb_r, cx + bulb_r, bulb_cy + bulb_r], outline=fill, width=lw)
+    img.paste(Image.new("RGB", (size, size), fill), (x, y), mask)
 
 
 def _draw_droplet_icon(
-    draw: ImageDraw.ImageDraw, x: int, y: int, size: int, fill: tuple[int, int, int] = FG,
+    img: Image.Image, x: int, y: int, size: int, fill: tuple[int, int, int] = FG,
 ) -> None:
-    """Draw a hollow (outline) water-drop glyph inside the [x, x+size] x [y, y+size] box."""
-    if size <= 0:
+    """Paste a water-drop glyph (assets/weather_icons/Raindrop.png) tinted with `fill`."""
+    mask = _load_mono_icon_mask("Raindrop", size)
+    if mask is None:
         return
-    cx = x + size / 2
-    r = size * 0.32
-    circle_cy = y + size - r - size * 0.02
-    apex_y = y + size * 0.05
-    lw = max(1, round(size * 0.09))
+    img.paste(Image.new("RGB", (size, size), fill), (x, y), mask)
 
-    # Tail lines meet the circle exactly on its boundary (not inside it) so
-    # the outline reads as a single seamless teardrop instead of a triangle
-    # overlapping a circle.
-    angle = math.radians(55)
-    left_pt = (cx - r * math.sin(angle), circle_cy - r * math.cos(angle))
-    right_pt = (cx + r * math.sin(angle), circle_cy - r * math.cos(angle))
 
-    draw.ellipse([cx - r, circle_cy - r, cx + r, circle_cy + r], outline=fill, width=lw)
-    draw.line([(cx, apex_y), left_pt], fill=fill, width=lw)
-    draw.line([(cx, apex_y), right_pt], fill=fill, width=lw)
+def _draw_mono_icon_centered(
+    img: Image.Image,
+    name: str,
+    center_x: float,
+    center_y: float,
+    size: int,
+    fill: tuple[int, int, int] = FG,
+) -> None:
+    """Paste a monochrome weather glyph with its visible bounds centered."""
+    mask = _load_mono_icon_mask(name, size)
+    if mask is None:
+        return
+    bbox = mask.getbbox()
+    if bbox is None:
+        return
+    visible_cx = (bbox[0] + bbox[2]) / 2
+    visible_cy = (bbox[1] + bbox[3]) / 2
+    x = int(round(center_x - visible_cx))
+    y = int(round(center_y - visible_cy))
+    img.paste(Image.new("RGB", (size, size), fill), (x, y), mask)
+
+
+def _draw_mono_icon_left_aligned(
+    img: Image.Image,
+    name: str,
+    visible_left_x: int,
+    center_y: float,
+    size: int,
+    fill: tuple[int, int, int] = FG,
+) -> None:
+    """Paste a monochrome weather glyph with visible left edge fixed."""
+    mask = _load_mono_icon_mask(name, size)
+    if mask is None:
+        return
+    bbox = mask.getbbox()
+    if bbox is None:
+        return
+    visible_cy = (bbox[1] + bbox[3]) / 2
+    x = int(round(visible_left_x - bbox[0]))
+    y = int(round(center_y - visible_cy))
+    img.paste(Image.new("RGB", (size, size), fill), (x, y), mask)
 
 
 def _cx_text(
