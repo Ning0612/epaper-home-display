@@ -110,8 +110,8 @@ def compute_dirty_regions(
 
         # Guaranteed non-None: every tile in this component was marked dirty
         # by at least one changed pixel within its own bounds.
-        l, t, r, b = diff.crop((px_left, px_top, px_right, px_bottom)).getbbox()
-        abs_box = (l + px_left, t + px_top, r + px_left, b + px_top)
+        crop_l, t, r, b = diff.crop((px_left, px_top, px_right, px_bottom)).getbbox()
+        abs_box = (crop_l + px_left, t + px_top, r + px_left, b + px_top)
         regions.append(_align_box(abs_box, width, height))
 
     regions.sort(key=lambda box: (box[1], box[0]))

@@ -28,7 +28,9 @@ def main() -> None:
 
 
 def _generate_test_tone(path: str) -> None:
-    import struct, math, wave
+    import math
+    import struct
+    import wave
     sample_rate = 44100
     duration = 1
     freq = 440

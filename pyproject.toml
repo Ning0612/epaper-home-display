@@ -1,0 +1,7 @@
+[tool.ruff]
+line-length = 120
+extend-exclude = ["lib/waveshare_epd"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]  # long literals in tests/renderer strings are common; not worth wrapping

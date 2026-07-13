@@ -272,6 +272,15 @@ else:                    → UNOCCUPIED (score = 0.0)
 | `ap_ip` | str | AP 熱點 IP（AP 模式下顯示，通常 10.42.0.1）|
 | `started_at` | datetime | 服務啟動時間戳 |
 
+### state 並發模型
+
+`state` 是模組層級單例，被上方「asyncio 協程架構」列出的九個協程與 WebUI 路由共寫/共讀，全程沒有 lock。安全性建立在兩個前提上：
+
+1. **單執行緒事件迴圈**：九個協程都在同一個 `asyncio.gather()` 下跑在同一條執行緒；Python 直譯器每次只執行一個協程的 bytecode，協程之間的切換只發生在 `await` 點。單一屬性的讀取或寫入（如 `state.temperature = 26.0`）之間不含 `await`，因此對其他協程而言是原子的，不會被插入執行到一半的狀態。
+2. **背景執行緒一律經 `run_coroutine_threadsafe()` 交還事件迴圈**：`MQTTService`（HydraCup）與 `BambuMQTTService`（印表機）用 paho-mqtt 自己的 `loop_start()` 背景執行緒處理網路 I/O，收到訊息不會直接改 `state`，而是用 `asyncio.run_coroutine_threadsafe()` 把 dispatch 丟回主事件迴圈執行，回到前提 1 的單執行緒保證下再寫入。按鈕 GPIO 回調（gpiozero 背景執行緒）同樣經此模式呼叫 `_handle_btn_dashboard`（見 `app/main.py`）。
+
+在此前提下，各協程遵守「各自擁有一組欄位、只有自己寫入」的慣例（例如 `_sensor_loop` 只寫 `temperature`/`humidity`/`light_*`，`_presence_loop` 只寫 `presence*`/`desk_session_*`），讀取端（`renderer.py`、WebUI 的 `/state`）只讀不寫，因此即使沒有 lock 也不會有兩個協程同時寫同一欄位的競爭；跨欄位的讀取快照理論上可能讀到「部分更新」的組合（例如渲染時 `hydra_current_ml` 已更新但 `hydra_pct` 還沒），但目前沒有任何欄位組合要求跨欄位原子性，因此可接受。
+
 ---
 
 ## 硬體抽象模式

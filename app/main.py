@@ -85,7 +85,7 @@ async def main() -> None:
     weather_service = WeatherService(settings.weather)
     claude_usage_service = ClaudeUsageService(settings.claude_usage.creds_path)
     codex_usage_service = CodexUsageService(settings.codex_usage.creds_path)
-    voice_service = VoiceService(settings.voice)
+    VoiceService(settings.voice)  # constructor sanitizes settings.voice in place; instance itself unused here
     discord_service = DiscordService(settings.discord)
     notification_manager = NotificationManager(discord_service, settings.discord)
     mqtt_service = MQTTService(settings.mqtt)

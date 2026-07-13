@@ -179,10 +179,6 @@ def _pick_daily_forecast(forecast_list: list[dict], count: int = 4) -> list[dict
         except (TypeError, ValueError):
             max_pop = 0.0
 
-        noon = next(
-            (s for s in slots if isinstance(s.get("dt_txt"), str) and "12:00:00" in s["dt_txt"]),
-            slots[0],
-        )
         result.append({
             "dt_txt": d.strftime("%Y-%m-%d 12:00:00"),  # local date, avoids UTC/local mismatch in renderer
             "weather": [{"main": mode_main}],
