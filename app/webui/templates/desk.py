@@ -2,8 +2,8 @@ from app.webui.templates.base import _make_shell
 
 _DESK_CONTENT = r"""
 <style>
-  .stats-grid{gap:.6rem;margin-bottom:1.2rem}
-  .stat{padding:1rem 1.2rem}
+  .metric-grid{gap:.6rem;margin-bottom:1.2rem}
+  .metric{padding:1rem 1.2rem}
   .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
   .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:Consolas,monospace;color:var(--teal)}
   .stat-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}
@@ -22,7 +22,6 @@ _DESK_CONTENT = r"""
   tr:last-child td{border-bottom:none}
   .badge-occ{background:var(--teal);color:var(--on-dark)}
   .badge-unocc{background:var(--coral);color:var(--on-dark)}
-  .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.3rem}
   .heatmap-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.75rem}
   .heatmap-header .card-title{margin:0;padding:0;border:0}
   .heatmap-sub{margin:.35rem 0 0;color:var(--muted);font:400 .74rem/1.45 Consolas,monospace}
@@ -47,20 +46,20 @@ _DESK_CONTENT = r"""
 <div class="page-wrap">
   <h1 class="page-title">書桌前分析</h1>
 
-  <div class="stats-grid" id="stats-grid">
-    <div class="stat"><div class="stat-label">目前狀態</div><div class="stat-value" id="s-presence">—</div></div>
-    <div class="stat"><div class="stat-label">今日累計</div><div class="stat-value" id="s-today">—</div></div>
-    <div class="stat"><div class="stat-label">本次時段</div><div class="stat-value" id="s-segment">—</div><div class="stat-sub" id="s-since"></div></div>
-    <div class="stat"><div class="stat-label">今日次數</div><div class="stat-value" id="s-count">—</div></div>
-    <div class="stat"><div class="stat-label">光線原始值</div><div class="stat-value" id="s-light">—</div></div>
-    <div class="stat"><div class="stat-label">光線閾值</div><div class="stat-value" id="s-thresh">—</div></div>
+  <div class="metric-grid" id="stats-grid">
+    <div class="metric"><div class="stat-label">目前狀態</div><div class="stat-value" id="s-presence">—</div></div>
+    <div class="metric"><div class="stat-label">今日累計</div><div class="stat-value" id="s-today">—</div></div>
+    <div class="metric"><div class="stat-label">目前時段</div><div class="stat-value" id="s-segment">—</div><div class="stat-sub" id="s-since"></div></div>
+    <div class="metric"><div class="stat-label">今日切換次數</div><div class="stat-value" id="s-count">—</div></div>
+    <div class="metric"><div class="stat-label">光線數值</div><div class="stat-value" id="s-light">—</div></div>
+    <div class="metric"><div class="stat-label">光線閾值</div><div class="stat-value" id="s-thresh">—</div></div>
   </div>
 
   <div class="card">
     <div class="card-title">光線感測器</div>
     <div class="sensor-row">
-      <span>目前值：<b id="s-light">—</b></span>
-      <span>閾值：<b id="s-thresh">—</b></span>
+      <span>光線數值：<b id="sensor-light-value">—</b></span>
+      <span>光線閾值：<b id="sensor-threshold-value">—</b></span>
       <div class="sensor-bar-wrap">
         <div class="sensor-bar">
           <div class="sensor-fill" id="s-fill" style="width:0%"></div>
@@ -68,7 +67,6 @@ _DESK_CONTENT = r"""
         </div>
       </div>
     </div>
-    <div class="refresh-ts" id="last-refresh"></div>
   </div>
 
   <div class="card">
@@ -92,7 +90,7 @@ _DESK_CONTENT = r"""
   <div class="card">
     <div class="heatmap-header">
       <div>
-        <div class="card-title">年度在席熱力圖</div>
+        <div class="card-title">年度書桌前熱力圖</div>
         <p class="heatmap-sub">每格代表一天；以 8 小時書桌前時間作為滿格強度基準。</p>
       </div>
       <div class="heatmap-year-controls" aria-label="年度切換">
@@ -103,19 +101,19 @@ _DESK_CONTENT = r"""
     </div>
     <div id="heatmap-loading" style="color:var(--muted);font-size:.85rem;text-align:center;padding:1.5rem 0">載入中…</div>
     <div id="heatmap-wrap" class="heatmap-wrap" style="display:none">
-      <canvas id="heatmap-canvas" tabindex="0" aria-label="年度每日在席時間熱力圖" aria-describedby="heatmap-summary"></canvas>
+      <canvas id="heatmap-canvas" tabindex="0" aria-label="年度每日書桌前時間熱力圖" aria-describedby="heatmap-summary"></canvas>
     </div>
     <div id="heatmap-tip" class="heatmap-tip" aria-live="polite"></div>
     <div id="heatmap-summary" class="heatmap-summary"></div>
-    <div class="heatmap-legend" aria-label="在席時間熱力圖圖例">
+    <div class="heatmap-legend" aria-label="書桌前時間熱力圖圖例">
       <span>無</span><canvas id="heatmap-legend-canvas" width="90" height="12" aria-hidden="true"></canvas><span>多（≥8h）</span>
     </div>
     <div id="heatmap-tooltip" class="heatmap-tooltip" role="tooltip"></div>
     <details class="heatmap-details">
-      <summary>以文字查看每日在席時間</summary>
+      <summary>以文字查看每日書桌前時間</summary>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>日期</th><th>在席時間</th><th>時段數</th><th>狀態</th></tr></thead>
+          <thead><tr><th>日期</th><th>書桌前時間</th><th>時段數</th><th>狀態</th></tr></thead>
           <tbody id="heatmap-tbody"><tr><td colspan="4" style="color:var(--muted)">載入中…</td></tr></tbody>
         </table>
       </div>
@@ -238,13 +236,13 @@ function drawHeatmap(payload,refreshTable){
   for(var dayIndex=0;dayIndex<nDays;dayIndex++){
     var grid=startWd+dayIndex,col=Math.floor(grid/7),row=grid%7;
     var x=LW+col*STEP,y=LH+row*STEP,day=days[dayIndex],total=Number(day.total_seconds)||0;
-    ctx.fillStyle=total<=0?colors.surface2:colors.teal;ctx.globalAlpha=day.status==='future'?.55:heatmapAlpha(total,reference);ctx.fillRect(x,y,CELL,CELL);ctx.globalAlpha=1;
+    ctx.fillStyle=total<=0?colors.surface2:colors.teal;ctx.globalAlpha=total>0?heatmapAlpha(total,reference):1;ctx.fillRect(x,y,CELL,CELL);ctx.globalAlpha=1;
   }
   canvas._hm={year:year,nDays:nDays,startWd:startWd,LW:LW,LH:LH,STEP:STEP,CELL:CELL,days:days,reference:reference,selectedIndex:previousMeta&&previousMeta.year===year?Math.min(previousMeta.selectedIndex||0,nDays-1):0};
   var activeDays=payload.active_days==null?days.filter(function(day){return Number(day.total_seconds)>0;}).length:payload.active_days;
   var totalYear=payload.total_seconds==null?days.reduce(function(sum,day){return sum+(Number(day.total_seconds)||0);},0):payload.total_seconds;
-  canvas.setAttribute('aria-label',year+' 年每日在席時間熱力圖，共 '+activeDays+' 天有紀錄');
-  document.getElementById('heatmap-summary').textContent=year+' 年累計 '+fmtDuration(totalYear)+'，'+activeDays+' 天有在席記錄';
+  canvas.setAttribute('aria-label',year+' 年每日書桌前時間熱力圖，共 '+activeDays+' 天有紀錄');
+  document.getElementById('heatmap-summary').textContent=year+' 年累計 '+fmtDuration(totalYear)+'，'+activeDays+' 天有書桌前記錄';
   if(refreshTable!==false)renderHeatmapTable(days);
   document.getElementById('heatmap-loading').style.display='none';
   document.getElementById('heatmap-year').textContent=String(year);
@@ -265,7 +263,7 @@ function showHeatmapTip(canvas,clientX,clientY,announce){
   if(dayIndex<0||dayIndex>=meta.nDays){clearHeatmapTip();return;}
   canvas._hm.selectedIndex=dayIndex;
   var day=meta.days[dayIndex],total=Number(day.total_seconds)||0,pct=meta.reference>0?Math.round(total/meta.reference*100):0;
-  var message=day.status==='future'?day.date+' · 尚未到':day.date+' · '+fmtDuration(total)+(total?'（'+pct+'% / 8h，'+(day.session_count||0)+' 次）':' · 無在席記錄');
+  var message=day.status==='future'?day.date+' · 尚未到':day.date+' · '+fmtDuration(total)+(total?'（'+pct+'% / 8h，'+(day.session_count||0)+' 次）':' · 無書桌前記錄');
   if(announce)document.getElementById('heatmap-tip').textContent=message;
   var tooltip=document.getElementById('heatmap-tooltip');tooltip.textContent=message;tooltip.style.display='block';
   var left=Math.min(clientX+12,window.innerWidth-tooltip.offsetWidth-8),top=Math.min(clientY+12,window.innerHeight-tooltip.offsetHeight-8);
@@ -375,18 +373,20 @@ function renderBarChart(daily30d){
 
 async function loadStats(){
   try{
-    var r=await fetch('/api/desk/stats');
+    var r=await fetch('/api/desk/status');
     if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     var occ=d.presence==='OCCUPIED';
     document.getElementById('s-presence').innerHTML=
-      '<span class="badge '+(occ?'badge-green':'badge-gray')+'">'+(occ?'在桌前':'不在')+'</span>';
+      '<span class="badge '+(occ?'badge-green':'badge-gray')+'">'+(occ?'在桌前':'離開')+'</span>';
     document.getElementById('s-today').textContent=fmtDuration(d.today_total_seconds);
     document.getElementById('s-segment').textContent=fmtDuration(d.current_segment_seconds);
     document.getElementById('s-since').textContent=d.last_change_ts?('自 '+fmtTime(d.last_change_ts)):'';
     document.getElementById('s-count').textContent=d.today_session_count+'次';
     document.getElementById('s-light').textContent=d.light_raw??'—';
     document.getElementById('s-thresh').textContent=d.threshold??'—';
+    document.getElementById('sensor-light-value').textContent=d.light_raw??'—';
+    document.getElementById('sensor-threshold-value').textContent=d.threshold??'—';
     var raw=d.light_raw??0, thresh=d.threshold??500;
     var fillPct=Math.min(100,raw/1023*100).toFixed(1);
     var threshPct=Math.min(100,thresh/1023*100).toFixed(1);
@@ -396,12 +396,20 @@ async function loadStats(){
   }catch(e){console.error('stats',e);}
 }
 
-async function loadHistory(){
+async function loadTimeline(){
   try{
-    var r=await fetch('/api/desk/history');
+    var r=await fetch('/api/desk/timeline');
     if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     document.getElementById('timeline-wrap').innerHTML=renderTimeline(d.timeline_24h||[]);
+  }catch(e){console.error('timeline',e);}
+}
+
+async function loadDaily(){
+  try{
+    var r=await fetch('/api/desk/daily');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var d=await r.json();
     document.getElementById('barchart-wrap').innerHTML=renderBarChart(d.daily_30d||[]);
     var totals=(d.daily_30d||[]).map(function(x){return x.total_seconds;});
     var nonZero=totals.filter(function(x){return x>0;});
@@ -415,7 +423,7 @@ async function loadHistory(){
       return '<tr><td>'+x.date+'</td><td>'+fmtDuration(x.total_seconds)+'</td><td>'+pct+'%</td></tr>';
     }).join('');
     tbody.innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無資料</td></tr>';
-  }catch(e){console.error('history',e);}
+  }catch(e){console.error('daily',e);}
 }
 
 async function loadSessions(){
@@ -442,10 +450,10 @@ document.getElementById('heatmap-next').addEventListener('click',function(){
   if(heatmapYear<currentYear){heatmapYear++;loadHeatmap(heatmapYear);}
 });
 bindHeatmapPointer();
-loadStats(); loadHistory(); loadSessions(); loadHeatmap(heatmapYear);
+loadStats(); loadTimeline(); loadDaily(); loadSessions(); loadHeatmap(heatmapYear);
 setInterval(loadStats, 30000);
-setInterval(function(){loadHistory();loadSessions();if(heatmapYear===new Date().getFullYear())loadHeatmap(heatmapYear);}, 300000);
-document.addEventListener('iot-theme-change',loadHistory);
+setInterval(function(){loadTimeline();loadDaily();loadSessions();if(heatmapYear===new Date().getFullYear())loadHeatmap(heatmapYear);}, 300000);
+document.addEventListener('iot-theme-change',function(){loadTimeline();loadDaily();});
 document.addEventListener('iot-theme-change',function(){
   var canvas=document.getElementById('heatmap-canvas'),meta=canvas._hm;
   if(meta)drawHeatmap({year:meta.year,days:meta.days,active_days:meta.days.filter(function(day){return Number(day.total_seconds)>0;}).length,reference_seconds:meta.reference},false);
@@ -462,4 +470,9 @@ window.addEventListener('resize',function(){
 </script>
 """
 
-_DESK_HTML = _make_shell("desk", "書桌前分析", _DESK_CONTENT)
+_DESK_HTML = _make_shell(
+    "desk",
+    "書桌前分析",
+    _DESK_CONTENT,
+    footer_meta='<span id="last-refresh">最後更新：—</span>',
+)

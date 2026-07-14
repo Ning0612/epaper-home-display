@@ -665,10 +665,10 @@ PUT carousel 請求體：
 
 ## 桌面工作時段 API
 
-### 今日統計
+### 即時狀態與感測器原始值
 
 ```
-GET /api/desk/stats
+GET /api/desk/status
 ```
 
 **回應：**
@@ -685,10 +685,10 @@ GET /api/desk/stats
 }
 ```
 
-### 歷史記錄
+### 近 24 小時時間軸
 
 ```
-GET /api/desk/history
+GET /api/desk/timeline
 ```
 
 **回應：**
@@ -696,7 +696,19 @@ GET /api/desk/history
 {
   "timeline_24h": [
     {"id": 1, "start_ts": "2026-05-29T09:00:00", "end_ts": "2026-05-29T12:00:00", "duration_seconds": 10800}
-  ],
+  ]
+}
+```
+
+### 每日彙總
+
+```
+GET /api/desk/daily
+```
+
+**回應：**
+```json
+{
   "daily_30d": [
     {"date": "2026-05-29", "total_seconds": 28800}
   ]
@@ -709,7 +721,7 @@ GET /api/desk/history
 GET /api/desk/sessions?limit=20
 ```
 
-### 年度在席熱力圖
+### 年度書桌前熱力圖
 
 ```
 GET /api/desk/heatmap?year=2025
@@ -718,9 +730,9 @@ GET /api/desk/heatmap?year=2025
 `year` 省略時使用 Pi 設定時區的目前年份；不可查詢未來年份。回應固定包含該年的 365 或 366 天，跨午夜的時段會按設定時區的午夜切分，進行中的時段會計算到 `as_of`。
 前端熱力圖以 8 小時書桌前時間作為滿格強度基準，`reference_seconds` 可供其他客戶端重用同一色階。
 
-`days[].status` 只會是 `future`（尚未到）、`empty`（無記錄）、`recorded`（有記錄）或 `ongoing`（目前仍在席）。`summary` 與頂層的 `total_seconds`、`active_days` 同步，另提供 `session_count` 與 `has_ongoing`。`400` 表示查詢未來年份，`422` 表示 `year` 不在 2000–2100 範圍。
+`days[].status` 只會是 `future`（尚未到）、`empty`（無記錄）、`recorded`（有記錄）或 `ongoing`（目前仍在桌前）。`summary` 與頂層的 `total_seconds`、`active_days` 同步，另提供 `session_count` 與 `has_ongoing`。`400` 表示查詢未來年份，`422` 表示 `year` 不在 2000–2100 範圍。
 
-在席時段的新寫入使用帶 UTC offset 的 ISO-8601 時間戳；舊版沒有 offset 的紀錄會先按 Pi 系統時區解讀，再轉換到回應中的 `timezone`，避免設定時區與系統時區不同時錯分日期。
+書桌前時段的新寫入使用帶 UTC offset 的 ISO-8601 時間戳；舊版沒有 offset 的紀錄會先按 Pi 系統時區解讀，再轉換到回應中的 `timezone`，避免設定時區與系統時區不同時錯分日期。
 
 ```json
 {

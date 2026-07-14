@@ -88,8 +88,8 @@ body[data-page="settings"] .page-title::before{content:'04 / configuration'}
 .danger-card::before{background:var(--coral)}
 .danger-card .card-title{color:var(--coral)}
 
-.stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-bottom:1.2rem}
-.stat{background:var(--inset);border:1px solid var(--line);border-radius:0;padding:.8rem .9rem;box-shadow:none;text-align:center;min-height:78px}
+.metric-grid,.stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-bottom:1.2rem}
+.metric,.stat{background:var(--inset);border:1px solid var(--line);border-radius:0;padding:.8rem .9rem;box-shadow:none;text-align:center;min-height:78px}
 .stat-label,.stat-sub{font:700 .68rem Consolas,monospace;color:var(--muted)}
 .stat-value{font:700 1.05rem/1.2 Consolas,monospace;color:var(--teal)}
 .stat-unit{font:400 .78rem Consolas,monospace;color:var(--muted)}
@@ -154,12 +154,12 @@ svg text{font-family:Consolas,monospace}
 
 .login-wrap{max-width:22rem;margin:4rem auto;padding:0 1rem}.login-tools{position:fixed;top:1rem;right:1rem}
 
-@media(min-width:760px){.stats-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(min-width:760px){.metric-grid,.stats-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media(max-width:720px){
   .topbar-in{align-items:flex-start;flex-direction:column}.topbar-actions{justify-content:flex-start}.nav{justify-content:flex-start}
   .status-banner{align-items:flex-start;flex-direction:column}.updated{text-align:left}.row2{flex-direction:column;gap:0}.page-wrap{padding-top:1rem}
 }
-@media(max-width:480px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.footer-in{flex-direction:column;align-items:flex-start}.login-tools{top:.6rem;right:.6rem}}
+@media(max-width:480px){.metric-grid,.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.footer-in{flex-direction:column;align-items:flex-start}.login-tools{top:.6rem;right:.6rem}}
 """
 
 _CSRF_FETCH_SCRIPT = r"""(function(){

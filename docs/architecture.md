@@ -397,9 +397,10 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
-| GET | `/api/desk/stats` | 今日統計（在場狀態、總時長、時段數）|
-| GET | `/api/desk/history` | 近 24 小時時間軸 + 近 30 天每日統計 |
-| GET | `/api/desk/heatmap?year=YYYY` | 年度每日在席時間熱力圖（跨午夜切分、時區轉換、進行中時段計至現在）|
+| GET | `/api/desk/status` | 即時狀態與感測器原始值（今日總時長、目前時段、切換次數）|
+| GET | `/api/desk/timeline` | 近 24 小時時間軸 |
+| GET | `/api/desk/daily` | 近 30 天每日彙總 |
+| GET | `/api/desk/heatmap?year=YYYY` | 年度每日書桌前時間熱力圖（跨午夜切分、時區轉換、進行中時段計至現在）|
 | GET | `/api/desk/sessions` | 最近 N 筆時段記錄（預設 20 筆）|
 
 所有 PUT /settings/* 端點變更會原子化寫入 `config.local.yaml`，並同時更新記憶體中的設定物件，**天氣、顯示器、在場偵測、語音、Discord 通知、時區、密碼**等設定立即生效（下次排程執行時採用新值）。

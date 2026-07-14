@@ -47,7 +47,7 @@ _SHELL = (
 <footer class="site-footer">
   <div class="footer-in">
     <div class="footer-repo"><span class="label">SOURCE</span><a href="https://github.com/Ning0612/epaper-home-display">Ning0612/epaper-home-display</a></div>
-    <div class="footer-meta">FastAPI · Vanilla HTML／CSS／JS · MIT License</div>
+    <div class="footer-meta">__FOOTER_META__</div>
   </div>
 </footer>
 <script>__CSRF_FETCH__</script>
@@ -62,13 +62,20 @@ _SHELL = (
 )
 
 
-def _make_shell(page_id: str, title: str, content: str, extra_head: str = "") -> str:
+def _make_shell(
+    page_id: str,
+    title: str,
+    content: str,
+    extra_head: str = "",
+    footer_meta: str = "FastAPI · Vanilla HTML／CSS／JS · MIT License",
+) -> str:
     return (
         _SHELL
         .replace("__TITLE__", title)
         .replace("__PAGE_ID__", page_id)
         .replace("__EXTRA_HEAD__", extra_head)
         .replace("__CONTENT__", content)
+        .replace("__FOOTER_META__", footer_meta)
         .replace("__DESK_A__", "active" if page_id == "desk" else "")
         .replace("__ENV_A__", "active" if page_id == "environment" else "")
         .replace("__IMAGES_A__", "active" if page_id == "images" else "")

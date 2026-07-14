@@ -59,8 +59,8 @@ def create_desk_router(settings: "Settings") -> APIRouter:
     async def desk_page():
         return HTMLResponse(_DESK_HTML)
 
-    @router.get("/api/desk/stats")
-    async def desk_stats():
+    @router.get("/api/desk/status")
+    async def desk_status():
         from app.storage.logs import get_sessions_for_date
         now, zone = _desk_clock()
         today_sessions = await get_sessions_for_date(
@@ -118,8 +118,7 @@ def create_desk_router(settings: "Settings") -> APIRouter:
             "last_change_ts": last_change_ts,
         }
 
-    @router.get("/api/desk/history")
-    async def desk_history():
+    async def _desk_history_data() -> dict:
         from app.storage.logs import get_sessions_last_n_days
         now, zone = _desk_clock()
         legacy_timezone = system_local_timezone()
@@ -179,6 +178,16 @@ def create_desk_router(settings: "Settings") -> APIRouter:
             daily_30d.append({"date": date_str, "total_seconds": daily_totals.get(date_str, 0)})
 
         return {"timeline_24h": timeline_24h, "daily_30d": daily_30d}
+
+    @router.get("/api/desk/timeline")
+    async def desk_timeline():
+        data = await _desk_history_data()
+        return {"timeline_24h": data["timeline_24h"]}
+
+    @router.get("/api/desk/daily")
+    async def desk_daily():
+        data = await _desk_history_data()
+        return {"daily_30d": data["daily_30d"]}
 
     @router.get("/api/desk/heatmap")
     async def desk_heatmap(year: int | None = Query(default=None, ge=2000, le=2100)):
