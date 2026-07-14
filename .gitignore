@@ -36,6 +36,9 @@ assets/fonts/*.otf
 .claude/
 .serena/
 
+CLAUDE.md
+AGENTS.md
+
 # OS
 .DS_Store
 Thumbs.db

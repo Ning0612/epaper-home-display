@@ -18,7 +18,9 @@ ssh pi@epaper-display.local
 # 若 mDNS 可用，也可直接 http://epaper-display.local:8000/settings
 ```
 
-> **認證機制**：WebUI 受密碼保護。首次存取時會顯示密碼設定頁面，設定後密碼雜湊值儲存至 `config.local.yaml`。Session cookie 有效期 7 天（每次請求滾動續期）。若忘記密碼，可刪除 `config.local.yaml` 中的 `webui.password_hash` 欄位重設。
+> **認證機制**：WebUI 受密碼保護。首次存取時會顯示密碼設定頁面，設定後只把 bcrypt 密碼雜湊儲存至 `config.local.yaml`。伺服器端維護單一有效 session slot：閒置 30 分鐘或最長 24 小時後失效，新登入會取代舊 session，登出／改密碼會立即撤銷。所有狀態變更請求都需要 CSRF token。若忘記密碼，可刪除 `config.local.yaml` 中的 `webui.password_hash` 欄位重設。
+>
+> 管理介面目前預設以 HTTP 提供；HTTP 下 session／CSRF token 仍可能被同網段主動攻擊者攔截與重放，建議限制在信任的隔離 LAN，或另行配置 HTTPS。
 
 ---
 
@@ -36,7 +38,7 @@ ssh pi@epaper-display.local
 
 | 欄位 | 說明 |
 |------|------|
-| **位置（互動地圖）** | 拖曳地圖標記或輸入緯度/經度，設定天氣查詢位置 |
+| **位置（離線座標）** | 直接輸入緯度/經度，設定天氣查詢位置；頁面不依賴外部地圖 CDN |
 | **API Key** | OpenWeatherMap API Key（輸入後顯示為 `true/false`，不顯示原始值）|
 | **單位** | `metric`（°C）或 `imperial`（°F）|
 | **更新間隔** | 天氣資料刷新頻率（秒），最小建議 300 秒 |
@@ -107,15 +109,15 @@ scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 
 ## REST API 參考
 
-以下為完整的 REST API 端點。以下端點**不需認證**（公開存取）：`/health`、`/login`、`/logout`、`/wifi`、`/api/wifi/scan`、`/api/wifi/connect`。其餘端點均需 Session cookie。
+以下為完整的 REST API 端點。以下端點**不需登入 session**：`/health`、`/login`；首次尚未設定管理密碼時，`/wifi`、`/api/wifi/scan`、`/api/wifi/connect` 也可由 AP 設定入口使用，但 WiFi POST 仍需 AP 頁面提供的 per-process CSRF token。管理密碼設定完成後，WiFi 入口改用有效 session 與 session-bound CSRF；其餘端點均需有效 session cookie 與狀態變更用 CSRF token。
 
 ### 認證端點
 
 ```
 GET  /               # 已登入時重新導向至 /settings；未登入的瀏覽器請求（Accept: text/html）導向 /login?next=/；非 HTML 請求（curl 等）回傳 401
 GET  /login          # 顯示登入頁面（初次使用時為密碼設定頁）
-POST /login          # 提交密碼（form: password, password_confirm, next）
-GET  /logout         # 清除 session，redirect 至 /login
+POST /login          # 提交密碼（form: password, password_confirm, next, csrf）
+POST /logout         # 清除 server-side session slot，redirect 至 /login
 ```
 
 ---
@@ -274,9 +276,9 @@ GET /settings/wifi
 
 ---
 
-### WiFi AP 熱點入口（不需認證）
+### WiFi AP 熱點入口（首次設定免登入；已設定裝置需登入）
 
-以下端點僅在裝置處於 AP 熱點模式時有意義，全部不需 Session cookie 認證（設計為供行動裝置的捕獲入口網站使用）。
+以下端點僅在裝置處於 AP 熱點模式時有意義；入口頁不需登入，POST 仍需頁面提供的 per-process CSRF token（設計為供行動裝置的捕獲入口網站使用）。
 
 ```
 GET  /wifi                  # AP 熱點設定引導頁面（HTML）
@@ -289,7 +291,7 @@ POST /api/wifi/connect      # 連接指定 WiFi 網路（AP 模式限定）
 {"networks": [{"ssid": "HomeNetwork", "signal": 75, "security": "WPA2"}, ...]}
 ```
 
-若裝置不在 AP 模式則回傳 HTTP 503。同一時間只允許一個 nmcli 操作，若操作中則回傳 HTTP 429。
+若裝置不在 AP 模式則回傳 HTTP 503。同一時間只允許一個 nmcli 操作，若操作中則回傳 HTTP 429。Pi Zero 2W 的單 radio 在 AP 模式無法可靠執行 live scan，因此掃描頁優先重新讀取 AP 啟動前由 `wifi_manager.sh` 寫入的 cache；cache 沒有資料時顯示空清單並保留手動輸入 SSID 的路徑。已設定管理密碼的裝置會先要求登入，避免重新進入 AP 模式時繞過管理權限。
 
 **`POST /api/wifi/connect` 請求體：**
 ```json

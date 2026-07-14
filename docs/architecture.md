@@ -97,13 +97,13 @@ epaper-home-display/
 │   └── webui/
 │       ├── server.py        # FastAPI 應用工廠（注入所有路由）
 │       ├── models.py        # Pydantic 請求/回應模型
-│       ├── middleware.py    # 認證中介層（Session cookie 驗證）
+│       ├── middleware.py    # 認證中介層（server-side session + CSRF 驗證）
 │       ├── config_helpers.py  # config.local.yaml 讀寫工具
 │       └── routes/
-│           ├── auth.py      # 登入/登出（Session cookie）
+│           ├── auth.py      # 登入/登出（單一 server-side session slot）
 │           ├── read_only.py # /health, /state, /logs/*
 │           ├── settings.py  # 設定 PUT 端點
-│           ├── wifi.py      # AP 熱點入口（/wifi portal、/api/wifi/scan、/api/wifi/connect，不需認證）
+│           ├── wifi.py      # AP 熱點入口（首次設定公開；已設定裝置需 session + CSRF）
 │           ├── desk.py      # 桌面工作時段 REST API
 │           ├── environment.py  # 環境溫濕度分析（/environment、/api/env/*）
 │           └── images.py    # 圖片上傳/裁切/確認/輪播管理
@@ -336,13 +336,13 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | GET | `/` | 已登入時重新導向至 `/settings`；未登入的瀏覽器請求導向 `/login?next=/`；非 HTML 請求回傳 `401` |
 | GET | `/login` | 登入頁面（首次使用時顯示密碼設定表單）|
 | POST | `/login` | 提交密碼，成功後 redirect 至目標頁面 |
-| GET | `/logout` | 清除 session，redirect 至 `/login` |
+| POST | `/logout` | 驗證 CSRF 後清除 server-side session，redirect 至 `/login` |
 
 **讀取端點（GET）**
 
 | 路徑 | 說明 |
 |------|------|
-| `/settings` | HTML 設定介面（含 Leaflet 互動地圖）|
+| `/settings` | HTML 設定介面（離線座標輸入、主題切換）|
 | `/images` | HTML 圖片管理介面 |
 | `/desk` | HTML 桌面工作時段介面 |
 | `/environment` | HTML 環境溫濕度分析介面（日/月/年圖表）|
@@ -356,14 +356,14 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/api/env/years` | 資料庫中有資料的年份清單 |
 | `/settings/config` | 讀取配置（`api_key`→`api_key_set`、`webhook_url`→`webhook_set` 遮罩為 boolean；`password_hash`/`session_secret` 移除）|
 | `/settings/wifi` | 取得 WiFi 連線資訊（SSID、IP、訊號強度）|
-| `/wifi` | AP 熱點入口網站（`wifi.py`，不需認證）|
-| `/api/wifi/scan` | 掃描周邊 WiFi 網路（GET，AP 模式限定，不需認證）|
+| `/wifi` | AP 熱點入口網站（首次尚未設定密碼時公開；已設定裝置需登入）|
+| `/api/wifi/scan` | 掃描周邊 WiFi 網路（GET，AP 模式限定；已設定裝置需登入）|
 
-**WiFi AP 管理端點（POST，不需認證）**
+**WiFi AP 管理端點（首次設定公開但需要 pre-auth CSRF；已設定裝置需要 session CSRF）**
 
 | 路徑 | 說明 |
 |------|------|
-| `/api/wifi/connect` | 連接指定 WiFi 網路（AP 模式限定）；兩階段：Phase 1 建立 NM 設定檔（同步），Phase 2 啟動連線（背景任務）|
+| `/api/wifi/connect` | 連接指定 WiFi 網路（AP 模式限定、需 CSRF）；兩階段：Phase 1 建立 NM 設定檔（同步），Phase 2 啟動連線（背景任務）|
 
 **設定更新端點（PUT）**
 

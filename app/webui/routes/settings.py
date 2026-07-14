@@ -6,12 +6,13 @@ import logging
 import os
 import re
 import subprocess
+import time
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.requests import Request
-
 from app.webui.config_helpers import _save_to_config
 from app.services.voice import VoiceService as _VoiceService
 from app.webui.models import (
@@ -19,7 +20,7 @@ from app.webui.models import (
     _PresenceBody, _VoiceBody, _VoiceTestBody, _NotificationsBody, _MQTTBody, _PrinterBody, _UsagePollBody,
     _GeneralBody, _AuthBody,
 )
-from app.webui.routes.auth import _pwd_ctx, _pw_version
+from app.webui.routes.auth import _pwd_ctx, invalidate_session
 from app.webui.templates.settings import _SETTINGS_HTML
 
 if TYPE_CHECKING:
@@ -32,6 +33,36 @@ logger = logging.getLogger(__name__)
 
 _ALLOWED_PLAYERS = frozenset({"aplay", "mpg123", "mpg321", "omxplayer", "paplay", "cvlc"})
 _ALLOWED_TTS_ENGINES = frozenset({"espeak-ng", "none"})
+
+_AUTH_CHANGE_FAILURES: dict[str, list[float]] = defaultdict(list)
+_AUTH_CHANGE_WINDOW = 300
+_AUTH_CHANGE_MAX = 5
+_AUTH_CHANGE_IP_CAP = 1024
+
+
+def _auth_change_rate_limited(ip: str) -> bool:
+    now = time.monotonic()
+    recent = [stamp for stamp in _AUTH_CHANGE_FAILURES.get(ip, []) if now - stamp < _AUTH_CHANGE_WINDOW]
+    _AUTH_CHANGE_FAILURES[ip] = recent
+    return len(recent) >= _AUTH_CHANGE_MAX
+
+
+def _record_auth_change_failure(ip: str) -> int:
+    now = time.monotonic()
+    recent = [stamp for stamp in _AUTH_CHANGE_FAILURES.get(ip, []) if now - stamp < _AUTH_CHANGE_WINDOW]
+    recent.append(now)
+    if ip not in _AUTH_CHANGE_FAILURES and len(_AUTH_CHANGE_FAILURES) >= _AUTH_CHANGE_IP_CAP:
+        oldest_ip = min(
+            _AUTH_CHANGE_FAILURES,
+            key=lambda key: _AUTH_CHANGE_FAILURES[key][-1] if _AUTH_CHANGE_FAILURES[key] else 0,
+        )
+        _AUTH_CHANGE_FAILURES.pop(oldest_ip, None)
+    _AUTH_CHANGE_FAILURES[ip] = recent
+    return len(recent)
+
+
+def _clear_auth_change_failures(ip: str) -> None:
+    _AUTH_CHANGE_FAILURES.pop(ip, None)
 
 
 def create_settings_router(
@@ -432,15 +463,23 @@ def create_settings_router(
     async def set_auth(request: Request, body: _AuthBody):
         if not settings.webui.password_hash:
             raise HTTPException(400, detail="No password configured. Use the login page for first-time setup.")
+        client_ip = request.client.host if request.client else "unknown"
+        if _auth_change_rate_limited(client_ip):
+            raise HTTPException(429, detail="嘗試次數過多，請稍後再試")
         if not _pwd_ctx.verify(body.current_password, settings.webui.password_hash):
+            count = _record_auth_change_failure(client_ip)
+            await asyncio.sleep(min(count * 0.5, 3.0))
             raise HTTPException(403, detail="目前密碼錯誤")
         if len(body.new_password) < 8:
+            count = _record_auth_change_failure(client_ip)
+            await asyncio.sleep(min(count * 0.25, 2.0))
             raise HTTPException(400, detail="密碼長度至少 8 個字元")
         new_hash = _pwd_ctx.hash(body.new_password)
         _save_to_config({"webui": {"password_hash": new_hash}})
         settings.webui.password_hash = new_hash
-        # Keep current session valid with new version; all other sessions will be invalidated
-        request.session["pw_version"] = _pw_version(new_hash, settings.webui.session_secret)
-        return {"ok": True}
+        _clear_auth_change_failures(client_ip)
+        # Password changes revoke the single server-side session slot immediately.
+        invalidate_session()
+        return {"ok": True, "reauthenticate": True}
 
     return router

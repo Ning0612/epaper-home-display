@@ -66,7 +66,6 @@ Installed via `pip install -r requirements.txt`; not bundled in this repository.
 | aiosqlite | ≥0.20 | MIT | Async SQLite |
 | passlib[bcrypt] | ≥1.7.4 | BSD-2-Clause (passlib) + Apache-2.0 (bcrypt) | Password hashing |
 | python-multipart | ≥0.0.9 | Apache-2.0 | File upload parsing |
-| itsdangerous | ≥2.1 | BSD-3-Clause | Session signing |
 
 ### 3.2 Pi-only Hardware Packages
 
@@ -88,40 +87,7 @@ Install on Raspberry Pi only (not in `requirements.txt` for laptop dev):
 
 ---
 
-## 4. CDN-Loaded Client Assets (WebUI only, not bundled)
-
-These files are fetched by the user's browser at runtime; no files are bundled in this repository.
-
-### 4.1 Web Fonts (Google Fonts CDN)
-
-| Font family | Used in | License |
-|-------------|---------|---------|
-| Outfit | All pages (sidebar, body) | OFL-1.1 |
-| JetBrains Mono | All pages (monospace) | OFL-1.1 |
-| DM Sans | Login page | OFL-1.1 |
-| DM Mono | Login page | OFL-1.1 |
-
-All four families are distributed under the [SIL Open Font License 1.1](https://scripts.sil.org/OFL).
-
-### 4.2 Leaflet.js
-
-| Asset | Version | License | CDN |
-|-------|---------|---------|-----|
-| Leaflet CSS + JS | 1.9.4 | BSD-2-Clause | unpkg.com |
-
-Used for the interactive location-picker map on the settings page.
-License: Copyright (c) 2010–2023, Vladimir Agafonkin; Copyright (c) 2010–2011, CloudMade.
-
-### 4.3 OpenStreetMap Tiles
-
-The settings page map loads tile images from OpenStreetMap servers.
-Map data is © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright) (ODbL 1.0).
-Leaflet's default attribution control already displays the required credit.
-This project does not cache, re-distribute, or modify tile data.
-
----
-
-## 5. External Runtime System Tools (not bundled)
+## 4. External Runtime System Tools (not bundled)
 
 All tools below are invoked as **separate OS processes** via `subprocess` or
 `asyncio.create_subprocess_exec()`. No source code is bundled or modified.
@@ -137,7 +103,7 @@ is unaffected by calling these tools.
 > programs, provide or reference the upstream distro source packages.
 > The recommended deployment is to have users install tools via `apt` themselves.
 
-### 5.1 TTS & Audio
+### 4.1 TTS & Audio
 
 | Tool | Package | License | Usage in project |
 |------|---------|---------|-----------------|
@@ -153,7 +119,7 @@ Install on Pi:
 sudo apt install espeak-ng alsa-utils
 ```
 
-### 5.2 WiFi Management
+### 4.2 WiFi Management
 
 | Tool | Package | License | Usage in project |
 |------|---------|---------|-----------------|
@@ -163,7 +129,7 @@ sudo apt install espeak-ng alsa-utils
 
 ---
 
-## 6. External APIs and Data Services
+## 5. External APIs and Data Services
 
 These are remote network services used at runtime. No source code or data is
 bundled; their respective terms of service apply independently.
@@ -186,9 +152,6 @@ bundled; their respective terms of service apply independently.
 | DejaVu fonts | ❌ gitignored | Bitstream Vera | Install separately (`apt`) |
 | fastapi, uvicorn, PyYAML, Pillow … | ❌ pip | MIT / Apache-2.0 / BSD | Install via pip |
 | passlib + bcrypt | ❌ pip | BSD-2-Clause + Apache-2.0 | Install via pip |
-| Outfit, JetBrains Mono, DM Sans, DM Mono | ❌ CDN | OFL-1.1 | Google Fonts CDN |
-| Leaflet.js 1.9.4 | ❌ CDN | BSD-2-Clause | unpkg CDN |
-| OpenStreetMap tiles | ❌ CDN | ODbL 1.0 (data) | OSM tile servers |
 | espeak-ng | ❌ system | GPL-3.0+ | subprocess — separate process |
 | alsa-utils (aplay / amixer) | ❌ system | GPL-2.0+ | subprocess — separate process |
 | NetworkManager (nmcli) | ❌ system | LGPL-2.1+ | subprocess — separate process |

@@ -1,7 +1,10 @@
+import pytest
+
 from app.logic.desk_session import (
     compute_day_stats,
     format_bar,
     format_daily_summary,
+    format_daily_summary_embed,
     format_duration,
     format_session_end_msg,
 )
@@ -67,6 +70,16 @@ def test_compute_day_stats_skips_ongoing():
     assert stats["count"] == 0
 
 
+def test_compute_day_stats_skips_invalid_negative_duration():
+    sessions = [
+        {"start_ts": "2026-05-30T09:00:00", "end_ts": "2026-05-30T08:59:00", "duration_seconds": -60},
+        {"start_ts": "2026-05-30T10:00:00", "end_ts": "2026-05-30T10:30:00", "duration_seconds": 1800},
+    ]
+    stats = compute_day_stats(sessions)
+    assert stats["count"] == 1
+    assert stats["total_seconds"] == 1800
+
+
 def test_compute_day_stats_single():
     sessions = [
         {"start_ts": "2026-05-30T09:00:00", "end_ts": "2026-05-30T10:00:00", "duration_seconds": 3600},
@@ -123,3 +136,48 @@ def test_format_daily_summary_no_sessions():
     assert "2026-05-30" in msg
     assert "次數 0" in msg
     assert "書桌前 0m" in msg
+
+
+def test_format_daily_summary_embed_uses_l2_contract():
+    sessions = [
+        {"start_ts": "2026-05-30T09:00:00", "end_ts": "2026-05-30T12:00:00", "duration_seconds": 10800},
+        {"start_ts": "2026-05-30T14:00:00", "end_ts": "2026-05-30T15:10:00", "duration_seconds": 4200},
+    ]
+    payload = format_daily_summary_embed("2026-05-30", sessions)
+    embed = payload["embeds"][0]
+    assert embed["title"] == "📊 在席日報 · 2026-05-30"
+    assert embed["description"].startswith("🟥⬜⬜⬜⬜⬜⬜⬜⬜⬜  17%")
+    assert len(embed["fields"]) == 3
+    assert all(field["inline"] is True for field in embed["fields"])
+    assert embed["color"] == 15158332
+
+
+def test_format_daily_summary_embed_caps_over_target_at_999_percent():
+    payload = format_daily_summary_embed(
+        "2026-05-30",
+        [{"start_ts": "2026-05-30T00:00:00", "end_ts": "2026-05-31T02:00:00", "duration_seconds": 93600}],
+    )
+    embed = payload["embeds"][0]
+    assert "🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩  108%" in embed["description"]
+    assert embed["color"] == 3066993
+
+
+@pytest.mark.parametrize(
+    ("percent", "color", "block"),
+    [
+        (49, 15158332, "🟥"),
+        (50, 15132194, "🟨"),
+        (79, 15132194, "🟨"),
+        (80, 3447003, "🟦"),
+        (99, 3447003, "🟦"),
+        (100, 3066993, "🟩"),
+    ],
+)
+def test_format_daily_summary_embed_uses_style_guide_boundaries(percent, color, block):
+    payload = format_daily_summary_embed(
+        "2026-05-30",
+        [{"duration_seconds": percent * 864, "start_ts": "2026-05-30T00:00:00", "end_ts": "2026-05-30T01:00:00"}],
+    )
+    embed = payload["embeds"][0]
+    assert embed["color"] == color
+    assert embed["description"].startswith(block)

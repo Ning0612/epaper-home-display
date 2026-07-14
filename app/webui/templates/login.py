@@ -1,70 +1,101 @@
 import html as _html
 
-_LOGIN_HTML = r"""<!DOCTYPE html>
+from app.webui.templates.theme import (
+    _FAVICON_DATA_URI,
+    _THEME_CONTROL_SCRIPT,
+    _THEME_CSS,
+    _THEME_INIT_SCRIPT,
+)
+
+
+_LOGIN_HTML = (
+    r"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>登入 — ePaper Home Display</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap">
+  <meta name="description" content="ePaper Home Display 管理介面登入">
+  <title>ePaper Home Display / 登入</title>
+  <link rel="icon" type="image/svg+xml" href="__FAVICON__">
+  <script>__THEME_INIT__</script>
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --bg:#080d18;--surface:#0f172a;--border:#1e3a5f;
-      --primary:#38bdf8;--primary-h:#0ea5e9;--text:#e2e8f0;--muted:#64748b;
-      --err-bg:rgba(248,113,113,.08);--err-border:rgba(248,113,113,.3);--r:10px
-    }
-    body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',system-ui,sans-serif}
-    .card{background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--primary);border-radius:var(--r);padding:2rem;width:100%;max-width:360px;box-shadow:0 4px 32px rgba(0,0,0,.5)}
-    .logo{text-align:center;font-size:2rem;margin-bottom:.4rem}
-    .title{text-align:center;font-size:1.05rem;font-weight:600;margin-bottom:.25rem}
-    .sub{text-align:center;font-size:.78rem;color:var(--muted);margin-bottom:1.5rem}
-    .err{background:var(--err-bg);border:1px solid var(--err-border);color:#f87171;border-radius:6px;padding:.55rem .9rem;font-size:.82rem;margin-bottom:1rem}
-    label{display:block;font-size:.78rem;font-weight:500;margin-bottom:.3rem}
-    input[type=password]{width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:.9rem;color:var(--text);background:var(--bg);outline:none;transition:border-color .15s,box-shadow .15s}
-    input[type=password]:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(56,189,248,.15)}
-    .f{margin-bottom:.9rem}
-    button{width:100%;padding:.6rem;background:var(--primary);color:#080d18;border:none;border-radius:6px;font-size:.9rem;font-weight:600;cursor:pointer;margin-top:.5rem;transition:background .15s}
-    button:hover{background:var(--primary-h)}
+    __THEME_CSS__
+    body{display:grid;place-items:center;padding:1rem}
+    .login-card{width:100%;max-width:22rem;padding:1.35rem}
+    .login-brand{display:flex;align-items:center;gap:.7rem;margin-bottom:1.55rem;color:var(--ink)}
+    .login-brand .brand-mark{border-color:var(--teal);color:var(--teal)}
+    .login-brand .brand-copy{font-size:.8rem}
+    .login-brand .brand-sub{color:var(--muted)}
+    .login-title{margin:.45rem 0 .3rem;font-size:2rem;line-height:.95;font-weight:400;letter-spacing:-.04em}
+    .login-sub{margin:0 0 1.2rem;color:var(--muted);font-size:.88rem;line-height:1.5}
+    .login-card .actions{margin-top:.25rem}
+    .login-card .actions button{width:100%;min-width:0}
+    .login-tools{position:fixed;top:1rem;right:1rem}
   </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo">🖥️</div>
-  <div class="title">ePaper Home Display</div>
-  <div class="sub">__SUBTITLE__</div>
-  __ERROR_HTML__
-  <form method="post" action="/login">
-    <input type="hidden" name="next" value="__NEXT__">
-    <div class="f">
-      <label>密碼</label>
-      <input type="password" name="password" required autofocus placeholder="輸入密碼">
+  <div class="login-tools">
+    <div class="theme-toggle" role="group" aria-label="配色主題切換">
+      <button type="button" data-theme-choice="light" aria-pressed="false">LIGHT</button>
+      <button type="button" data-theme-choice="dark" aria-pressed="false">DARK</button>
     </div>
-    __CONFIRM_FIELD__
-    <button type="submit">__BUTTON__</button>
-  </form>
-</div>
+  </div>
+  <main class="login-wrap">
+    <div class="login-brand">
+      <span class="brand-mark">EH</span>
+      <span class="brand-copy">EPAPER HOME DISPLAY<span class="brand-sub">LOCAL DEVICE / ACCESS CONTROL</span></span>
+    </div>
+    <section class="card login-card">
+      <div class="kicker">01 / access</div>
+      <h1 class="login-title">__TITLE__</h1>
+      <p class="login-sub">__SUBTITLE__</p>
+      __ERROR_HTML__
+      <form method="post" action="/login">
+        <input type="hidden" name="next" value="__NEXT__">
+        <input type="hidden" name="csrf" value="__CSRF__">
+        <div class="f"><label for="login-password">管理密碼</label><input id="login-password" type="password" name="password" required autofocus></div>
+        __CONFIRM_FIELD__
+        <div class="actions"><button type="submit">__BUTTON__</button></div>
+      </form>
+    </section>
+  </main>
+  <script>__THEME_CONTROL__</script>
 </body>
 </html>"""
+    .replace("__FAVICON__", _FAVICON_DATA_URI)
+    .replace("__THEME_INIT__", _THEME_INIT_SCRIPT)
+    .replace("__THEME_CSS__", _THEME_CSS)
+    .replace("__THEME_CONTROL__", _THEME_CONTROL_SCRIPT)
+)
 
 
-def _render_login(next_url: str = "/settings", error: str = "", is_setup: bool = False) -> str:
+def _render_login(
+    next_url: str = "/settings",
+    error: str = "",
+    is_setup: bool = False,
+    csrf_token: str = "",
+) -> str:
     raw_next = next_url if next_url.startswith("/") and not next_url.startswith("//") else "/settings"
     safe_next = _html.escape(raw_next, quote=True)
-    subtitle = "首次設定 — 請設定登入密碼" if is_setup else "請輸入密碼以登入"
+    safe_csrf = _html.escape(csrf_token, quote=True)
+    title = "設定管理密碼" if is_setup else "登入"
+    subtitle = "首次設定完成後即可管理裝置。" if is_setup else "輸入密碼以開啟本機控制台。"
     button = "設定密碼" if is_setup else "登入"
-    error_html = f'<div class="err">{_html.escape(error)}</div>' if error else ""
+    error_html = (
+        f'<div class="message error" aria-live="polite">{_html.escape(error)}</div>' if error else ""
+    )
     confirm_field = (
-        '<div class="f"><label>確認密碼</label>'
-        '<input type="password" name="password_confirm" required placeholder="再次輸入密碼"></div>'
-        if is_setup else ""
+        '<div class="f"><label for="login-password-confirm">確認管理密碼</label>'
+        '<input id="login-password-confirm" type="password" name="password_confirm" required></div>'
+        if is_setup
+        else ""
     )
     return (
-        _LOGIN_HTML
+        _LOGIN_HTML.replace("__TITLE__", title)
         .replace("__SUBTITLE__", subtitle)
         .replace("__BUTTON__", button)
         .replace("__ERROR_HTML__", error_html)
         .replace("__CONFIRM_FIELD__", confirm_field)
         .replace("__NEXT__", safe_next)
+        .replace("__CSRF__", safe_csrf)
     )
