@@ -15,8 +15,8 @@ async def test_desk_heatmap_endpoint_returns_year_and_reference(monkeypatch):
     sessions = [
         {
             "id": 1,
-            "start_ts": "2024-12-31T23:00:00",
-            "end_ts": "2025-01-01T02:30:00",
+            "start_ts": "2024-12-31T23:00:00+08:00",
+            "end_ts": "2025-01-01T02:30:00+08:00",
             "duration_seconds": 12600,
         }
     ]
