@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+from starlette.requests import Request
 
 from app.config import _AP_STATUS_FILE, _WIFI_SCAN_CACHE_FILE
 from app.state import state
-from app.webui.templates.wifi import _WIFI_HTML
+from app.webui.routes.auth import _preauth_csrf_token
+from app.webui.templates.wifi import _render_wifi
 
 if TYPE_CHECKING:
     from app.config import Settings
@@ -32,9 +34,9 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
     router = APIRouter()
 
     @router.get("/wifi", response_class=HTMLResponse)
-    async def wifi_page():
-        """AP mode WiFi setup portal — no authentication required."""
-        return HTMLResponse(_WIFI_HTML)
+    async def wifi_page(request: Request):
+        """AP mode WiFi setup portal; first-run is public, configured devices require login."""
+        return HTMLResponse(_render_wifi(getattr(request.state, "csrf_token", _preauth_csrf_token())))
 
     @router.get("/api/wifi/scan")
     async def wifi_scan():
@@ -53,7 +55,7 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
             return JSONResponse({"networks": networks})
         except Exception as exc:
             logger.error("WiFi scan failed: %s", exc)
-            raise HTTPException(500, detail=f"WiFi 掃描失敗：{exc}")
+            raise HTTPException(500, detail="WiFi 掃描失敗，請稍後再試") from exc
 
     @router.post("/api/wifi/connect")
     async def wifi_connect(body: _WifiConnectBody, background_tasks: BackgroundTasks):
@@ -79,6 +81,8 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
         # Open networks have no password; secured networks require ≥ 8 chars
         if password and len(password) < 8:
             raise HTTPException(400, detail="WiFi 密碼至少需要 8 個字元")
+        if "\n" in password or "\r" in password:
+            raise HTTPException(400, detail="WiFi 密碼不可包含換行")
 
         # Phase 1: build NM profile (AP stays up, client receives this response)
         try:
@@ -86,13 +90,13 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
                 ok, msg = await asyncio.to_thread(_prepare_wifi_profile_sync, ssid, password)
         except Exception as exc:
             logger.error("WiFi prepare error: %s", exc)
-            raise HTTPException(500, detail=f"連線失敗：{exc}")
+            raise HTTPException(500, detail="WiFi 設定失敗，請稍後再試") from exc
 
         if not ok:
             raise HTTPException(400, detail=msg)
 
         # Phase 2: activate after client receives 200 (AP will shut down)
-        background_tasks.add_task(_activate_wifi_background, ssid)
+        background_tasks.add_task(_activate_wifi_background, ssid, password)
 
         return JSONResponse({"ok": True, "message": "正在切換網路，AP 熱點即將關閉..."})
 
@@ -187,15 +191,18 @@ def _prepare_wifi_profile_sync(ssid: str, password: str) -> tuple[bool, str]:
             "ssid", ssid,
         ]
         if password:
-            add_cmd += [
-                "wifi-sec.key-mgmt", "wpa-psk",
-                "wifi-sec.psk", password,
-            ]
+            # Leave the secret unset during phase 1.  Phase 2 supplies it to
+            # nmcli through stdin so it never appears in process argv.
+            add_cmd += ["wifi-sec.key-mgmt", "wpa-psk"]
 
         result = subprocess.run(add_cmd, text=True, capture_output=True, timeout=15)
         if result.returncode != 0:
-            err = (result.stderr or result.stdout).strip()
-            return False, f"建立連線設定失敗：{err}"
+            logger.warning(
+                "WiFi profile creation failed for %r: %s",
+                ssid,
+                (result.stderr or result.stdout).strip(),
+            )
+            return False, "建立連線設定失敗，請確認 SSID 與密碼"
         return True, "profile created"
 
     except FileNotFoundError:
@@ -204,27 +211,36 @@ def _prepare_wifi_profile_sync(ssid: str, password: str) -> tuple[bool, str]:
         return False, "建立連線設定逾時"
 
 
-def _activate_wifi_profile_sync() -> tuple[bool, str]:
+def _activate_wifi_profile_sync(password: str = "") -> tuple[bool, str]:
     """Phase 2 sync: bring up the pre-created EpaperWifiSetup connection.
 
-    This terminates the AP hotspot as a side-effect.
+    This terminates the AP hotspot as a side-effect.  For secured networks,
+    `--ask` reads the secret from stdin instead of exposing it in argv.
     """
     try:
+        command = ["sudo", "nmcli"]
+        input_text = None
+        if password:
+            command.append("--ask")
+            input_text = password + "\n"
+        command += ["connection", "up", _SETUP_CON_ID]
         result = subprocess.run(
-            ["sudo", "nmcli", "connection", "up", _SETUP_CON_ID],
-            text=True, capture_output=True, timeout=30,
+            command,
+            input=input_text,
+            text=True,
+            capture_output=True,
+            timeout=30,
         )
         if result.returncode == 0:
             return True, "連線成功"
-        err = (result.stderr or result.stdout).strip()
-        return False, f"連線失敗：{err}"
+        return False, "連線失敗，請確認 WiFi 設定"
     except FileNotFoundError:
         return False, "nmcli 不可用（非 Pi 環境）"
     except subprocess.TimeoutExpired:
         return False, "連線逾時（30 秒）"
 
 
-async def _activate_wifi_background(ssid: str) -> None:
+async def _activate_wifi_background(ssid: str, password: str = "") -> None:
     """Phase 2 BackgroundTask: activate WiFi after HTTP response is sent.
 
     Sleeps 1s to let ASGI flush the response before the AP shuts down.
@@ -234,7 +250,7 @@ async def _activate_wifi_background(ssid: str) -> None:
     await asyncio.sleep(1.0)
     try:
         async with _nmcli_lock:
-            ok, msg = await asyncio.to_thread(_activate_wifi_profile_sync)
+            ok, msg = await asyncio.to_thread(_activate_wifi_profile_sync, password)
         if ok:
             try:
                 if os.path.exists(_AP_STATUS_FILE):

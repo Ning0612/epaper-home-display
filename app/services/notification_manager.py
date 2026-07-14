@@ -4,8 +4,8 @@ import logging
 from datetime import datetime, timedelta
 
 from app.config import DiscordConfig
-from app.logic.desk_session import format_daily_summary, format_session_end_msg
-from app.services.discord import DiscordService
+from app.logic.desk_session import format_daily_summary_embed, format_session_end_msg
+from app.services.discord import DiscordMessage, DiscordService, deserialize_message, serialize_message
 from app.storage.logs import (
     get_pending_notifications,
     mark_notification_sent,
@@ -39,7 +39,7 @@ class NotificationManager:
     async def send_daily_summary(self, date_str: str, sessions: list[dict]) -> None:
         if not self._config.notify_daily_summary:
             return
-        msg = format_daily_summary(date_str, sessions)
+        msg = format_daily_summary_embed(date_str, sessions)
         await self._send_or_queue("daily_summary", msg)
 
     async def process_retry_queue(self) -> None:
@@ -47,7 +47,7 @@ class NotificationManager:
         now = datetime.now()
         pending = await get_pending_notifications(now)
         for item in pending:
-            success = await self._discord.send(item["message"])
+            success = await self._discord.send(deserialize_message(item["message"]))
             if success:
                 await mark_notification_sent(item["id"])
                 logger.info(
@@ -67,12 +67,12 @@ class NotificationManager:
                     next_retry = now + _RETRY_DELAYS[delay_idx]
                     await update_notification_retry(item["id"], next_retry, attempts)
 
-    async def _send_or_queue(self, msg_type: str, message: str) -> None:
+    async def _send_or_queue(self, msg_type: str, message: DiscordMessage) -> None:
         if not self._config.webhook_url:
             logger.debug("Discord webhook not configured, skipping notification (type=%s)", msg_type)
             return
         success = await self._discord.send(message)
         if not success:
             next_retry = datetime.now() + _RETRY_DELAYS[0]
-            await queue_notification(msg_type, message, next_retry)
+            await queue_notification(msg_type, serialize_message(message), next_retry)
             logger.info("Notification queued for retry (type=%s)", msg_type)

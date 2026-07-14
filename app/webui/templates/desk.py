@@ -2,37 +2,39 @@ from app.webui.templates.base import _make_shell
 
 _DESK_CONTENT = r"""
 <style>
-  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem;margin-bottom:1.2rem}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh);text-align:center}
+  .stats-grid{gap:.6rem;margin-bottom:1.2rem}
+  .stat{padding:1rem 1.2rem}
   .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
-  .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:'JetBrains Mono',monospace}
+  .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:Consolas,monospace;color:var(--teal)}
   .stat-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}
-  .badge{display:inline-block;padding:.2rem .65rem;border-radius:99px;font-size:.78rem;font-weight:600}
-  .badge-green{background:rgba(52,211,153,.15);color:#34d399}
-  .badge-gray{background:rgba(100,116,139,.15);color:#94a3b8}
+  .badge{display:inline-block;padding:.2rem .65rem;border-radius:0;font:700 .68rem Consolas,monospace}
+  .badge-green{background:var(--teal);color:var(--on-dark)}
+  .badge-gray{background:var(--coral);color:var(--on-dark)}
   .sensor-row{display:flex;align-items:center;gap:1rem;font-size:.85rem;flex-wrap:wrap}
   .sensor-bar-wrap{flex:1;min-width:180px}
-  .sensor-bar{height:8px;background:var(--surface2);border-radius:4px;position:relative;overflow:visible}
-  .sensor-fill{height:100%;border-radius:4px;background:var(--primary);transition:width .4s}
-  .sensor-threshold-line{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--amber);border-radius:1px}
+  .sensor-bar{height:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:0;position:relative;overflow:visible}
+  .sensor-fill{height:100%;background:var(--teal);transition:width .4s}
+  .sensor-threshold-line{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--amber)}
   .chart-wrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-size:.82rem}
-  th{text-align:left;padding:.5rem .7rem;font-size:.72rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
-  td{padding:.5rem .7rem;border-bottom:1px solid rgba(27,40,66,.5)}
+  th{text-align:left;padding:.5rem .7rem;font-size:.72rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+  td{padding:.5rem .7rem;border-bottom:1px solid var(--line)}
   tr:last-child td{border-bottom:none}
-  .badge-occ{background:rgba(56,189,248,.15);color:#7dd3fc}
-  .badge-unocc{background:rgba(100,116,139,.15);color:#94a3b8}
+  .badge-occ{background:var(--teal);color:var(--on-dark)}
+  .badge-unocc{background:var(--coral);color:var(--on-dark)}
   .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.3rem}
 </style>
 
 <div class="page-wrap">
-  <div class="page-title">📊 書桌前分析</div>
+  <h1 class="page-title">書桌前分析</h1>
 
   <div class="stats-grid" id="stats-grid">
     <div class="stat"><div class="stat-label">目前狀態</div><div class="stat-value" id="s-presence">—</div></div>
     <div class="stat"><div class="stat-label">今日累計</div><div class="stat-value" id="s-today">—</div></div>
     <div class="stat"><div class="stat-label">本次時段</div><div class="stat-value" id="s-segment">—</div><div class="stat-sub" id="s-since"></div></div>
     <div class="stat"><div class="stat-label">今日次數</div><div class="stat-value" id="s-count">—</div></div>
+    <div class="stat"><div class="stat-label">光線原始值</div><div class="stat-value" id="s-light">—</div></div>
+    <div class="stat"><div class="stat-label">光線閾值</div><div class="stat-value" id="s-thresh">—</div></div>
   </div>
 
   <div class="card">
@@ -109,18 +111,20 @@ function fmtDate(iso){
   return iso.slice(0,10);
 }
 
+function chartColor(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+
 function renderTimeline(sessions){
   var now=Date.now();
   var start24=now-86400000;
   var W=800, H=48;
-  var bars='';
+  var bars='',teal=chartColor('--teal'),muted=chartColor('--muted'),line=chartColor('--line'),inset=chartColor('--inset');
   sessions.forEach(function(s){
     var x1=Math.max(0,(new Date(s.start_ts).getTime()-start24)/86400000*W);
     var endMs=s.end_ts?new Date(s.end_ts).getTime():now;
     var x2=Math.min(W,(endMs-start24)/86400000*W);
     var w=Math.max(2,x2-x1);
     var opacity=s.end_ts?'0.75':'0.95';
-    bars+='<rect x="'+x1+'" y="6" width="'+w+'" height="36" rx="3" fill="#38bdf8" opacity="'+opacity+'"/>';
+    bars+='<rect x="'+x1+'" y="6" width="'+w+'" height="36" fill="'+teal+'" opacity="'+opacity+'"/>';
   });
   var labels='';
   for(var h=0;h<=24;h+=6){
@@ -128,11 +132,11 @@ function renderTimeline(sessions){
     var t=new Date(start24+h*3600000);
     var lbl=String(t.getHours()).padStart(2,'0')+':00';
     var anchor=h===0?'start':h===24?'end':'middle';
-    labels+='<text x="'+x+'" y="'+H+'" text-anchor="'+anchor+'" font-size="10" fill="#4E647A">'+lbl+'</text>';
-    labels+='<line x1="'+x+'" y1="44" x2="'+x+'" y2="47" stroke="#1B2842" stroke-width="1"/>';
+    labels+='<text x="'+x+'" y="'+H+'" text-anchor="'+anchor+'" font-size="10" fill="'+muted+'">'+lbl+'</text>';
+    labels+='<line x1="'+x+'" y1="44" x2="'+x+'" y2="47" stroke="'+line+'" stroke-width="1"/>';
   }
   return '<svg viewBox="0 0 '+W+' '+(H+2)+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px">'
-    +'<rect width="'+W+'" height="48" rx="4" fill="#0C1225"/>'
+    +'<rect width="'+W+'" height="48" fill="'+inset+'" stroke="'+line+'"/>'
     +bars+labels+'</svg>';
 }
 
@@ -141,26 +145,27 @@ function renderBarChart(daily30d){
   var maxSec=Math.max.apply(null,daily30d.map(function(d){return d.total_seconds;}));
   if(maxSec===0) maxSec=3600;
   var bW=W/30-2;
-  var bars='',labels='';
+  var bars='',labels='',teal=chartColor('--teal'),muted=chartColor('--muted'),line=chartColor('--line'),inset=chartColor('--inset');
   daily30d.forEach(function(d,i){
     var x=i*(W/30);
     var h=Math.max(2,d.total_seconds/maxSec*bH);
     var y=bH-h;
     var opacity=d.total_seconds>0?'0.75':'0.2';
-    bars+='<rect x="'+(x+1)+'" y="'+y+'" width="'+bW+'" height="'+h+'" rx="2" fill="#38bdf8" opacity="'+opacity+'"/>';
+    bars+='<rect x="'+(x+1)+'" y="'+y+'" width="'+bW+'" height="'+h+'" fill="'+teal+'" opacity="'+opacity+'"/>';
     if(i%7===0||i===29){
       var lbl=d.date.slice(5);
-      labels+='<text x="'+(x+bW/2)+'" y="'+(svgH-2)+'" text-anchor="middle" font-size="9" fill="#4E647A">'+lbl+'</text>';
+      labels+='<text x="'+(x+bW/2)+'" y="'+(svgH-2)+'" text-anchor="middle" font-size="9" fill="'+muted+'">'+lbl+'</text>';
     }
   });
   return '<svg viewBox="0 0 '+W+' '+svgH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px">'
-    +'<rect width="'+W+'" height="'+svgH+'" rx="4" fill="#0C1225"/>'
+    +'<rect width="'+W+'" height="'+svgH+'" fill="'+inset+'" stroke="'+line+'"/>'
     +bars+labels+'</svg>';
 }
 
 async function loadStats(){
   try{
     var r=await fetch('/api/desk/stats');
+    if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     var occ=d.presence==='OCCUPIED';
     document.getElementById('s-presence').innerHTML=
@@ -183,6 +188,7 @@ async function loadStats(){
 async function loadHistory(){
   try{
     var r=await fetch('/api/desk/history');
+    if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     document.getElementById('timeline-wrap').innerHTML=renderTimeline(d.timeline_24h||[]);
     document.getElementById('barchart-wrap').innerHTML=renderBarChart(d.daily_30d||[]);
@@ -204,6 +210,7 @@ async function loadHistory(){
 async function loadSessions(){
   try{
     var r=await fetch('/api/desk/sessions?limit=20');
+    if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     var tbody=document.getElementById('sessions-tbody');
     var rows=(d.sessions||[]).map(function(s){
@@ -219,6 +226,7 @@ async function loadSessions(){
 loadStats(); loadHistory(); loadSessions();
 setInterval(loadStats, 30000);
 setInterval(function(){loadHistory();loadSessions();}, 300000);
+document.addEventListener('iot-theme-change',loadHistory);
 </script>
 """
 

@@ -4,40 +4,40 @@ _IMAGES_CONTENT = r"""
 <style>
   .img-grid2{display:grid;grid-template-columns:repeat(auto-fill,96px);gap:.8rem;justify-content:start;margin-top:.9rem}
   .img-card2{width:96px;display:flex;flex-direction:column;align-items:center}
-  .img-thumb2{width:88px;height:141px;background:#000;border-radius:6px;overflow:hidden;position:relative;flex-shrink:0;cursor:pointer}
+  .img-thumb2{width:88px;height:141px;background:var(--ink-soft);border-radius:0;overflow:hidden;position:relative;flex-shrink:0;cursor:pointer}
   .img-thumb2 img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block;transition:filter .15s}
   .img-thumb2:hover>img{filter:brightness(.78)}
-  .cur-ribbon{position:absolute;bottom:0;left:0;right:0;background:rgba(56,189,248,.88);color:#060A14;font-size:.62rem;font-weight:700;text-align:center;padding:.18rem 0}
-  .img-del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(6,10,20,.78);border:1px solid rgba(248,113,113,.5);color:var(--red);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;padding:0;line-height:1}
-  .img-del-btn:hover{background:rgba(248,113,113,.28);border-color:var(--red)}
+  .cur-ribbon{position:absolute;bottom:0;left:0;right:0;background:var(--teal);color:var(--on-dark);font:700 .62rem Consolas,monospace;text-align:center;padding:.18rem 0}
+  .img-del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:0;background:var(--coral);border:1px solid var(--coral);color:var(--on-dark);font:700 1rem Consolas,monospace;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;padding:0;line-height:1}
+  .img-del-btn:hover{background:var(--coral-dark);border-color:var(--coral-dark)}
   .img-card2-name{font-size:.72rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:.35rem;width:96px;text-align:center;color:var(--text)}
   .img-card2-date{font-size:.67rem;color:var(--muted);text-align:center;margin-top:.08rem}
   .empty-state{text-align:center;padding:2rem;color:var(--muted);font-size:.88rem}
-  .drop-zone{border:2px dashed var(--border);border-radius:8px;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:var(--muted)}
-  .drop-zone:hover,.drop-zone.drag-over{border-color:var(--primary);background:rgba(56,189,248,.05);color:var(--text)}
-  .drop-zone-icon{font-size:2rem;margin-bottom:.5rem}
+  .drop-zone{border:2px dashed var(--line);border-radius:0;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:var(--muted)}
+  .drop-zone:hover,.drop-zone.drag-over{border-color:var(--teal);background:var(--surface-2);color:var(--ink)}
+  .drop-zone-icon{display:none}
   .drop-zone-text{font-size:.85rem}
   .crop-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
-  #crop-canvas{max-width:100%;cursor:crosshair;border-radius:6px;display:block;touch-action:none}
+  #crop-canvas{max-width:100%;cursor:crosshair;border-radius:0;display:block;touch-action:none}
   .crop-hint{font-size:.78rem;color:var(--muted);text-align:center}
   .transform-bar{display:flex;gap:.45rem;flex-wrap:wrap;justify-content:center;margin:.6rem 0 .2rem}
-  .btn-tf{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:.32rem .65rem;font-size:.78rem;cursor:pointer;transition:background .15s;white-space:nowrap}
-  .btn-tf:hover{background:#1C2940}
+  .btn-tf{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:0;padding:.32rem .65rem;font:700 .78rem Consolas,monospace;cursor:pointer;transition:background .15s;white-space:nowrap}
+  .btn-tf:hover{background:var(--ink-soft);color:var(--on-dark)}
   .preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1rem}
   .preview-panel{text-align:center}
   .preview-label{font-size:.75rem;color:var(--muted);margin-bottom:.5rem;font-weight:500;text-transform:uppercase;letter-spacing:.05em}
-  #crop-mini,#dither-preview{max-width:100%;border-radius:6px;border:1px solid var(--border);display:block;margin:0 auto;image-rendering:pixelated}
-  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
-  .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.3rem 1.1rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem;position:relative;max-width:90vw}
+  #crop-mini,#dither-preview{max-width:100%;border-radius:0;border:1px solid var(--line);display:block;margin:0 auto;image-rendering:pixelated}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:10000;display:flex;align-items:center;justify-content:center}
+  .modal-box{background:var(--surface);border:1px solid var(--ink);border-radius:0;box-shadow:5px 5px 0 var(--line);padding:1.3rem 1.1rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem;position:relative;max-width:90vw}
   .modal-close{position:absolute;top:.5rem;right:.7rem;background:transparent;border:none;color:var(--muted);font-size:1.5rem;cursor:pointer;line-height:1;padding:.1rem .35rem;transition:color .15s}
   .modal-close:hover{color:var(--text)}
-  #modal-img{max-height:70vh;max-width:min(560px,85vw);width:auto;height:auto;image-rendering:pixelated;border-radius:4px;display:block}
+  #modal-img{max-height:70vh;max-width:min(560px,85vw);width:auto;height:auto;image-rendering:pixelated;border-radius:0;display:block}
   .modal-fname{font-size:.78rem;color:var(--muted);text-align:center;max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media(max-width:600px){.preview-grid{grid-template-columns:1fr}}
 </style>
 
 <div class="page-wrap">
-  <div class="page-title">🖼️ 圖片輪播管理</div>
+  <h1 class="page-title">圖片輪播管理</h1>
 
   <div id="view-gallery">
     <div class="card">
@@ -74,7 +74,7 @@ _IMAGES_CONTENT = r"""
     <div class="card">
       <div class="card-title">已上傳圖片</div>
       <div id="drop-zone" class="drop-zone" onclick="startUpload()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
-        <div class="drop-zone-icon">📁</div>
+        <div class="drop-zone-icon" aria-hidden="true"></div>
         <div class="drop-zone-text">點擊上傳，或將圖片拖曳至此<br><span style="font-size:.73rem;color:var(--muted)">支援 JPEG、PNG、WebP（最大 15 MB）</span></div>
       </div>
       <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" style="display:none" onchange="onFileSelect(event)">
@@ -294,30 +294,37 @@ function drawCropUI() {
      srcImg.naturalWidth  * canvasScale,
      srcImg.naturalHeight * canvasScale);
   ctx.restore();
-  ctx.strokeStyle = 'rgba(78,100,122,0.45)';
+  const lineColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
+  const tealColor = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim();
+  const overlayColor = getComputedStyle(document.documentElement).getPropertyValue('--crop-overlay').trim();
+  ctx.strokeStyle = lineColor;
   ctx.setLineDash([5, 5]);
   ctx.lineWidth = 1;
   ctx.strokeRect(imgOffsetX + 0.5, imgOffsetY + 0.5, imgPxW - 1, imgPxH - 1);
   ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillStyle = overlayColor;
   ctx.fillRect(0, 0, canvas.width, y);
   ctx.fillRect(0, y, x, h);
   ctx.fillRect(x + w, y, canvas.width - x - w, h);
   ctx.fillRect(0, y + h, canvas.width, canvas.height - y - h);
-  ctx.strokeStyle = 'rgba(56,189,248,0.22)';
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = tealColor;
   ctx.lineWidth = 1;
   for (let i = 1; i < 3; i++) {
     ctx.beginPath(); ctx.moveTo(x + i*w/3, y); ctx.lineTo(x + i*w/3, y+h); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x, y + i*h/3); ctx.lineTo(x+w, y + i*h/3); ctx.stroke();
   }
-  ctx.strokeStyle = '#38bdf8';
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = tealColor;
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, w, h);
-  ctx.fillStyle = '#38bdf8';
+  ctx.fillStyle = tealColor;
   [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(([hx,hy]) => {
     ctx.fillRect(hx - 5, hy - 5, 10, 10);
   });
 }
+
+document.addEventListener('iot-theme-change', redrawCrop);
 
 function redrawCrop() {
   if (srcImg && cropRect) drawCropUI();

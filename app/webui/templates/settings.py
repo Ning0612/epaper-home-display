@@ -1,41 +1,39 @@
 from app.webui.templates.base import _make_shell
 
-_SETTINGS_EXTRA_HEAD = r"""<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>"""
+_SETTINGS_EXTRA_HEAD = ""
 
 _SETTINGS_CONTENT = r"""
 <style>
   .acc{max-width:700px;margin:0 auto;padding:1.5rem 1rem}
-  .acc-item{border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;overflow:hidden}
+  .acc-item{border:1px solid var(--ink);border-radius:0;margin-bottom:.75rem;overflow:hidden;box-shadow:3px 3px 0 var(--line)}
   .acc-head{
     display:flex;align-items:center;gap:.55rem;padding:.72rem 1rem;
     cursor:pointer;user-select:none;background:var(--surface);
-    font-size:.9rem;font-weight:500;color:var(--text);transition:background .15s;
+    font:700 .8rem Consolas,monospace;color:var(--ink);transition:background .15s;
   }
-  .acc-head:hover{background:var(--surface2)}
-  .acc-ic{width:1.3rem;text-align:center;font-size:1rem}
+  .acc-head:hover{background:var(--surface-2)}
+  .acc-ic{width:1.3rem;text-align:center;color:var(--coral);font:700 .7rem Consolas,monospace}
   .acc-chev{margin-left:auto;font-size:.7rem;color:var(--muted);transition:transform .2s;line-height:1}
   .acc-item.open>.acc-head>.acc-chev{transform:rotate(180deg)}
-  .acc-body{display:none;padding:.75rem 1rem 1rem;border-top:1px solid var(--border)}
+  .acc-body{display:none;padding:.75rem 1rem 1rem;border-top:1px solid var(--line)}
   .acc-item.open>.acc-body{display:block}
   .c-sub{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.9rem}
-  #map{height:300px;border-radius:6px;border:1px solid var(--border);margin-top:.4rem}
-  #map .leaflet-tile-pane{filter:invert(100%) hue-rotate(180deg) brightness(90%)}
+  #map{height:300px;border-radius:0;border:1px solid var(--line);margin-top:.4rem}
   .coord{display:flex;gap:1rem;margin-top:.6rem;font-size:.83rem;color:var(--muted)}
-  .coord b{color:var(--text)}
+  .coord b{color:var(--ink)}
   .info{display:grid;grid-template-columns:auto 1fr;gap:.4rem .9rem;font-size:.85rem}
   .ik{color:var(--muted);font-weight:500}
-  .iv{font-family:'JetBrains Mono',monospace;color:var(--text)}
-  pre{background:var(--surface2);padding:.7rem;border-radius:6px;font-size:.75rem;overflow-x:auto;color:var(--muted);line-height:1.5;font-family:'JetBrains Mono',monospace}
-  hr{border:none;border-top:1px solid var(--border);margin:.9rem 0}
+  .iv{font-family:Consolas,monospace;color:var(--ink)}
+  pre{background:var(--surface-2);padding:.7rem;border-radius:0;font-size:.75rem;overflow-x:auto;color:var(--muted);line-height:1.5;font-family:Consolas,monospace}
+  hr{border:none;border-top:1px solid var(--line);margin:.9rem 0}
   @media(max-width:600px){.acc{padding:1rem .5rem}}
 </style>
 
-<div class="acc">
+<div class="page-wrap"><h1 class="page-title">系統設定</h1><div class="acc">
 
   <div class="acc-item open" id="acc-weather">
     <div class="acc-head" onclick="toggle('weather')">
-      <span class="acc-ic">☁️</span>天氣設定
+      <span class="acc-ic">01</span>天氣設定
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -63,12 +61,12 @@ _SETTINGS_CONTENT = r"""
       </div>
       <div class="card">
         <div class="c-sub">地點</div>
-        <p style="font-size:.78rem;color:var(--muted);margin-bottom:.3rem">點擊地圖或拖曳標記來選取位置</p>
-        <div id="map"></div>
-        <div class="coord">
-          <span>緯度 <b id="v-lat">__LAT__</b></span>
-          <span>經度 <b id="v-lon">__LON__</b></span>
+        <p style="font-size:.78rem;color:var(--muted);margin-bottom:.8rem">離線模式不載入外部地圖；直接輸入座標即可更新天氣位置。</p>
+        <div class="row2">
+          <div class="f"><label for="location-lat">緯度</label><input type="number" id="location-lat" min="-90" max="90" step="0.00001" value="__LAT__"></div>
+          <div class="f"><label for="location-lon">經度</label><input type="number" id="location-lon" min="-180" max="180" step="0.00001" value="__LON__"></div>
         </div>
+        <div class="coord"><span>目前座標 <b id="v-lat">__LAT__</b> / <b id="v-lon">__LON__</b></span></div>
         <div class="btn-row"><button class="btn-p" onclick="saveLocation()">儲存位置</button></div>
       </div>
     </div>
@@ -76,7 +74,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-display">
     <div class="acc-head" onclick="toggle('display')">
-      <span class="acc-ic">🖥️</span>顯示器設定
+      <span class="acc-ic">02</span>顯示器設定
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -118,7 +116,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-presence">
     <div class="acc-head" onclick="toggle('presence')">
-      <span class="acc-ic">💡</span>在場偵測
+      <span class="acc-ic">03</span>在場偵測
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -128,17 +126,17 @@ _SETTINGS_CONTENT = r"""
           <span id="lp-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;transition:background .3s"></span>
         </div>
         <div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.7rem">
-          <span id="lp-val" style="font-size:2rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text);min-width:3.5ch">—</span>
+          <span id="lp-val" style="font-size:2rem;font-weight:700;font-family:Consolas,monospace;color:var(--ink);min-width:3.5ch">—</span>
           <span style="font-size:.78rem;color:var(--muted)">/1023</span>
           <span style="font-size:.78rem;color:var(--muted)">≈ <span id="lp-lux">—</span> lux</span>
           <span style="margin-left:auto">
-            <span id="lp-badge" style="font-size:.78rem;font-weight:600;padding:.18rem .65rem;border-radius:999px;background:var(--surface2);color:var(--muted)">—</span>
+            <span id="lp-badge" style="font:700 .68rem Consolas,monospace;padding:.18rem .65rem;border-radius:0;background:var(--surface-2);color:var(--muted)">—</span>
           </span>
         </div>
-        <div style="position:relative;height:10px;background:var(--surface2);border-radius:5px;margin-bottom:.35rem">
-          <div id="lp-bar" style="height:100%;border-radius:5px;width:0%;transition:width .4s,background .3s;max-width:100%"></div>
-          <div id="lp-thresh-line" style="position:absolute;top:-5px;bottom:-5px;width:2px;background:#f59e0b;border-radius:2px;left:49%;transform:translateX(-50%)">
-            <span style="position:absolute;top:-17px;left:50%;transform:translateX(-50%);font-size:.6rem;white-space:nowrap;color:#f59e0b;font-weight:700">閾值</span>
+        <div style="position:relative;height:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:0;margin-bottom:.35rem">
+          <div id="lp-bar" style="height:100%;width:0%;transition:width .4s,background .3s;max-width:100%"></div>
+          <div id="lp-thresh-line" style="position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--amber);left:49%;transform:translateX(-50%)">
+            <span style="position:absolute;top:-17px;left:50%;transform:translateX(-50%);font:700 .6rem Consolas,monospace;white-space:nowrap;color:var(--amber)">閾值</span>
           </div>
         </div>
         <div style="font-size:.7rem;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:.2rem">
@@ -157,7 +155,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-voice">
     <div class="acc-head" onclick="toggle('voice')">
-      <span class="acc-ic">🔊</span>語音設定
+      <span class="acc-ic">04</span>語音設定
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -216,7 +214,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-notif">
     <div class="acc-head" onclick="toggle('notif')">
-      <span class="acc-ic">💬</span>通知設定
+      <span class="acc-ic">05</span>通知設定
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -254,7 +252,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-mqtt">
     <div class="acc-head" onclick="toggle('mqtt')">
-      <span class="acc-ic">📡</span>HydraCup MQTT 設定
+      <span class="acc-ic">06</span>HydraCup MQTT 設定
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -301,7 +299,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-printer">
     <div class="acc-head" onclick="toggle('printer')">
-      <span class="acc-ic">🖨️</span>Bambu 印表機設定
+      <span class="acc-ic">07</span>Bambu 印表機設定
       <span class="acc-chev">⌄</span>
     </div>
     <div class="acc-body">
@@ -325,7 +323,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-usage">
     <div class="acc-head" onclick="toggle('usage')">
-      <span class="acc-ic">🤖</span>AI 工具用量設定
+      <span class="acc-ic">08</span>AI 工具用量設定
       <span class="acc-chev">⌄</span>
     </div>
     <div class="acc-body">
@@ -348,7 +346,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-general">
     <div class="acc-head" onclick="toggle('general')">
-      <span class="acc-ic">⚙️</span>一般設定
+      <span class="acc-ic">09</span>一般設定
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -364,7 +362,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-wifi">
     <div class="acc-head" onclick="toggle('wifi')">
-      <span class="acc-ic">📶</span>WiFi 狀態
+      <span class="acc-ic">10</span>WiFi 狀態
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -382,7 +380,7 @@ _SETTINGS_CONTENT = r"""
 
   <div class="acc-item" id="acc-auth">
     <div class="acc-head" onclick="toggle('auth')">
-      <span class="acc-ic">🔒</span>帳號安全
+      <span class="acc-ic">11</span>帳號安全
       <span class="acc-chev">▾</span>
     </div>
     <div class="acc-body">
@@ -393,7 +391,7 @@ _SETTINGS_CONTENT = r"""
           <input type="password" id="a-cur" placeholder="輸入目前密碼">
         </div>
         <div class="f">
-          <label>新密碼 <span class="hint">（至少 4 個字元）</span></label>
+          <label>新密碼 <span class="hint">（至少 8 個字元）</span></label>
           <input type="password" id="a-new" placeholder="輸入新密碼">
         </div>
         <div class="f">
@@ -404,17 +402,16 @@ _SETTINGS_CONTENT = r"""
       </div>
       <div class="card">
         <div class="c-sub">會話管理</div>
-        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.8rem">Cookie 有效期 7 天，登出後需重新輸入密碼。</p>
-        <a href="/logout" style="display:inline-block;padding:.45rem 1.2rem;background:#dc2626;color:#fff;border-radius:6px;font-size:.83rem;font-weight:500;text-decoration:none">登出</a>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.8rem">單一管理 session：閒置 30 分鐘或最長 24 小時後失效；新登入會取代舊 session。</p>
+        <button type="button" class="btn-d" data-action="logout">登出</button>
       </div>
     </div>
   </div>
 
-</div>
+</div></div>
 
 <script>
 var mapLat=__LAT__, mapLon=__LON__;
-var lmap=null, lmk=null;
 var _presTimer=null;
 
 var MODEL_PRESETS={
@@ -441,10 +438,6 @@ function toggle(name){
   stopLightPoll();
   if(!wasOpen){
     item.classList.add('open');
-    if(name==='weather'){
-      if(!lmap) initMap();
-      else setTimeout(function(){lmap.invalidateSize();},50);
-    }
     if(name==='wifi') loadWifi();
     if(name==='mqtt') loadMqttStatus();
     if(name==='printer') loadPrinterStatus();
@@ -475,7 +468,7 @@ async function _fetchLight(){
     var raw=d.light_raw;
     var dot=document.getElementById('lp-dot');
     var badge=document.getElementById('lp-badge');
-    var _nodata='font-size:.78rem;font-weight:600;padding:.18rem .65rem;border-radius:999px;background:var(--surface2);color:var(--muted)';
+    var _nodata='font:700 .68rem Consolas,monospace;padding:.18rem .65rem;border-radius:0;background:var(--surface-2);color:var(--muted)';
     if(raw==null){
       document.getElementById('lp-val').textContent='—';
       document.getElementById('lp-lux').textContent='—';
@@ -495,9 +488,9 @@ async function _fetchLight(){
     document.getElementById('lp-bar').style.background=bright?'var(--muted)':'var(--primary)';
     document.getElementById('lp-thresh-line').style.left=(thresh/1023*100).toFixed(2)+'%';
     if(!bright){
-      dot.style.background='#22c55e';
+      dot.style.background='var(--teal)';
       badge.textContent='亮燈（在場）';
-      badge.style.cssText='font-size:.78rem;font-weight:600;padding:.18rem .65rem;border-radius:999px;background:rgba(34,197,94,.15);color:#16a34a';
+      badge.style.cssText='font:700 .68rem Consolas,monospace;padding:.18rem .65rem;border-radius:0;background:var(--teal);color:var(--on-dark)';
     }else{
       dot.style.background='var(--muted)';
       badge.textContent='暗燈（離場）';
@@ -512,22 +505,14 @@ function toast(msg,ok){
   clearTimeout(t._t); t._t=setTimeout(function(){t.className=''},3000);
 }
 
-function initMap(){
-  if(typeof L==='undefined'){
-    var el=document.getElementById('map');
-    if(el) el.innerHTML='<p style="padding:1rem;color:var(--muted);font-size:.85rem">⚠️ 地圖無法載入（需要網路連線）</p>';
-    return;
-  }
-  lmap=L.map('map').setView([mapLat,mapLon],10);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(lmap);
-  lmk=L.marker([mapLat,mapLon],{draggable:true}).addTo(lmap);
-  function upd(ll){
-    mapLat=+ll.lat.toFixed(5); mapLon=+ll.lng.toFixed(5);
+function syncLocation(){
+  var lat=+document.getElementById('location-lat').value;
+  var lon=+document.getElementById('location-lon').value;
+  if(Number.isFinite(lat)&&Number.isFinite(lon)){
+    mapLat=+lat.toFixed(5);mapLon=+lon.toFixed(5);
     document.getElementById('v-lat').textContent=mapLat;
     document.getElementById('v-lon').textContent=mapLon;
   }
-  lmk.on('dragend',function(e){upd(e.target.getLatLng())});
-  lmap.on('click',function(e){lmk.setLatLng(e.latlng);upd(e.latlng)});
 }
 
 async function loadCfg(){
@@ -540,9 +525,10 @@ async function loadCfg(){
     document.getElementById('w-interval').value=w.fetch_interval_seconds??600;
     if(w.lat!=null && w.lon!=null){
       mapLat=w.lat; mapLon=w.lon;
+      document.getElementById('location-lat').value=mapLat;
+      document.getElementById('location-lon').value=mapLon;
       document.getElementById('v-lat').textContent=mapLat;
       document.getElementById('v-lon').textContent=mapLon;
-      if(lmap && lmk){lmap.setView([mapLat,mapLon]);lmk.setLatLng([mapLat,mapLon]);}
     }
     var d=c.display||{};
     document.getElementById('d-model').value=d.model||'epd7in3e';
@@ -642,7 +628,7 @@ async function put(path,data){
 }
 
 async function saveLocation(){
-  try{await put('/settings/location',{lat:mapLat,lon:mapLon});toast('✓ 位置已儲存',true);}
+  try{syncLocation();await put('/settings/location',{lat:mapLat,lon:mapLon});toast('位置已儲存',true);}
   catch(e){toast('儲存失敗：'+e.message,false);}
 }
 async function saveWeather(){
@@ -793,18 +779,19 @@ async function saveAuth(){
   if(nw!==conf){toast('新密碼與確認密碼不一致',false);return;}
   if(nw.length<8){toast('密碼長度至少 8 個字元',false);return;}
   try{
-    await put('/settings/auth',{current_password:cur,new_password:nw});
+    var result=await put('/settings/auth',{current_password:cur,new_password:nw});
     document.getElementById('a-cur').value='';
     document.getElementById('a-new').value='';
     document.getElementById('a-conf').value='';
-    toast('✓ 密碼已更新',true);
+    toast('密碼已更新，請重新登入',true);
+    if(result.reauthenticate)setTimeout(function(){window.location.href='/login';},500);
   }catch(e){toast('更改失敗：'+e.message,false);}
 }
 
 loadCfg();
 loadMqttStatus();
 loadPrinterStatus();
-initMap();
+syncLocation();
 </script>
 """
 

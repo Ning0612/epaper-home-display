@@ -52,7 +52,8 @@ storage:
 webui:
   host: "0.0.0.0"
   port: 8000
-  # password_hash and session_secret are managed automatically — do not edit manually
+  # password_hash is managed automatically — do not edit manually
+  # session_secret is retained only for legacy config compatibility and is ignored
 
 timezone: "Asia/Taipei"
 

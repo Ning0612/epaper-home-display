@@ -2,36 +2,36 @@ from app.webui.templates.base import _make_shell
 
 _ENV_CONTENT = r"""
 <style>
-  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.6rem;margin-bottom:1.2rem}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.7rem .9rem;box-shadow:var(--sh);text-align:center}
+  .stats-grid{gap:.6rem;margin-bottom:1.2rem}
+  .stat{padding:.7rem .9rem}
   .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
   .stat-value-row{display:flex;align-items:baseline;justify-content:center;gap:2px}
-  .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:'JetBrains Mono',monospace}
-  .stat-unit{font-size:.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace;font-weight:400}
-  .temp-val{color:#38BDF8}
-  .hum-val{color:#34D399}
-  .hi-val{color:#FBBF24}
-  .lo-val{color:#7dd3fc}
+  .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:Consolas,monospace;color:var(--teal)}
+  .stat-unit{font-size:.78rem;color:var(--muted);font-family:Consolas,monospace;font-weight:400}
+  .temp-val{color:var(--teal)}
+  .hum-val{color:var(--teal)}
+  .hi-val{color:var(--amber)}
+  .lo-val{color:var(--coral)}
   .chart-wrap{overflow-x:auto;margin-top:.5rem}
   .tab-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
-  .tab-btn{padding:.35rem .9rem;border:1px solid var(--border);border-radius:6px;font-size:.8rem;font-weight:600;background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s;font-family:inherit}
-  .tab-btn.active{background:var(--primary);color:#060A14;border-color:var(--primary)}
-  .tab-btn:hover:not(.active){background:#1C2940;color:var(--text)}
-  input[type=date],input[type=month]{width:auto;padding:.3rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.8rem;color:var(--text);background:var(--bg);outline:none;font-family:'JetBrains Mono',monospace}
+  .tab-btn{padding:.35rem .9rem;border:1px solid var(--line);border-radius:0;font:700 .8rem Consolas,monospace;background:var(--surface-2);color:var(--muted);cursor:pointer;transition:all .15s}
+  .tab-btn.active{background:var(--teal);color:var(--on-dark);border-color:var(--teal)}
+  .tab-btn:hover:not(.active){background:var(--line);color:var(--ink)}
+  input[type=date],input[type=month]{width:auto;padding:.3rem .6rem;border:1px solid var(--line);border-radius:0;font:700 .8rem Consolas,monospace;color:var(--ink);background:var(--inset);outline:none}
   input[type=date]:focus,input[type=month]:focus{border-color:var(--primary)}
-  select.ref-year{width:auto;padding:.3rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.8rem;color:var(--text);background:var(--bg);outline:none;font-family:'JetBrains Mono',monospace}
+  select.ref-year{width:auto;padding:.3rem .6rem;border:1px solid var(--line);border-radius:0;font:700 .8rem Consolas,monospace;color:var(--ink);background:var(--inset);outline:none}
   .mini-stats{display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.8rem;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)}
   .mini-stats span{white-space:nowrap}
   .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.4rem}
   .stat-table-wrap{overflow-x:auto;margin-top:.5rem}
   table{width:100%;border-collapse:collapse;font-size:.82rem}
-  th{text-align:left;padding:.5rem .7rem;font-size:.72rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
-  td{padding:.5rem .7rem;border-bottom:1px solid rgba(27,40,66,.5)}
+  th{text-align:left;padding:.5rem .7rem;font-size:.72rem;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+  td{padding:.5rem .7rem;border-bottom:1px solid var(--line)}
   tr:last-child td{border-bottom:none}
 </style>
 
 <div class="page-wrap">
-  <div class="page-title">🌡️ 溫溼度分析</div>
+  <h1 class="page-title">溫溼度分析</h1>
 
   <div class="stats-grid">
     <div class="stat">
@@ -74,7 +74,7 @@ _ENV_CONTENT = r"""
 
   <!-- 溫度趨勢 -->
   <div class="card">
-    <div class="card-title">🌡️ 溫度趨勢 (°C)</div>
+    <div class="card-title">溫度趨勢 (°C)</div>
     <div class="chart-wrap" id="chart-temp">
       <div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>
     </div>
@@ -87,7 +87,7 @@ _ENV_CONTENT = r"""
 
   <!-- 濕度趨勢 -->
   <div class="card">
-    <div class="card-title">💧 濕度趨勢 (%)</div>
+    <div class="card-title">濕度趨勢 (%)</div>
     <div class="chart-wrap" id="chart-hum">
       <div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>
     </div>
@@ -127,6 +127,8 @@ var PLOT_H=CH-PAD.top-PAD.bottom;
 
 var currentScale='day';
 
+function chartColor(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+
 function setScale(scale){
   currentScale=scale;
   document.querySelectorAll('.tab-btn').forEach(function(b){
@@ -155,22 +157,22 @@ function buildBand(pts,xScale,yFn,minKey,maxKey,color){
 
 function buildYGrid(min,max){
   if(min===max){min-=1;max+=1;}
-  var out='';
+  var out='',grid=chartColor('--chart-grid'),muted=chartColor('--muted');
   for(var i=0;i<=4;i++){
     var v=min+(max-min)*i/4;
     var y=PAD.top+(1-i/4)*PLOT_H;
-    out+='<line x1="'+PAD.left+'" y1="'+y+'" x2="'+(W-PAD.right)+'" y2="'+y+'" stroke="#1B2842" stroke-width="1"/>';
-    out+='<text x="'+(PAD.left-5)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="#4E647A">'+v.toFixed(1)+'</text>';
+    out+='<line x1="'+PAD.left+'" y1="'+y+'" x2="'+(W-PAD.right)+'" y2="'+y+'" stroke="'+grid+'" stroke-width="1"/>';
+    out+='<text x="'+(PAD.left-5)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="'+muted+'">'+v.toFixed(1)+'</text>';
   }
   return out;
 }
 
 function buildXLabels(pts,xScale){
   var step=Math.max(1,Math.ceil(pts.length/12));
-  var out='';
+  var out='',muted=chartColor('--muted');
   pts.forEach(function(p,i){
     if(i%step===0||i===pts.length-1){
-      out+='<text x="'+xScale(i)+'" y="'+(SVG_H-4)+'" text-anchor="middle" font-size="9" fill="#4E647A">'+p.label+'</text>';
+      out+='<text x="'+xScale(i)+'" y="'+(SVG_H-4)+'" text-anchor="middle" font-size="9" fill="'+muted+'">'+p.label+'</text>';
     }
   });
   return out;
@@ -179,10 +181,11 @@ function buildXLabels(pts,xScale){
 function renderSingleChart(pts, valKey, minKey, maxKey, color, emptyLabel){
   var xScale=function(i){return PAD.left+(pts.length>1?i/(pts.length-1)*PLOT_W:PLOT_W/2);};
 
+  var inset=chartColor('--inset'),lineColor=chartColor('--line'),muted=chartColor('--muted');
   if(!pts.length){
     return '<svg viewBox="0 0 '+W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:280px">'
-      +'<rect width="'+W+'" height="'+SVG_H+'" rx="4" fill="#0C1225"/>'
-      +'<text x="'+W/2+'" y="'+SVG_H/2+'" text-anchor="middle" font-size="13" fill="#4E647A">此時段無資料</text></svg>';
+      +'<rect width="'+W+'" height="'+SVG_H+'" fill="'+inset+'" stroke="'+lineColor+'"/>'
+      +'<text x="'+W/2+'" y="'+SVG_H/2+'" text-anchor="middle" font-size="13" fill="'+muted+'">此時段無資料</text></svg>';
   }
 
   var vals=pts.map(function(p){return p[valKey];}).filter(function(v){return v!=null;});
@@ -201,7 +204,7 @@ function renderSingleChart(pts, valKey, minKey, maxKey, color, emptyLabel){
   var labels=buildXLabels(pts,xScale);
 
   return '<svg viewBox="0 0 '+W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:280px">'
-    +'<rect width="'+W+'" height="'+SVG_H+'" rx="4" fill="#0C1225"/>'
+    +'<rect width="'+W+'" height="'+SVG_H+'" fill="'+inset+'" stroke="'+lineColor+'"/>'
     +grid+band
     +(line?'<polyline points="'+line+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>':'')
     +labels+'</svg>';
@@ -230,32 +233,37 @@ function renderStats(stats){
     ['樣本數', stats.sample_count+'筆', stats.sample_count+'筆'],
   ].map(function(r){
     return '<tr><td>'+r[0]+'</td>'
-      +'<td style="color:#38BDF8;font-family:\'JetBrains Mono\',monospace">'+r[1]+'</td>'
-      +'<td style="color:#34D399;font-family:\'JetBrains Mono\',monospace">'+r[2]+'</td></tr>';
+      +'<td style="color:var(--teal);font-family:Consolas,monospace">'+r[1]+'</td>'
+      +'<td style="color:var(--teal);font-family:Consolas,monospace">'+r[2]+'</td></tr>';
   }).join('');
 }
 
 async function loadChart(){
   var ref=getRef();
   var url='/api/env/chart?scale='+currentScale+(ref?'&ref='+encodeURIComponent(ref):'');
+  var tempChart=document.getElementById('chart-temp');
+  var humChart=document.getElementById('chart-hum');
+  var hasPreviousChart=!!(tempChart.querySelector('svg')||humChart.querySelector('svg'));
   var loading='<div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>';
-  document.getElementById('chart-temp').innerHTML=loading;
-  document.getElementById('chart-hum').innerHTML=loading;
+  if(!hasPreviousChart){tempChart.innerHTML=loading;humChart.innerHTML=loading;}
+  else{document.getElementById('chart-refresh').textContent='更新中…';}
   try{
     var r=await fetch(url);
+    if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     var pts=d.points||[];
-    document.getElementById('chart-temp').innerHTML=renderSingleChart(pts,'temp','temp_min','temp_max','#38BDF8');
-    document.getElementById('chart-hum').innerHTML=renderSingleChart(pts,'hum','hum_min','hum_max','#34D399');
+    var teal=chartColor('--teal');
+    tempChart.innerHTML=renderSingleChart(pts,'temp','temp_min','temp_max',teal);
+    humChart.innerHTML=renderSingleChart(pts,'hum','hum_min','hum_max',teal);
     renderStats(d.stats||null);
     document.getElementById('chart-refresh').textContent='最後更新：'+new Date().toLocaleTimeString('zh-TW',{hour12:false});
   }catch(e){
-    var err='<div style="color:var(--red);font-size:.85rem;padding:.5rem 0">資料載入失敗</div>';
-    document.getElementById('chart-temp').innerHTML=err;
-    document.getElementById('chart-hum').innerHTML=err;
-    document.getElementById('stats-temp').style.display='none';
-    document.getElementById('stats-hum').style.display='none';
-    document.getElementById('stats-tbody').innerHTML='<tr><td colspan="3" style="color:var(--muted)">資料載入失敗</td></tr>';
+    if(hasPreviousChart){
+      document.getElementById('chart-refresh').textContent='更新失敗，保留上次資料';
+    }else{
+      var err='<div style="color:var(--red);font-size:.85rem;padding:.5rem 0">資料載入失敗</div>';
+      tempChart.innerHTML=err;humChart.innerHTML=err;
+    }
     console.error('chart',e);
   }
 }
@@ -263,6 +271,7 @@ async function loadChart(){
 async function loadCurrent(){
   try{
     var r=await fetch('/api/env/current');
+    if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     document.getElementById('s-temp').textContent     = d.temperature!=null ? d.temperature.toFixed(1) : '—';
     document.getElementById('s-hum').textContent      = d.humidity!=null    ? d.humidity.toFixed(1)    : '—';
@@ -277,6 +286,7 @@ async function loadCurrent(){
 async function initYears(){
   try{
     var r=await fetch('/api/env/years');
+    if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     var sel=document.getElementById('ref-year');
     (d.years||[]).forEach(function(y){
@@ -299,6 +309,7 @@ loadCurrent();
 loadChart();
 setInterval(loadCurrent,30000);
 setInterval(loadChart,300000);
+document.addEventListener('iot-theme-change',loadChart);
 </script>
 """
 

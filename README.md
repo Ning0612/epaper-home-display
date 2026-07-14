@@ -66,8 +66,8 @@ Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並�
 - **Bambu Lab 3D 印表機進度**：透過 Bambu Lab 官方雲端 MQTT（獨立於本機 Mosquitto，不需 LAN Only Mode）取得任務名稱、進度百分比與剩餘時間，顯示於儀表板（協定見 `docs/bambu-mqtt-protocol.md`）
 - **圖片輪播**：上傳自訂圖片，支援裁切、旋轉、翻轉、Floyd-Steinberg dithering，顯示於 e-Paper 面板
 - **桌面工作時段**：自動追蹤在場時段、記錄每日統計、離場時推送 Discord 摘要
-- **WebUI 設定介面**：密碼保護的瀏覽器設定介面，支援互動地圖選點、圖片管理
-- **Discord 通知**：裝置上線、桌面時段結束、每日統計推送
+- **WebUI 設定介面**：密碼保護、深／淺色主題、離線座標設定、圖片管理與 WiFi AP 掃描
+- **Discord 通知**：統一裝置上線、桌面時段結束文字格式與每日統計 embed
 - **音效播放**：aplay + USB 音箱（目前為 dormant，僅供 WebUI 手動測試，未被任何自動事件觸發）
 - **事件日誌**：SQLite 記錄環境、圖片、工作時段、通知等事件（AI 使用量僅快取於記憶體，不持久化）
 

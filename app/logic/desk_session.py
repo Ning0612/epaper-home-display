@@ -3,6 +3,14 @@ from __future__ import annotations
 from datetime import datetime
 
 
+_EMBED_COLORS = {
+    "low": 15158332,
+    "medium": 15132194,
+    "high": 3447003,
+    "complete": 3066993,
+}
+
+
 def format_duration(seconds: int) -> str:
     """Format seconds as human-readable duration: '3h 20m', '45m', '0m'."""
     if seconds <= 0:
@@ -32,7 +40,10 @@ def compute_day_stats(sessions: list[dict]) -> dict:
 
     Returns total_seconds, count, longest_seconds, desk_ratio (fraction of 24h).
     """
-    completed = [s for s in sessions if s.get("duration_seconds") is not None]
+    completed = [
+        s for s in sessions
+        if isinstance(s.get("duration_seconds"), int) and s["duration_seconds"] >= 0
+    ]
     if not completed:
         return {"total_seconds": 0, "count": 0, "longest_seconds": 0, "desk_ratio": 0.0}
     total_seconds = sum(s["duration_seconds"] for s in completed)
@@ -80,3 +91,38 @@ def format_daily_summary(date_str: str, sessions: list[dict]) -> str:
         f"離開 {absence_pct}% [{bar}] 書桌前 {desk_pct}%\n"
         f"書桌前 {total_str} / 最長一次 {longest_str} / 次數 {count}"
     )
+
+
+def format_daily_summary_embed(date_str: str, sessions: list[dict]) -> dict:
+    """Build the L2 Discord embed used for daily desk-presence reports."""
+    stats = compute_day_stats(sessions)
+    total_sec = stats["total_seconds"]
+    count = stats["count"]
+    desk_pct = max(0, min(999, int(total_sec / 86400 * 100)))
+    filled = min(10, desk_pct // 10)
+    if desk_pct < 50:
+        level, block = "low", "🟥"
+    elif desk_pct < 80:
+        level, block = "medium", "🟨"
+    elif desk_pct < 100:
+        level, block = "high", "🟦"
+    else:
+        level, block = "complete", "🟩"
+    progress = block * filled + "⬜" * (10 - filled)
+    total_str = format_duration(total_sec)
+    longest_str = format_duration(stats["longest_seconds"])
+    conclusion = f"書桌前 {total_str}，共 {count} 次"
+    return {
+        "embeds": [
+            {
+                "title": f"📊 在席日報 · {date_str}",
+                "description": f"{progress}  {desk_pct}%\n{conclusion}",
+                "fields": [
+                    {"name": "書桌前", "value": total_str, "inline": True},
+                    {"name": "最長一次", "value": longest_str, "inline": True},
+                    {"name": "次數", "value": str(count), "inline": True},
+                ],
+                "color": _EMBED_COLORS[level],
+            }
+        ]
+    }

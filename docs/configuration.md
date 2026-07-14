@@ -26,7 +26,7 @@ cp config.example.yaml config.yaml
 ```yaml
 weather:
   api_key: "your_openweathermap_api_key"  # 必填：OWM API Key（免費方案即可）
-  lat: 25.05    # 緯度（可透過 WebUI 設定頁面的地圖選取）
+  lat: 25.05    # 緯度（可透過 WebUI 設定頁面直接輸入）
   lon: 121.53   # 經度
   units: "metric"   # "metric"（°C）或 "imperial"（°F）
   fetch_interval_seconds: 600   # 天氣更新間隔（秒），預設 10 分鐘
@@ -130,6 +130,8 @@ discord:
   notify_daily_summary: true      # 每日固定時間推送昨日統計
   daily_summary_time: "23:00"     # 每日摘要時間（HH:MM，依系統時區）
 ```
+
+通知格式統一為三種訊息：裝置上線文字、時段結束文字，以及包含進度色塊與三欄摘要的每日 Discord embed。Webhook 失敗時仍沿用既有重試佇列。
 
 ---
 
@@ -365,7 +367,7 @@ storage:
 webui:
   host: "0.0.0.0"
   port: 8000
-  # password_hash and session_secret are managed automatically
+  # password_hash is managed automatically; session_secret is legacy and ignored
 
 timezone: "Asia/Taipei"
 
