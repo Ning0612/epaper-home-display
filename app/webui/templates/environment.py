@@ -32,6 +32,7 @@ _ENV_CONTENT = r"""
 
 <div class="page-wrap">
   <h1 class="page-title">溫溼度分析</h1>
+  <p class="page-desc">檢視室內溫溼度即時讀值、日／月／年趨勢圖表與統計摘要。</p>
 
   <div class="stats-grid">
     <div class="stat">

@@ -38,6 +38,7 @@ _IMAGES_CONTENT = r"""
 
 <div class="page-wrap">
   <h1 class="page-title">圖片輪播管理</h1>
+  <p class="page-desc">上傳、裁切並管理電子紙輪播圖片，設定切換間隔與模式。</p>
 
   <div id="view-gallery">
     <div class="card">

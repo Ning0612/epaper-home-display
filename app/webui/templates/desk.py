@@ -34,9 +34,6 @@ _DESK_CONTENT = r"""
   .heatmap-wrap canvas{display:block;margin:0 auto;max-width:none;background:var(--inset);border:1px solid var(--line)}
   .heatmap-tip{min-height:18px;margin-top:.45rem;color:var(--muted);text-align:center;font:400 .74rem Consolas,monospace}
   .heatmap-summary{margin-top:.35rem;color:var(--muted);font:400 .74rem/1.45 Consolas,monospace}
-  .heatmap-details{margin-top:.85rem;border-top:1px solid var(--line);padding-top:.7rem}
-  .heatmap-details summary{cursor:pointer;color:var(--teal);font:700 .74rem Consolas,monospace}
-  .heatmap-details .table-wrap{margin-top:.65rem;max-height:300px;overflow:auto}
   .heatmap-legend{display:flex;align-items:center;gap:.4rem;margin-top:.6rem;color:var(--muted);font:400 .7rem Consolas,monospace}
   .heatmap-legend canvas{border:0;background:transparent}
   .heatmap-tooltip{position:fixed;z-index:10002;display:none;max-width:240px;padding:.55rem .7rem;background:var(--ink-soft);border:1px solid var(--mint);color:var(--on-dark);font:700 .72rem/1.45 Consolas,monospace;pointer-events:none;box-shadow:5px 5px 0 var(--line)}
@@ -45,6 +42,15 @@ _DESK_CONTENT = r"""
 
 <div class="page-wrap">
   <h1 class="page-title">書桌前分析</h1>
+  <p class="page-desc">追蹤書桌前光線感測器讀值、近 24 小時狀態軸與長期書桌前趨勢。</p>
+
+  <div class="status-banner" id="status-banner">
+    <div>
+      <div class="status-label">LIVE SENSOR STATUS</div>
+      <div class="status-value" id="banner-presence" aria-live="polite">—</div>
+    </div>
+    <div class="updated" id="banner-updated"></div>
+  </div>
 
   <div class="metric-grid" id="stats-grid">
     <div class="metric"><div class="stat-label">目前狀態</div><div class="stat-value" id="s-presence">—</div></div>
@@ -71,6 +77,11 @@ _DESK_CONTENT = r"""
 
   <div class="card">
     <div class="card-title">近 24 小時狀態軸</div>
+    <div class="legend-row" aria-label="狀態顏色圖例">
+      <span><span class="key on"></span>在桌前</span>
+      <span><span class="key off"></span>離開</span>
+      <span><span class="key unknown"></span>資料不足</span>
+    </div>
     <div class="chart-wrap" id="timeline-wrap">
       <div style="color:var(--muted);font-size:.85rem">載入中…</div>
     </div>
@@ -78,12 +89,13 @@ _DESK_CONTENT = r"""
 
   <div class="card">
     <div class="card-title">近 30 天書桌前時間</div>
+    <div class="summary-grid" id="summary-grid">
+      <div class="metric"><div class="stat-label">30 天平均</div><div class="stat-value" id="avg30">—</div></div>
+      <div class="metric"><div class="stat-label">最高一天</div><div class="stat-value" id="max30">—</div></div>
+      <div class="metric"><div class="stat-label">有記錄天數</div><div class="stat-value" id="daysCount30">—</div></div>
+    </div>
     <div class="chart-wrap" id="barchart-wrap">
       <div style="color:var(--muted);font-size:.85rem">載入中…</div>
-    </div>
-    <div style="display:flex;gap:2rem;margin-top:.9rem;font-size:.82rem;flex-wrap:wrap">
-      <span>30 天平均：<b id="avg30">—</b></span>
-      <span>最高一天：<b id="max30">—</b></span>
     </div>
   </div>
 
@@ -109,15 +121,6 @@ _DESK_CONTENT = r"""
       <span>無</span><canvas id="heatmap-legend-canvas" width="90" height="12" aria-hidden="true"></canvas><span>多（≥8h）</span>
     </div>
     <div id="heatmap-tooltip" class="heatmap-tooltip" role="tooltip"></div>
-    <details class="heatmap-details">
-      <summary>以文字查看每日書桌前時間</summary>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>日期</th><th>書桌前時間</th><th>時段數</th><th>狀態</th></tr></thead>
-          <tbody id="heatmap-tbody"><tr><td colspan="4" style="color:var(--muted)">載入中…</td></tr></tbody>
-        </table>
-      </div>
-    </details>
   </div>
 
   <div class="card">
@@ -128,6 +131,11 @@ _DESK_CONTENT = r"""
         <tbody id="daily-tbody"><tr><td colspan="3" style="color:var(--muted)">載入中…</td></tr></tbody>
       </table>
     </div>
+    <div class="pagination" aria-label="每日統計分頁">
+      <button type="button" class="ghost" id="daily-prev">&#8249; 上一頁</button>
+      <span class="pagination-info" id="daily-page-info" aria-live="polite">第 1 / 1 頁</span>
+      <button type="button" class="ghost" id="daily-next">下一頁 &#8250;</button>
+    </div>
   </div>
 
   <div class="card">
@@ -137,6 +145,11 @@ _DESK_CONTENT = r"""
         <thead><tr><th>開始</th><th>結束</th><th>持續時間</th></tr></thead>
         <tbody id="sessions-tbody"><tr><td colspan="3" style="color:var(--muted)">載入中…</td></tr></tbody>
       </table>
+    </div>
+    <div class="pagination" aria-label="最近時段紀錄分頁">
+      <button type="button" class="ghost" id="sessions-prev">&#8249; 上一頁</button>
+      <span class="pagination-info" id="sessions-page-info" aria-live="polite">第 1 / 1 頁</span>
+      <button type="button" class="ghost" id="sessions-next">下一頁 &#8250;</button>
     </div>
   </div>
 </div>
@@ -162,6 +175,44 @@ function fmtDate(iso){
 }
 
 function chartColor(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+
+var PAGE_SIZE=10;
+var dailyRows=[],dailyPage=1,sessionRows=[],sessionPage=1;
+
+function paginate(rows,page){
+  var totalPages=Math.max(1,Math.ceil(rows.length/PAGE_SIZE));
+  page=Math.min(Math.max(1,page),totalPages);
+  return {slice:rows.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE),page:page,totalPages:totalPages};
+}
+function updatePaginationUI(prevId,nextId,infoId,page,totalPages){
+  document.getElementById(prevId).disabled=page<=1;
+  document.getElementById(nextId).disabled=page>=totalPages;
+  document.getElementById(infoId).textContent='第 '+page+' / '+totalPages+' 頁';
+}
+function renderDailyPage(){
+  var result=paginate(dailyRows,dailyPage);dailyPage=result.page;
+  var rows=result.slice.map(function(x){
+    var pct=Math.round(x.total_seconds/864);
+    return '<tr><td>'+x.date+'</td><td>'+fmtDuration(x.total_seconds)+'</td><td>'+pct+'%</td></tr>';
+  }).join('');
+  document.getElementById('daily-tbody').innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無資料</td></tr>';
+  updatePaginationUI('daily-prev','daily-next','daily-page-info',result.page,result.totalPages);
+}
+function renderSessionsPage(){
+  var result=paginate(sessionRows,sessionPage);sessionPage=result.page;
+  var rows=result.slice.map(function(s){
+    var badge=s.end_ts?'':'<span class="badge badge-green" style="font-size:.65rem">進行中</span>';
+    return '<tr><td>'+fmtTime(s.start_ts)+'<br><span style="font-size:.72rem;color:var(--muted)">'+fmtDate(s.start_ts)+'</span></td>'
+      +'<td>'+(s.end_ts?fmtTime(s.end_ts):badge)+'</td>'
+      +'<td>'+(s.duration_seconds!=null?fmtDuration(s.duration_seconds):'—')+'</td></tr>';
+  }).join('');
+  document.getElementById('sessions-tbody').innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無紀錄</td></tr>';
+  updatePaginationUI('sessions-prev','sessions-next','sessions-page-info',result.page,result.totalPages);
+}
+document.getElementById('daily-prev').addEventListener('click',function(){dailyPage--;renderDailyPage();});
+document.getElementById('daily-next').addEventListener('click',function(){dailyPage++;renderDailyPage();});
+document.getElementById('sessions-prev').addEventListener('click',function(){sessionPage--;renderSessionsPage();});
+document.getElementById('sessions-next').addEventListener('click',function(){sessionPage++;renderSessionsPage();});
 
 var heatmapYear=new Date().getFullYear(),heatmapCache={},heatmapRequestSeq=0;
 var HEATMAP_MIN_CELL=10,HEATMAP_MAX_CELL=22,HEATMAP_GAP=2,HEATMAP_LABEL_WIDTH=22,HEATMAP_LABEL_HEIGHT=18;
@@ -193,19 +244,7 @@ function drawHeatmapLegend(reference){
   });
 }
 
-function renderHeatmapTable(days){
-  var tbody=document.getElementById('heatmap-tbody');tbody.replaceChildren();
-  var labels={future:'尚未到',empty:'無記錄',recorded:'有記錄',ongoing:'進行中'};
-  days.forEach(function(day){
-    var row=document.createElement('tr');
-    [day.date,fmtDuration(Number(day.total_seconds)||0),String(day.session_count||0),labels[day.status]||'—'].forEach(function(value){
-      var cell=document.createElement('td');cell.textContent=value;row.appendChild(cell);
-    });
-    tbody.appendChild(row);
-  });
-}
-
-function drawHeatmap(payload,refreshTable){
+function drawHeatmap(payload){
   var year=payload.year,days=payload.days||[],reference=payload.reference_seconds||28800;
   var heatmapWrap=document.getElementById('heatmap-wrap');
   heatmapWrap.style.display='';
@@ -243,7 +282,6 @@ function drawHeatmap(payload,refreshTable){
   var totalYear=payload.total_seconds==null?days.reduce(function(sum,day){return sum+(Number(day.total_seconds)||0);},0):payload.total_seconds;
   canvas.setAttribute('aria-label',year+' 年每日書桌前時間熱力圖，共 '+activeDays+' 天有紀錄');
   document.getElementById('heatmap-summary').textContent=year+' 年累計 '+fmtDuration(totalYear)+'，'+activeDays+' 天有書桌前記錄';
-  if(refreshTable!==false)renderHeatmapTable(days);
   document.getElementById('heatmap-loading').style.display='none';
   document.getElementById('heatmap-year').textContent=String(year);
   drawHeatmapLegend(reference);
@@ -325,16 +363,29 @@ async function loadHeatmap(year){
 function renderTimeline(sessions){
   var now=Date.now();
   var start24=now-86400000;
-  var W=800, H=48;
-  var bars='',teal=chartColor('--teal'),muted=chartColor('--muted'),line=chartColor('--line'),inset=chartColor('--inset');
-  sessions.forEach(function(s){
-    var x1=Math.max(0,(new Date(s.start_ts).getTime()-start24)/86400000*W);
+  var W=800, H=48, top=6, bh=36;
+  var unknown=chartColor('--unknown'),teal=chartColor('--teal'),coral=chartColor('--coral'),muted=chartColor('--muted'),line=chartColor('--line'),inset=chartColor('--inset');
+  function band(fromMs,toMs,fillColor){
+    var x1=(fromMs-start24)/86400000*W, x2=(toMs-start24)/86400000*W;
+    return '<rect x="'+x1+'" y="'+top+'" width="'+Math.max(1,x2-x1)+'" height="'+bh+'" fill="'+fillColor+'"/>';
+  }
+  var occupied=(sessions||[]).map(function(s){
+    var startMs=new Date(s.start_ts).getTime();
     var endMs=s.end_ts?new Date(s.end_ts).getTime():now;
-    var x2=Math.min(W,(endMs-start24)/86400000*W);
-    var w=Math.max(2,x2-x1);
-    var opacity=s.end_ts?'0.75':'0.95';
-    bars+='<rect x="'+x1+'" y="6" width="'+w+'" height="36" fill="'+teal+'" opacity="'+opacity+'"/>';
-  });
+    return {start:Math.max(start24,startMs),end:Math.min(now,endMs)};
+  }).filter(function(iv){return iv.end>iv.start;}).sort(function(a,b){return a.start-b.start;});
+  var bands='';
+  if(!occupied.length){
+    bands=band(start24,now,unknown);
+  }else{
+    var cursor=start24;
+    occupied.forEach(function(iv){
+      if(iv.start>cursor){bands+=band(cursor,iv.start,coral);}
+      bands+=band(iv.start,iv.end,teal);
+      cursor=Math.max(cursor,iv.end);
+    });
+    if(cursor<now){bands+=band(cursor,now,coral);}
+  }
   var labels='';
   for(var h=0;h<=24;h+=6){
     var x=h/24*W;
@@ -342,11 +393,11 @@ function renderTimeline(sessions){
     var lbl=String(t.getHours()).padStart(2,'0')+':00';
     var anchor=h===0?'start':h===24?'end':'middle';
     labels+='<text x="'+x+'" y="'+H+'" text-anchor="'+anchor+'" font-size="10" fill="'+muted+'">'+lbl+'</text>';
-    labels+='<line x1="'+x+'" y1="44" x2="'+x+'" y2="47" stroke="'+line+'" stroke-width="1"/>';
+    labels+='<line x1="'+x+'" y1="'+(top+bh)+'" x2="'+x+'" y2="'+(top+bh+3)+'" stroke="'+line+'" stroke-width="1"/>';
   }
-  return '<svg viewBox="0 0 '+W+' '+(H+2)+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px">'
-    +'<rect width="'+W+'" height="48" fill="'+inset+'" stroke="'+line+'"/>'
-    +bars+labels+'</svg>';
+  return '<svg viewBox="0 0 '+W+' '+(H+2)+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:320px" role="img" aria-label="近 24 小時書桌前狀態軸">'
+    +'<rect width="'+W+'" height="'+(top+bh)+'" fill="'+inset+'" stroke="'+line+'"/>'
+    +bands+labels+'</svg>';
 }
 
 function renderBarChart(daily30d){
@@ -357,10 +408,11 @@ function renderBarChart(daily30d){
   var bars='',labels='',teal=chartColor('--teal'),muted=chartColor('--muted'),line=chartColor('--line'),inset=chartColor('--inset');
   daily30d.forEach(function(d,i){
     var x=i*(W/30);
-    var h=Math.max(2,d.total_seconds/maxSec*bH);
-    var y=bH-h;
-    var opacity=d.total_seconds>0?'0.75':'0.2';
-    bars+='<rect x="'+(x+1)+'" y="'+y+'" width="'+bW+'" height="'+h+'" fill="'+teal+'" opacity="'+opacity+'"/>';
+    if(d.total_seconds>0){
+      var h=Math.max(2,d.total_seconds/maxSec*bH);
+      var y=bH-h;
+      bars+='<rect x="'+(x+1)+'" y="'+y+'" width="'+bW+'" height="'+h+'" fill="'+teal+'" opacity="0.75"/>';
+    }
     if(i%7===0||i===29){
       var lbl=d.date.slice(5);
       labels+='<text x="'+(x+bW/2)+'" y="'+(svgH-2)+'" text-anchor="middle" font-size="9" fill="'+muted+'">'+lbl+'</text>';
@@ -377,8 +429,13 @@ async function loadStats(){
     if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
     var occ=d.presence==='OCCUPIED';
+    var presenceKnown=d.presence==='OCCUPIED'||d.presence==='UNOCCUPIED';
+    var presenceLabel=presenceKnown?(occ?'在桌前':'離開'):'未知';
     document.getElementById('s-presence').innerHTML=
-      '<span class="badge '+(occ?'badge-green':'badge-gray')+'">'+(occ?'在桌前':'離開')+'</span>';
+      '<span class="badge '+(presenceKnown&&occ?'badge-green':'badge-gray')+'">'+presenceLabel+'</span>';
+    document.getElementById('banner-presence').textContent = presenceLabel;
+    document.getElementById('status-banner').classList.toggle('state-off', presenceKnown&&!occ);
+    document.getElementById('banner-updated').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW',{hour12:false});
     document.getElementById('s-today').textContent=fmtDuration(d.today_total_seconds);
     document.getElementById('s-segment').textContent=fmtDuration(d.current_segment_seconds);
     document.getElementById('s-since').textContent=d.last_change_ts?('自 '+fmtTime(d.last_change_ts)):'';
@@ -417,28 +474,21 @@ async function loadDaily(){
     var max=nonZero.length?Math.max.apply(null,nonZero):0;
     document.getElementById('avg30').textContent=fmtDuration(avg);
     document.getElementById('max30').textContent=fmtDuration(max);
-    var tbody=document.getElementById('daily-tbody');
-    var rows=(d.daily_30d||[]).slice().reverse().map(function(x){
-      var pct=Math.round(x.total_seconds/864);
-      return '<tr><td>'+x.date+'</td><td>'+fmtDuration(x.total_seconds)+'</td><td>'+pct+'%</td></tr>';
-    }).join('');
-    tbody.innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無資料</td></tr>';
+    document.getElementById('daysCount30').textContent=nonZero.length+' 天';
+    dailyRows=(d.daily_30d||[]).slice().reverse();
+    dailyPage=1;
+    renderDailyPage();
   }catch(e){console.error('daily',e);}
 }
 
 async function loadSessions(){
   try{
-    var r=await fetch('/api/desk/sessions?limit=20');
+    var r=await fetch('/api/desk/sessions?limit=50');
     if(!r.ok)throw new Error('HTTP '+r.status);
     var d=await r.json();
-    var tbody=document.getElementById('sessions-tbody');
-    var rows=(d.sessions||[]).map(function(s){
-      var badge=s.end_ts?'':'<span class="badge badge-green" style="font-size:.65rem">進行中</span>';
-      return '<tr><td>'+fmtTime(s.start_ts)+'<br><span style="font-size:.72rem;color:var(--muted)">'+fmtDate(s.start_ts)+'</span></td>'
-        +'<td>'+(s.end_ts?fmtTime(s.end_ts):badge)+'</td>'
-        +'<td>'+(s.duration_seconds!=null?fmtDuration(s.duration_seconds):'—')+'</td></tr>';
-    }).join('');
-    tbody.innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無紀錄</td></tr>';
+    sessionRows=(d.sessions||[]).slice();
+    sessionPage=1;
+    renderSessionsPage();
   }catch(e){console.error('sessions',e);}
 }
 
@@ -456,7 +506,7 @@ setInterval(function(){loadTimeline();loadDaily();loadSessions();if(heatmapYear=
 document.addEventListener('iot-theme-change',function(){loadTimeline();loadDaily();});
 document.addEventListener('iot-theme-change',function(){
   var canvas=document.getElementById('heatmap-canvas'),meta=canvas._hm;
-  if(meta)drawHeatmap({year:meta.year,days:meta.days,active_days:meta.days.filter(function(day){return Number(day.total_seconds)>0;}).length,reference_seconds:meta.reference},false);
+  if(meta)drawHeatmap({year:meta.year,days:meta.days,active_days:meta.days.filter(function(day){return Number(day.total_seconds)>0;}).length,reference_seconds:meta.reference});
 });
 var heatmapResizeTimer;
 window.addEventListener('resize',function(){
@@ -464,7 +514,7 @@ window.addEventListener('resize',function(){
   heatmapResizeTimer=setTimeout(function(){
     var canvas=document.getElementById('heatmap-canvas'),meta=canvas._hm;
     if(meta&&document.getElementById('heatmap-wrap').style.display!=='none')
-      drawHeatmap({year:meta.year,days:meta.days,active_days:meta.days.filter(function(day){return Number(day.total_seconds)>0;}).length,reference_seconds:meta.reference},false);
+      drawHeatmap({year:meta.year,days:meta.days,active_days:meta.days.filter(function(day){return Number(day.total_seconds)>0;}).length,reference_seconds:meta.reference});
   },100);
 });
 </script>

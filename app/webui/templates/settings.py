@@ -29,7 +29,7 @@ _SETTINGS_CONTENT = r"""
   @media(max-width:600px){.acc{padding:1rem .5rem}}
 </style>
 
-<div class="page-wrap"><h1 class="page-title">系統設定</h1><div class="acc">
+<div class="page-wrap"><h1 class="page-title">系統設定</h1><p class="page-desc">調整天氣、顯示器、在場偵測、語音、通知與 MQTT 裝置整合等系統設定。</p><div class="acc">
 
   <div class="acc-item open" id="acc-weather">
     <div class="acc-head" onclick="toggle('weather')">
