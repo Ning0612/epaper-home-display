@@ -10,6 +10,8 @@ passlib[bcrypt]>=1.7.4
 bcrypt>=4.0,<5
 python-multipart>=0.0.9
 paho-mqtt>=2.1
+# Windows has no system IANA database; Raspberry Pi uses its OS tzdata.
+tzdata>=2024.1; platform_system == "Windows"
 
 # Pi hardware -- comment out for laptop dev, install on Pi only
 # adafruit-circuitpython-dht>=3.7

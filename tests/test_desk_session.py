@@ -1,6 +1,9 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from app.logic.desk_session import (
+    aggregate_sessions_by_day,
     compute_day_stats,
     format_bar,
     format_daily_summary,
@@ -52,6 +55,134 @@ def test_format_bar_desk_ratio_38pct():
     assert len(bar) == 15
     assert bar.count("█") == 6
     assert bar.count("░") == 9
+
+
+def test_aggregate_sessions_by_day_splits_cross_midnight_session():
+    days = aggregate_sessions_by_day(
+        [
+            {
+                "start_ts": "2024-12-31T23:00:00",
+                "end_ts": "2025-01-01T02:30:00",
+                "duration_seconds": 12600,
+            }
+        ],
+        2025,
+    )
+
+    assert len(days) == 365
+    assert days[0]["date"] == "2025-01-01"
+    assert days[0]["total_seconds"] == 9000
+    assert days[0]["status"] == "recorded"
+    assert days[-1]["total_seconds"] == 0
+
+
+def test_aggregate_sessions_by_day_includes_ongoing_session_until_now():
+    days = aggregate_sessions_by_day(
+        [{"start_ts": "2024-02-29T23:30:00", "end_ts": None, "duration_seconds": None}],
+        2024,
+        now=datetime(2024, 3, 1, 1, 15),
+    )
+
+    assert len(days) == 366
+    assert days[59]["total_seconds"] == 1800
+    assert days[60]["total_seconds"] == 4500
+    assert days[59]["status"] == "recorded"
+    assert days[60]["status"] == "ongoing"
+
+
+def test_aggregate_sessions_by_day_ignores_invalid_and_out_of_range_sessions():
+    days = aggregate_sessions_by_day(
+        [
+            {"start_ts": "not-a-date", "end_ts": "2025-01-01T01:00:00", "duration_seconds": 3600},
+            {"start_ts": "2025-01-02T09:00:00", "end_ts": "not-a-date", "duration_seconds": 3600},
+            {"start_ts": "2026-01-01T00:00:00", "end_ts": "2026-01-01T01:00:00", "duration_seconds": 3600},
+            {"start_ts": "2024-01-01T00:00:00", "end_ts": "2024-01-01T01:00:00", "duration_seconds": 3600},
+        ],
+        2025,
+    )
+
+    assert sum(day["total_seconds"] for day in days) == 0
+
+
+def test_aggregate_sessions_by_day_converts_offset_aware_timestamps():
+    days = aggregate_sessions_by_day(
+        [{"start_ts": "2025-01-01T23:30:00-05:00", "end_ts": "2025-01-02T00:30:00-05:00"}],
+        2025,
+        now=datetime(2025, 1, 3, tzinfo=timezone.utc),
+        timezone_name="Asia/Taipei",
+    )
+
+    assert days[1]["date"] == "2025-01-02"
+    assert days[1]["total_seconds"] == 3600
+
+
+def test_aggregate_sessions_by_day_uses_legacy_timezone_for_naive_rows():
+    days = aggregate_sessions_by_day(
+        [{"start_ts": "2025-01-01T23:30:00", "end_ts": "2025-01-02T00:30:00"}],
+        2025,
+        now=datetime(2025, 1, 3, tzinfo=timezone.utc),
+        timezone_name="Asia/Taipei",
+        legacy_timezone=timezone(timedelta(hours=-5)),
+    )
+
+    assert days[1]["date"] == "2025-01-02"
+    assert days[1]["total_seconds"] == 3600
+
+
+def test_aggregate_sessions_by_day_respects_dst_offset():
+    days = aggregate_sessions_by_day(
+        [{"start_ts": "2025-03-09T01:30:00-05:00", "end_ts": "2025-03-09T03:30:00-04:00"}],
+        2025,
+        now=datetime(2025, 3, 10, tzinfo=timezone.utc),
+        timezone_name="America/New_York",
+    )
+
+    assert days[67]["date"] == "2025-03-09"
+    assert days[67]["total_seconds"] == 3600
+
+
+def test_aggregate_sessions_by_day_respects_dst_fall_back_fold():
+    days = aggregate_sessions_by_day(
+        [{"start_ts": "2025-11-02T01:30:00-04:00", "end_ts": "2025-11-02T01:15:00-05:00"}],
+        2025,
+        now=datetime(2025, 11, 3, tzinfo=timezone.utc),
+        timezone_name="America/New_York",
+    )
+
+    day = next(day for day in days if day["date"] == "2025-11-02")
+    assert day["total_seconds"] == 2700
+    assert day["status"] == "recorded"
+
+
+def test_aggregate_sessions_by_day_uses_now_for_ongoing_even_with_stale_duration():
+    days = aggregate_sessions_by_day(
+        [{"start_ts": "2025-06-01T09:00:00", "end_ts": None, "duration_seconds": 60}],
+        2025,
+        now=datetime(2025, 6, 1, 10, 0),
+    )
+
+    assert days[151]["total_seconds"] == 3600
+    assert days[151]["status"] == "ongoing"
+
+
+def test_aggregate_sessions_by_day_merges_overlapping_sessions():
+    days = aggregate_sessions_by_day(
+        [
+            {"start_ts": "2025-06-02T09:00:00", "end_ts": "2025-06-02T10:00:00"},
+            {"start_ts": "2025-06-02T09:30:00", "end_ts": "2025-06-02T11:00:00"},
+        ],
+        2025,
+    )
+
+    assert days[152]["total_seconds"] == 7200
+    assert days[152]["session_count"] == 2
+
+
+def test_aggregate_sessions_by_day_marks_future_days():
+    days = aggregate_sessions_by_day([], 2025, now=datetime(2025, 6, 1, 12, 0))
+
+    assert days[151]["status"] == "empty"
+    assert days[152]["status"] == "future"
 
 
 def test_compute_day_stats_empty():

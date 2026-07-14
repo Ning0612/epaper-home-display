@@ -9,7 +9,6 @@ import subprocess
 import time
 from collections import defaultdict
 from typing import TYPE_CHECKING
-
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.requests import Request
@@ -21,6 +20,7 @@ from app.webui.models import (
     _GeneralBody, _AuthBody,
 )
 from app.webui.routes.auth import _pwd_ctx, invalidate_session
+from app.timezone import configured_zone
 from app.webui.templates.settings import _SETTINGS_HTML
 
 if TYPE_CHECKING:
@@ -449,6 +449,10 @@ def create_settings_router(
         tz = body.timezone.strip()
         if not tz:
             raise HTTPException(400, detail="timezone must not be empty")
+        try:
+            configured_zone(tz)
+        except ValueError as exc:
+            raise HTTPException(400, detail="timezone must be a valid IANA timezone") from exc
 
         try:
             _save_to_config({"timezone": tz})

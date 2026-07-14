@@ -37,6 +37,7 @@ from app.state import state
 from app.storage.db import init_db
 from app.storage.logs import end_desk_session, get_ongoing_desk_session, list_images, log_system_event
 from app.storage._log_images import get_unconfirmed_images, delete_image_record
+from app.timezone import configured_now, configured_zone, elapsed_seconds
 from app.webui.server import create_app
 
 logger = logging.getLogger(__name__)
@@ -70,8 +71,13 @@ async def main() -> None:
     # Recover any session that was still open when the process last stopped
     orphaned = await get_ongoing_desk_session()
     if orphaned:
-        now_startup = _DateTime.now()
-        duration = int((now_startup - _DateTime.fromisoformat(orphaned["start_ts"])).total_seconds())
+        now_startup = configured_now(settings.timezone)
+        orphaned_start = _DateTime.fromisoformat(orphaned["start_ts"].replace("Z", "+00:00"))
+        if orphaned_start.tzinfo is None:
+            orphaned_start = orphaned_start.replace(tzinfo=configured_zone(settings.timezone))
+        else:
+            orphaned_start = orphaned_start.astimezone(configured_zone(settings.timezone))
+        duration = elapsed_seconds(orphaned_start, now_startup)
         await end_desk_session(orphaned["id"], now_startup, duration)
         logger.info("Recovered orphaned desk session %s (duration=%ds)", orphaned["id"], duration)
 
@@ -94,7 +100,9 @@ async def main() -> None:
     loop = asyncio.get_running_loop()
 
     def _on_btn_0():
-        f = asyncio.run_coroutine_threadsafe(_handle_btn_dashboard(display_queue), loop)
+        f = asyncio.run_coroutine_threadsafe(
+            _handle_btn_dashboard(display_queue, settings.timezone), loop
+        )
         f.add_done_callback(make_done_callback("Button 1"))
 
     button.register_callback(0, _on_btn_0)
