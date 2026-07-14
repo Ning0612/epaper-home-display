@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime as _DateTime
 
 from app.logic.presence import compute_presence
 from app.logic.reminder import generate_reminder
+from app.timezone import configured_now, elapsed_seconds
 from app.services.notification_manager import NotificationManager
 from app.state import state
 from app.storage.logs import end_desk_session, log_presence, start_desk_session
@@ -19,13 +19,13 @@ async def _presence_loop(
     while True:
         try:
             score, presence = compute_presence(state.light_is_bright)
-            now = _DateTime.now()
+            now = configured_now(settings.timezone)
             prev_presence = state.presence
 
             # Transition OCCUPIED → UNOCCUPIED: end active session
             if prev_presence == "OCCUPIED" and presence != "OCCUPIED":
                 if state.desk_session_id is not None and state.desk_session_start is not None:
-                    duration = int((now - state.desk_session_start).total_seconds())
+                    duration = elapsed_seconds(state.desk_session_start, now)
                     try:
                         await end_desk_session(state.desk_session_id, now, duration)
                         if duration >= settings.discord.session_end_min_minutes * 60:

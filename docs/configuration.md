@@ -128,7 +128,7 @@ discord:
   notify_session_end: true        # 桌面工作時段結束時推送摘要
   session_end_min_minutes: 5      # 短於此分鐘數的時段不觸發通知
   notify_daily_summary: true      # 每日固定時間推送昨日統計
-  daily_summary_time: "23:00"     # 每日摘要時間（HH:MM，依系統時區）
+  daily_summary_time: "23:00"     # 每日摘要時間（HH:MM，依 timezone 設定）
 ```
 
 通知格式統一為三種訊息：裝置上線文字、時段結束文字，以及包含進度色塊與三欄摘要的每日 Discord embed。Webhook 失敗時仍沿用既有重試佇列。

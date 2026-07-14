@@ -77,7 +77,7 @@ ssh pi@epaper-display.local
 | **時段結束通知** | 桌面工作時段結束時推送摘要 |
 | **最短時段時間** | 短於此分鐘數的時段不觸發通知 |
 | **每日摘要通知** | 每日固定時間推送昨日統計 |
-| **每日摘要時間** | 摘要推送時間（HH:MM 格式，依系統時區）|
+| **每日摘要時間** | 摘要推送時間（HH:MM 格式，依 `timezone` 設定）|
 
 ### 一般設定
 
@@ -707,6 +707,39 @@ GET /api/desk/history
 
 ```
 GET /api/desk/sessions?limit=20
+```
+
+### 年度在席熱力圖
+
+```
+GET /api/desk/heatmap?year=2025
+```
+
+`year` 省略時使用 Pi 設定時區的目前年份；不可查詢未來年份。回應固定包含該年的 365 或 366 天，跨午夜的時段會按設定時區的午夜切分，進行中的時段會計算到 `as_of`。
+前端熱力圖以 8 小時書桌前時間作為滿格強度基準，`reference_seconds` 可供其他客戶端重用同一色階。
+
+`days[].status` 只會是 `future`（尚未到）、`empty`（無記錄）、`recorded`（有記錄）或 `ongoing`（目前仍在席）。`summary` 與頂層的 `total_seconds`、`active_days` 同步，另提供 `session_count` 與 `has_ongoing`。`400` 表示查詢未來年份，`422` 表示 `year` 不在 2000–2100 範圍。
+
+在席時段的新寫入使用帶 UTC offset 的 ISO-8601 時間戳；舊版沒有 offset 的紀錄會先按 Pi 系統時區解讀，再轉換到回應中的 `timezone`，避免設定時區與系統時區不同時錯分日期。
+
+```json
+{
+  "year": 2025,
+  "timezone": "Asia/Taipei",
+  "as_of": "2026-07-14T18:20:00+08:00",
+  "days": [
+    {"date": "2025-01-01", "total_seconds": 28800, "session_count": 1, "status": "recorded"}
+  ],
+  "total_seconds": 28800,
+  "active_days": 1,
+  "reference_seconds": 28800,
+  "summary": {
+    "total_seconds": 28800,
+    "active_days": 1,
+    "session_count": 1,
+    "has_ongoing": false
+  }
+}
 ```
 
 ---

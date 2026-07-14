@@ -6,6 +6,7 @@ from datetime import datetime as _DateTime
 
 from app.state import state
 from app.storage.logs import start_desk_session
+from app.timezone import configured_now, elapsed_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +29,10 @@ def _within_cooldown(btn_num: int, now: _DateTime) -> bool:
     last = _btn_last_accepted.get(btn_num)
     if last is None:
         return False
-    return (now - last).total_seconds() < _SAME_PAGE_COOLDOWN_SECS
+    return elapsed_seconds(last, now) < _SAME_PAGE_COOLDOWN_SECS
 
 
-async def _handle_btn_dashboard(display_queue: asyncio.Queue) -> None:
+async def _handle_btn_dashboard(display_queue: asyncio.Queue, timezone_name: str = "Asia/Taipei") -> None:
     """Button 1 (GPIO 5) — force OCCUPIED and switch to Dashboard.
 
     When already on dashboard, repeated presses within _SAME_PAGE_COOLDOWN_SECS
@@ -39,7 +40,7 @@ async def _handle_btn_dashboard(display_queue: asyncio.Queue) -> None:
     """
     if _in_ap_mode(1):
         return
-    now = _DateTime.now()
+    now = configured_now(timezone_name)
     if state.display_page == "dashboard" and _within_cooldown(1, now):
         logger.debug(
             "Button 1 ignored: already on dashboard within %ds cooldown",

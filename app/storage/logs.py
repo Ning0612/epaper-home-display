@@ -16,6 +16,7 @@ from app.storage._log_sessions import (
     get_ongoing_desk_session,
     get_sessions_for_date,
     get_sessions_last_n_days,
+    get_sessions_overlapping,
     get_recent_sessions,
 )
 from app.storage._log_notifications import (
@@ -57,6 +58,7 @@ __all__ = [
     "get_ongoing_desk_session",
     "get_sessions_for_date",
     "get_sessions_last_n_days",
+    "get_sessions_overlapping",
     "get_recent_sessions",
     "queue_notification",
     "get_pending_notifications",
