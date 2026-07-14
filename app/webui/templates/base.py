@@ -7,6 +7,17 @@ from app.webui.templates.theme import (
 )
 
 
+_THEME_CSS += r"""
+.page-desc{margin:.35rem 0 1.15rem;color:var(--muted);font:400 .88rem/1.6 Georgia,'Noto Serif TC',serif;max-width:640px}
+.summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-bottom:.9rem}
+.pagination{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-top:.75rem}
+.pagination button{min-width:0;padding:.4rem .75rem}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+.pagination-info{color:var(--muted);font:700 .74rem Consolas,monospace;min-width:5.5rem;text-align:center}
+@media(max-width:480px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-grid .metric:last-child{grid-column:1/-1}}
+"""
+
+
 _SHELL = (
     r"""<!DOCTYPE html>
 <html lang="zh-TW">
