@@ -33,7 +33,7 @@ _LOGIN_HTML = (
     .login-tools{position:fixed;top:1rem;right:1rem}
   </style>
 </head>
-<body>
+<body data-page="login">
   <div class="login-tools">
     <div class="theme-toggle" role="group" aria-label="配色主題切換">
       <button type="button" data-theme-choice="light" aria-pressed="false">LIGHT</button>

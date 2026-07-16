@@ -4,11 +4,12 @@ _SETTINGS_EXTRA_HEAD = ""
 
 _SETTINGS_CONTENT = r"""
 <style>
-  .acc{max-width:700px;margin:0 auto;padding:1.5rem 1rem}
+  .acc{max-width:820px;margin:0 auto;padding:1.5rem 1rem}
   .acc-item{border:1px solid var(--ink);border-radius:0;margin-bottom:.75rem;overflow:hidden;box-shadow:3px 3px 0 var(--line)}
   .acc-head{
     display:flex;align-items:center;gap:.55rem;padding:.72rem 1rem;
-    cursor:pointer;user-select:none;background:var(--surface);
+    width:100%;border:0;border-radius:0;cursor:pointer;user-select:none;background:var(--surface);
+    text-align:left;appearance:none;
     font:700 .8rem Consolas,monospace;color:var(--ink);transition:background .15s;
   }
   .acc-head:hover{background:var(--surface-2)}
@@ -17,10 +18,32 @@ _SETTINGS_CONTENT = r"""
   .acc-item.open>.acc-head>.acc-chev{transform:rotate(180deg)}
   .acc-body{display:none;padding:.75rem 1rem 1rem;border-top:1px solid var(--line)}
   .acc-item.open>.acc-body{display:block}
+  .acc-body>.card{background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;padding:.2rem .15rem 1.1rem;margin:0 0 1rem}
+  .acc-body>.card:last-child{border-bottom:0;padding-bottom:.2rem;margin-bottom:0}
+  .acc-body>.card::before{display:none}
   .c-sub{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.9rem}
+  .c-sub-row{display:flex;align-items:center;justify-content:space-between;gap:.8rem}
   #map{height:300px;border-radius:0;border:1px solid var(--line);margin-top:.4rem}
   .coord{display:flex;gap:1rem;margin-top:.6rem;font-size:.83rem;color:var(--muted)}
   .coord b{color:var(--ink)}
+  .optional-control{margin-top:.9rem}
+  .live-reading{display:flex;align-items:baseline;gap:.5rem;margin-bottom:.7rem}
+  .live-value{min-width:3.5ch;color:var(--ink);font:700 2rem Consolas,monospace}
+  .live-meta{color:var(--muted);font:400 .78rem Consolas,monospace}
+  .live-badge{margin-left:auto}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background .3s}
+  .status-dot.on{background:var(--teal)}
+  .status-badge{display:inline-block;padding:.18rem .65rem;background:var(--surface-2);color:var(--muted);font:700 .68rem Consolas,monospace}
+  .status-badge.on{background:var(--teal);color:var(--on-dark)}
+  .light-bar{position:relative;height:10px;background:var(--surface-2);border:1px solid var(--line);margin-bottom:.35rem}
+  .light-fill{height:100%;width:0%;max-width:100%;transition:width .4s,background .3s}
+  .light-threshold{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--amber);left:49%;transform:translateX(-50%)}
+  .light-threshold-label{position:absolute;top:-17px;left:50%;transform:translateX(-50%);color:var(--amber);font:700 .6rem Consolas,monospace;white-space:nowrap}
+  .light-scale{display:flex;justify-content:space-between;margin-bottom:.2rem;color:var(--muted);font:400 .7rem Consolas,monospace}
+  .narrow-input{max-width:160px}
+  .test-actions{margin-top:.6rem;margin-bottom:0;justify-content:flex-start;align-items:center;gap:.75rem}
+  .test-status{color:var(--muted);font:400 .8rem Consolas,monospace}
+  .range-input{width:100%;accent-color:var(--teal)}
   .info{display:grid;grid-template-columns:auto 1fr;gap:.4rem .9rem;font-size:.85rem}
   .ik{color:var(--muted);font-weight:500}
   .iv{font-family:Consolas,monospace;color:var(--ink)}
@@ -32,11 +55,11 @@ _SETTINGS_CONTENT = r"""
 <div class="page-wrap"><h1 class="page-title">系統設定</h1><p class="page-desc">調整天氣、顯示器、在場偵測、語音、通知與 MQTT 裝置整合等系統設定。</p><div class="acc">
 
   <div class="acc-item open" id="acc-weather">
-    <div class="acc-head" onclick="toggle('weather')">
+    <button type="button" class="acc-head" aria-expanded="true" aria-controls="acc-body-weather" onclick="toggle('weather')">
       <span class="acc-ic">01</span>天氣設定
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-weather">
       <div class="card">
         <div class="c-sub">API 設定</div>
         <div class="f">
@@ -61,7 +84,7 @@ _SETTINGS_CONTENT = r"""
       </div>
       <div class="card">
         <div class="c-sub">地點</div>
-        <p style="font-size:.78rem;color:var(--muted);margin-bottom:.8rem">離線模式不載入外部地圖；直接輸入座標即可更新天氣位置。</p>
+        <p class="field-note">離線模式不載入外部地圖；直接輸入座標即可更新天氣位置。</p>
         <div class="row2">
           <div class="f"><label for="location-lat">緯度</label><input type="number" id="location-lat" min="-90" max="90" step="0.00001" value="__LAT__"></div>
           <div class="f"><label for="location-lon">經度</label><input type="number" id="location-lon" min="-180" max="180" step="0.00001" value="__LON__"></div>
@@ -73,11 +96,11 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-display">
-    <div class="acc-head" onclick="toggle('display')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-display" onclick="toggle('display')">
       <span class="acc-ic">02</span>顯示器設定
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-display">
       <div class="card">
         <div class="f">
           <label>e-Paper 型號</label>
@@ -105,7 +128,7 @@ _SETTINGS_CONTENT = r"""
             <option value="60">60 分鐘</option>
           </select>
         </div>
-        <div id="d-fre-row" class="f" style="margin-top:.9rem">
+        <div id="d-fre-row" class="f optional-control">
           <label>全刷新間隔 <span class="hint">（次數，1–100；每 N 次做一次全刷新清除鬼影）</span></label>
           <input type="number" id="d-fre" min="1" max="100">
         </div>
@@ -115,31 +138,29 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-presence">
-    <div class="acc-head" onclick="toggle('presence')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-presence" onclick="toggle('presence')">
       <span class="acc-ic">03</span>在場偵測
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-presence">
       <div class="card">
-        <div class="c-sub" style="display:flex;align-items:center;justify-content:space-between">
+        <div class="c-sub c-sub-row">
           即時光線讀值
-          <span id="lp-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;transition:background .3s"></span>
+          <span id="lp-dot" class="status-dot"></span>
         </div>
-        <div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.7rem">
-          <span id="lp-val" style="font-size:2rem;font-weight:700;font-family:Consolas,monospace;color:var(--ink);min-width:3.5ch">—</span>
-          <span style="font-size:.78rem;color:var(--muted)">/1023</span>
-          <span style="font-size:.78rem;color:var(--muted)">≈ <span id="lp-lux">—</span> lux</span>
-          <span style="margin-left:auto">
-            <span id="lp-badge" style="font:700 .68rem Consolas,monospace;padding:.18rem .65rem;border-radius:0;background:var(--surface-2);color:var(--muted)">—</span>
-          </span>
+        <div class="live-reading">
+          <span id="lp-val" class="live-value">—</span>
+          <span class="live-meta">/1023</span>
+          <span class="live-meta">≈ <span id="lp-lux">—</span> lux</span>
+          <span class="live-badge"><span id="lp-badge" class="status-badge">—</span></span>
         </div>
-        <div style="position:relative;height:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:0;margin-bottom:.35rem">
-          <div id="lp-bar" style="height:100%;width:0%;transition:width .4s,background .3s;max-width:100%"></div>
-          <div id="lp-thresh-line" style="position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--amber);left:49%;transform:translateX(-50%)">
-            <span style="position:absolute;top:-17px;left:50%;transform:translateX(-50%);font:700 .6rem Consolas,monospace;white-space:nowrap;color:var(--amber)">閾值</span>
+        <div class="light-bar">
+          <div id="lp-bar" class="light-fill"></div>
+          <div id="lp-thresh-line" class="light-threshold">
+            <span class="light-threshold-label">閾值</span>
           </div>
         </div>
-        <div style="font-size:.7rem;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:.2rem">
+        <div class="light-scale">
           <span>0 暗</span><span>1023 亮</span>
         </div>
       </div>
@@ -154,11 +175,11 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-voice">
-    <div class="acc-head" onclick="toggle('voice')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-voice" onclick="toggle('voice')">
       <span class="acc-ic">04</span>語音設定
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-voice">
       <div class="card">
         <div class="tog-row">
           <div>
@@ -176,17 +197,15 @@ _SETTINGS_CONTENT = r"""
         <div class="c-sub">音量</div>
         <div class="f">
           <label>播放音量 <span class="hint">（0–100，目前：<b id="v-vol-val">80</b>）</span></label>
-          <input type="range" id="v-vol" min="0" max="100" step="5"
-                 oninput="document.getElementById('v-vol-val').textContent=this.value"
-                 style="width:100%;accent-color:var(--primary)">
+          <input type="range" id="v-vol" class="range-input" min="0" max="100" step="5" oninput="document.getElementById('v-vol-val').textContent=this.value">
         </div>
         <div class="f">
           <label>ALSA Mixer 控制項 <span class="hint">（如 PCM / Master；留空則跳過音量設定）</span></label>
-          <input type="text" id="v-alsa" placeholder="PCM" style="max-width:160px">
+          <input type="text" id="v-alsa" class="narrow-input" placeholder="PCM">
         </div>
-        <div class="btn-row" style="margin-top:.6rem;margin-bottom:0;justify-content:flex-start;align-items:center;gap:.75rem">
+        <div class="btn-row test-actions">
           <button class="btn-s" id="v-test-btn" onclick="testVoice()">▶ 測試語音</button>
-          <span id="v-test-status" style="font-size:.8rem;color:var(--muted)"></span>
+          <span id="v-test-status" class="test-status"></span>
         </div>
         <hr>
         <div class="c-sub">開門天氣提醒（TTS）</div>
@@ -200,12 +219,12 @@ _SETTINGS_CONTENT = r"""
           </div>
           <div class="f" id="v-tts-lang-row">
             <label>語音語言 <span class="hint">（espeak-ng voice，如 zh / zh-TW）</span></label>
-            <input type="text" id="v-tts-lang" placeholder="zh" style="max-width:140px">
+            <input type="text" id="v-tts-lang" class="narrow-input" placeholder="zh">
           </div>
         </div>
         <div class="f" id="v-tts-speed-row">
           <label>語速 <span class="hint">（50–500 words/min，預設 130）</span></label>
-          <input type="number" id="v-tts-speed" min="50" max="500" step="10" style="max-width:140px">
+          <input type="number" id="v-tts-speed" class="narrow-input" min="50" max="500" step="10">
         </div>
         <div class="btn-row"><button class="btn-p" onclick="saveVoice()">儲存</button></div>
       </div>
@@ -213,11 +232,11 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-notif">
-    <div class="acc-head" onclick="toggle('notif')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-notif" onclick="toggle('notif')">
       <span class="acc-ic">05</span>通知設定
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-notif">
       <div class="card">
         <div class="f">
           <label>Discord Webhook URL</label>
@@ -243,7 +262,7 @@ _SETTINGS_CONTENT = r"""
         </div>
         <div class="f">
           <label>每日摘要時間 <span class="hint">（HH:MM）</span></label>
-          <input type="text" id="n-time" placeholder="23:00" style="max-width:120px">
+          <input type="text" id="n-time" class="narrow-input" placeholder="23:00">
         </div>
         <div class="btn-row"><button class="btn-p" onclick="saveNotif()">儲存</button></div>
       </div>
@@ -251,11 +270,11 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-mqtt">
-    <div class="acc-head" onclick="toggle('mqtt')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-mqtt" onclick="toggle('mqtt')">
       <span class="acc-ic">06</span>HydraCup MQTT 設定
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-mqtt">
       <div class="card" id="mqtt-status-card">
         <div class="info">
           <div class="ik">Broker 連線</div><div class="iv" id="mq-st-broker">—</div>
@@ -298,11 +317,11 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-printer">
-    <div class="acc-head" onclick="toggle('printer')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-printer" onclick="toggle('printer')">
       <span class="acc-ic">07</span>Bambu 印表機設定
       <span class="acc-chev">⌄</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-printer">
       <div class="card" id="printer-status-card">
         <div class="info">
           <div class="ik">連線狀態</div><div class="iv" id="pr-st-broker">--</div>
@@ -322,11 +341,11 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-usage">
-    <div class="acc-head" onclick="toggle('usage')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-usage" onclick="toggle('usage')">
       <span class="acc-ic">08</span>AI 工具用量設定
       <span class="acc-chev">⌄</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-usage">
       <div class="card">
         <div class="row2">
           <div class="f">
@@ -345,11 +364,11 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-general">
-    <div class="acc-head" onclick="toggle('general')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-general" onclick="toggle('general')">
       <span class="acc-ic">09</span>一般設定
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-general">
       <div class="card">
         <div class="f">
           <label>時區 <span class="hint">（例：Asia/Taipei）</span></label>
@@ -361,29 +380,29 @@ _SETTINGS_CONTENT = r"""
   </div>
 
   <div class="acc-item" id="acc-wifi">
-    <div class="acc-head" onclick="toggle('wifi')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-wifi" onclick="toggle('wifi')">
       <span class="acc-ic">10</span>WiFi 狀態
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-wifi">
       <div class="card" id="wifi-card">
-        <div style="font-size:.85rem;color:var(--muted)">載入中…</div>
+        <div class="loading-state">載入中…</div>
       </div>
       <div class="card">
         <div class="c-sub">更換 WiFi</div>
-        <p style="font-size:.78rem;color:var(--muted);margin-bottom:.8rem">由於安全限制，更換 WiFi 需透過 SSH 執行：</p>
+        <p class="field-note">由於安全限制，更換 WiFi 需透過 SSH 執行：</p>
         <pre>sudo nmcli dev wifi connect "SSID名稱" password "密碼"</pre>
-        <p style="font-size:.72rem;color:var(--muted);margin-top:.5rem">或編輯 /etc/wpa_supplicant/wpa_supplicant.conf 後重啟網路</p>
+        <p class="field-note">或編輯 /etc/wpa_supplicant/wpa_supplicant.conf 後重啟網路</p>
       </div>
     </div>
   </div>
 
   <div class="acc-item" id="acc-auth">
-    <div class="acc-head" onclick="toggle('auth')">
+    <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-auth" onclick="toggle('auth')">
       <span class="acc-ic">11</span>帳號安全
       <span class="acc-chev">▾</span>
-    </div>
-    <div class="acc-body">
+    </button>
+    <div class="acc-body" id="acc-body-auth">
       <div class="card">
         <div class="c-sub">更改密碼</div>
         <div class="f">
@@ -402,7 +421,7 @@ _SETTINGS_CONTENT = r"""
       </div>
       <div class="card">
         <div class="c-sub">會話管理</div>
-        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.8rem">單一管理 session：閒置 30 分鐘或最長 24 小時後失效；新登入會取代舊 session。</p>
+        <p class="field-note">單一管理 session：閒置 30 分鐘或最長 24 小時後失效；新登入會取代舊 session。</p>
         <button type="button" class="btn-d" data-action="logout">登出</button>
       </div>
     </div>
@@ -434,10 +453,16 @@ function _applyModelVisibility(p){
 function toggle(name){
   var item=document.getElementById('acc-'+name);
   var wasOpen=item.classList.contains('open');
-  document.querySelectorAll('.acc-item').forEach(function(i){i.classList.remove('open')});
+  document.querySelectorAll('.acc-item').forEach(function(i){
+    i.classList.remove('open');
+    var head=i.querySelector('.acc-head');
+    if(head)head.setAttribute('aria-expanded','false');
+  });
   stopLightPoll();
   if(!wasOpen){
     item.classList.add('open');
+    var activeHead=item.querySelector('.acc-head');
+    if(activeHead)activeHead.setAttribute('aria-expanded','true');
     if(name==='wifi') loadWifi();
     if(name==='mqtt') loadMqttStatus();
     if(name==='printer') loadPrinterStatus();
@@ -468,14 +493,14 @@ async function _fetchLight(){
     var raw=d.light_raw;
     var dot=document.getElementById('lp-dot');
     var badge=document.getElementById('lp-badge');
-    var _nodata='font:700 .68rem Consolas,monospace;padding:.18rem .65rem;border-radius:0;background:var(--surface-2);color:var(--muted)';
     if(raw==null){
       document.getElementById('lp-val').textContent='—';
       document.getElementById('lp-lux').textContent='—';
       document.getElementById('lp-bar').style.width='0%';
       document.getElementById('lp-bar').style.background='var(--muted)';
-      dot.style.background='var(--muted)';
-      badge.textContent='無資料';badge.style.cssText=_nodata;
+      dot.className='status-dot';
+      badge.className='status-badge';
+      badge.textContent='無資料';
       return;
     }
     var dispRaw=Math.min(Math.max(raw,0),1023);
@@ -485,16 +510,16 @@ async function _fetchLight(){
     document.getElementById('lp-val').textContent=raw;
     document.getElementById('lp-lux').textContent=(dispRaw*0.098).toFixed(1);
     document.getElementById('lp-bar').style.width=(dispRaw/1023*100).toFixed(2)+'%';
-    document.getElementById('lp-bar').style.background=bright?'var(--muted)':'var(--primary)';
+    document.getElementById('lp-bar').style.background=bright?'var(--muted)':'var(--teal)';
     document.getElementById('lp-thresh-line').style.left=(thresh/1023*100).toFixed(2)+'%';
     if(!bright){
-      dot.style.background='var(--teal)';
+      dot.className='status-dot on';
       badge.textContent='亮燈（在場）';
-      badge.style.cssText='font:700 .68rem Consolas,monospace;padding:.18rem .65rem;border-radius:0;background:var(--teal);color:var(--on-dark)';
+      badge.className='status-badge on';
     }else{
-      dot.style.background='var(--muted)';
+      dot.className='status-dot';
       badge.textContent='暗燈（離場）';
-      badge.style.cssText=_nodata;
+      badge.className='status-badge';
     }
   }catch(e){console.error('light poll',e);}
 }
@@ -587,7 +612,7 @@ async function loadWifi(){
     }).join('');
     card.innerHTML='<div class="info">'+rows+'</div>';
   }catch(e){
-    card.innerHTML='<div style="color:var(--muted);font-size:.85rem">無法取得 WiFi 資訊</div>';
+    card.innerHTML='<div class="error-state">無法取得 WiFi 資訊</div>';
   }
 }
 

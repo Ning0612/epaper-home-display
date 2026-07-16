@@ -5,18 +5,22 @@ _IMAGES_CONTENT = r"""
   .img-grid2{display:grid;grid-template-columns:repeat(auto-fill,96px);gap:.8rem;justify-content:start;margin-top:.9rem}
   .img-card2{width:96px;display:flex;flex-direction:column;align-items:center}
   .img-thumb2{width:88px;height:141px;background:var(--ink-soft);border-radius:0;overflow:hidden;position:relative;flex-shrink:0;cursor:pointer}
+  .img-thumb2:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
   .img-thumb2 img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block;transition:filter .15s}
   .img-thumb2:hover>img{filter:brightness(.78)}
   .cur-ribbon{position:absolute;bottom:0;left:0;right:0;background:var(--teal);color:var(--on-dark);font:700 .62rem Consolas,monospace;text-align:center;padding:.18rem 0}
   .img-del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:0;background:var(--coral);border:1px solid var(--coral);color:var(--on-dark);font:700 1rem Consolas,monospace;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;padding:0;line-height:1}
   .img-del-btn:hover{background:var(--coral-dark);border-color:var(--coral-dark)}
-  .img-card2-name{font-size:.72rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:.35rem;width:96px;text-align:center;color:var(--text)}
+  .img-card2-name{font-size:.72rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:.35rem;width:96px;text-align:center;color:var(--ink)}
   .img-card2-date{font-size:.67rem;color:var(--muted);text-align:center;margin-top:.08rem}
   .empty-state{text-align:center;padding:2rem;color:var(--muted);font-size:.88rem}
   .drop-zone{border:2px dashed var(--line);border-radius:0;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;color:var(--muted)}
   .drop-zone:hover,.drop-zone.drag-over{border-color:var(--teal);background:var(--surface-2);color:var(--ink)}
   .drop-zone-icon{display:none}
   .drop-zone-text{font-size:.85rem}
+  .drop-zone-note{font-size:.73rem;color:var(--muted)}
+  .carousel-fields{margin-top:.8rem}
+  .crop-title-note{color:var(--muted);font-size:.75rem;font-weight:400;letter-spacing:0;text-transform:none}
   .crop-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
   #crop-canvas{max-width:100%;cursor:crosshair;border-radius:0;display:block;touch-action:none}
   .crop-hint{font-size:.78rem;color:var(--muted);text-align:center}
@@ -30,7 +34,7 @@ _IMAGES_CONTENT = r"""
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:10000;display:flex;align-items:center;justify-content:center}
   .modal-box{background:var(--surface);border:1px solid var(--ink);border-radius:0;box-shadow:5px 5px 0 var(--line);padding:1.3rem 1.1rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem;position:relative;max-width:90vw}
   .modal-close{position:absolute;top:.5rem;right:.7rem;background:transparent;border:none;color:var(--muted);font-size:1.5rem;cursor:pointer;line-height:1;padding:.1rem .35rem;transition:color .15s}
-  .modal-close:hover{color:var(--text)}
+  .modal-close:hover{color:var(--ink)}
   #modal-img{max-height:70vh;max-width:min(560px,85vw);width:auto;height:auto;image-rendering:pixelated;border-radius:0;display:block}
   .modal-fname{font-size:.78rem;color:var(--muted);text-align:center;max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media(max-width:600px){.preview-grid{grid-template-columns:1fr}}
@@ -53,7 +57,7 @@ _IMAGES_CONTENT = r"""
           <span class="sl"></span>
         </label>
       </div>
-      <div class="row2" style="margin-top:.8rem">
+      <div class="row2 carousel-fields">
         <div class="f">
           <label>換圖間隔 <span class="hint">（每幾次刷新，最少 1）</span></label>
           <input type="number" id="c-interval" min="1" max="999" value="10">
@@ -74,18 +78,18 @@ _IMAGES_CONTENT = r"""
 
     <div class="card">
       <div class="card-title">已上傳圖片</div>
-      <div id="drop-zone" class="drop-zone" onclick="startUpload()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div id="drop-zone" class="drop-zone" role="button" tabindex="0" onclick="startUpload()" onkeydown="if(event.key==='Enter'||event.key===' ')startUpload()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
         <div class="drop-zone-icon" aria-hidden="true"></div>
-        <div class="drop-zone-text">點擊上傳，或將圖片拖曳至此<br><span style="font-size:.73rem;color:var(--muted)">支援 JPEG、PNG、WebP（最大 15 MB）</span></div>
+        <div class="drop-zone-text">點擊上傳，或將圖片拖曳至此<br><span class="drop-zone-note">支援 JPEG、PNG、WebP（最大 15 MB）</span></div>
       </div>
       <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" style="display:none" onchange="onFileSelect(event)">
       <div id="img-grid"></div>
     </div>
   </div>
 
-  <div id="view-crop" style="display:none">
+  <div id="view-crop" class="is-hidden">
     <div class="card">
-      <div class="card-title">裁切圖片 <span style="color:var(--muted);font-size:.75rem;font-weight:400;letter-spacing:0;text-transform:none">— 拖曳選框定位，拖曳角點調整大小（固定 5:8 比例）</span></div>
+      <div class="card-title">裁切圖片 <span class="crop-title-note">— 拖曳選框定位，拖曳角點調整大小（固定 5:8 比例）</span></div>
       <div class="crop-wrap">
         <canvas id="crop-canvas"></canvas>
         <div class="crop-hint">選框比例鎖定為電子紙圖片卡尺寸（280×448）；可拖曳至圖片外側白邊，超出部分顯示為白色</div>
@@ -104,7 +108,7 @@ _IMAGES_CONTENT = r"""
     </div>
   </div>
 
-  <div id="view-preview" style="display:none">
+  <div id="view-preview" class="is-hidden">
     <div class="card">
       <div class="card-title">確認效果</div>
       <div class="preview-grid">
@@ -125,9 +129,9 @@ _IMAGES_CONTENT = r"""
   </div>
 </div>
 
-<div id="img-modal" class="modal-overlay" style="display:none" onclick="closeModal(event)">
+<div id="img-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-fname" style="display:none" onclick="closeModal(event)">
   <div class="modal-box">
-    <button class="modal-close" onclick="closePreview()">×</button>
+    <button class="modal-close" aria-label="關閉預覽" onclick="closePreview()">×</button>
     <img id="modal-img" alt="">
     <div id="modal-fname" class="modal-fname"></div>
   </div>
@@ -149,7 +153,7 @@ const EXPAND = 2.0;
 
 function showView(name) {
   ['gallery', 'crop', 'preview'].forEach(v => {
-    document.getElementById('view-' + v).style.display = v === name ? '' : 'none';
+    document.getElementById('view-' + v).classList.toggle('is-hidden', v !== name);
   });
 }
 
@@ -171,14 +175,19 @@ function renderGrid(images) {
   grid.innerHTML = '<div class="img-grid2">' + images.map(img => `
     <div class="img-card2">
       <div class="img-thumb2"
+           role="button"
+           tabindex="0"
+           aria-label="預覽 ${esc(img.filename)}"
            data-id="${esc(img.id)}"
            data-name="${esc(img.filename)}"
-           onclick="openPreview(this.dataset.id, this.dataset.name)">
+           onclick="openPreview(this.dataset.id, this.dataset.name)"
+           onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openPreview(this.dataset.id, this.dataset.name)}">
         <img src="/api/images/file/${esc(img.id)}" alt="${esc(img.filename)}" loading="lazy">
         ${img.is_current ? '<div class="cur-ribbon">顯示中</div>' : ''}
         <button class="img-del-btn"
                 onclick="event.stopPropagation();deleteImage('${esc(img.id)}')"
-                title="刪除">×</button>
+                title="刪除"
+                aria-label="刪除 ${esc(img.filename)}">×</button>
       </div>
       <div class="img-card2-name" title="${esc(img.filename)}">${esc(img.filename)}</div>
       <div class="img-card2-date">${fmtDate(img.created_ts)}</div>

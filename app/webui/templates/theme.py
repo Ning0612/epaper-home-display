@@ -21,9 +21,6 @@ _THEME_CSS = r""":root{
   --mint:#a8d2c4;--on-dark:#fbf8ef;--on-light:#17231f;
   --dark-block-muted:#aab8ae;--nav-border:#71847a;
   --on-ring:rgba(168,210,196,.18);--off-ring:rgba(207,90,71,.18);
-  /* Compatibility aliases for existing page-specific controls. */
-  --bg:var(--paper);--surface2:var(--surface-2);--border:var(--line);
-  --primary:var(--teal);--green:var(--teal);--red:var(--coral);--text:var(--ink);
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
@@ -84,6 +81,16 @@ body[data-page="settings"] .page-title::before{content:'04 / configuration'}
 .card::before{content:'';position:absolute;top:0;left:0;width:42px;height:4px;background:var(--teal)}
 .card-title{display:flex;align-items:baseline;gap:.55rem;margin:0 0 1rem;padding-bottom:.65rem;border-bottom:1px solid var(--line);color:var(--ink);font:700 1.05rem Georgia,'Noto Serif TC',serif;letter-spacing:0;text-transform:none}
 .card-title::before{counter-increment:card;content:counter(card,decimal-leading-zero);color:var(--coral);font:700 .7rem Consolas,monospace}
+.control-card{padding:.9rem 1.15rem;margin-bottom:1.2rem}
+.scroll-x{overflow-x:auto}
+.loading-state,.error-state{color:var(--muted);font:400 .82rem/1.5 Consolas,monospace;padding:.65rem 0}
+.error-state{color:var(--coral)}
+.field-note{margin:.35rem 0 .85rem;color:var(--muted);font:400 .76rem/1.55 Consolas,monospace}
+.tog-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.45rem 0}
+.tog-lbl{font:700 .82rem Georgia,'Noto Serif TC',serif;color:var(--ink)}
+.tog-desc{margin-top:.12rem;color:var(--muted);font:400 .72rem/1.45 Consolas,monospace}
+.is-hidden{display:none!important}
+.value-cell{color:var(--teal);font:700 .78rem Consolas,monospace}
 .danger-card{border-color:var(--coral);background:var(--danger-surface)}
 .danger-card::before{background:var(--coral)}
 .danger-card .card-title{color:var(--coral)}

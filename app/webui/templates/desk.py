@@ -22,6 +22,8 @@ _DESK_CONTENT = r"""
   tr:last-child td{border-bottom:none}
   .badge-occ{background:var(--teal);color:var(--on-dark)}
   .badge-unocc{background:var(--coral);color:var(--on-dark)}
+  .badge-sm{font-size:.65rem}
+  .data-date{color:var(--muted);font-size:.72rem}
   .heatmap-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.75rem}
   .heatmap-header .card-title{margin:0;padding:0;border:0}
   .heatmap-sub{margin:.35rem 0 0;color:var(--muted);font:400 .74rem/1.45 Consolas,monospace}
@@ -83,7 +85,7 @@ _DESK_CONTENT = r"""
       <span><span class="key unknown"></span>資料不足</span>
     </div>
     <div class="chart-wrap" id="timeline-wrap">
-      <div style="color:var(--muted);font-size:.85rem">載入中…</div>
+      <div class="loading-state">載入中…</div>
     </div>
   </div>
 
@@ -95,7 +97,7 @@ _DESK_CONTENT = r"""
       <div class="metric"><div class="stat-label">有記錄天數</div><div class="stat-value" id="daysCount30">—</div></div>
     </div>
     <div class="chart-wrap" id="barchart-wrap">
-      <div style="color:var(--muted);font-size:.85rem">載入中…</div>
+      <div class="loading-state">載入中…</div>
     </div>
   </div>
 
@@ -111,7 +113,7 @@ _DESK_CONTENT = r"""
         <button type="button" class="heatmap-year-btn" id="heatmap-next" aria-label="查看下一年">&#8250;</button>
       </div>
     </div>
-    <div id="heatmap-loading" style="color:var(--muted);font-size:.85rem;text-align:center;padding:1.5rem 0">載入中…</div>
+    <div id="heatmap-loading" class="loading-state" style="text-align:center;padding:1.5rem 0">載入中…</div>
     <div id="heatmap-wrap" class="heatmap-wrap" style="display:none">
       <canvas id="heatmap-canvas" tabindex="0" aria-label="年度每日書桌前時間熱力圖" aria-describedby="heatmap-summary"></canvas>
     </div>
@@ -125,10 +127,10 @@ _DESK_CONTENT = r"""
 
   <div class="card">
     <div class="card-title">每日統計（最近 30 天）</div>
-    <div style="overflow-x:auto">
+    <div class="scroll-x">
       <table id="daily-table">
         <thead><tr><th>日期</th><th>書桌前時間</th><th>書桌前比例</th></tr></thead>
-        <tbody id="daily-tbody"><tr><td colspan="3" style="color:var(--muted)">載入中…</td></tr></tbody>
+        <tbody id="daily-tbody"><tr><td colspan="3" class="loading-state">載入中…</td></tr></tbody>
       </table>
     </div>
     <div class="pagination" aria-label="每日統計分頁">
@@ -140,10 +142,10 @@ _DESK_CONTENT = r"""
 
   <div class="card">
     <div class="card-title">最近時段紀錄</div>
-    <div style="overflow-x:auto">
+    <div class="scroll-x">
       <table id="sessions-table">
         <thead><tr><th>開始</th><th>結束</th><th>持續時間</th></tr></thead>
-        <tbody id="sessions-tbody"><tr><td colspan="3" style="color:var(--muted)">載入中…</td></tr></tbody>
+        <tbody id="sessions-tbody"><tr><td colspan="3" class="loading-state">載入中…</td></tr></tbody>
       </table>
     </div>
     <div class="pagination" aria-label="最近時段紀錄分頁">
@@ -195,18 +197,18 @@ function renderDailyPage(){
     var pct=Math.round(x.total_seconds/864);
     return '<tr><td>'+x.date+'</td><td>'+fmtDuration(x.total_seconds)+'</td><td>'+pct+'%</td></tr>';
   }).join('');
-  document.getElementById('daily-tbody').innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無資料</td></tr>';
+  document.getElementById('daily-tbody').innerHTML=rows||'<tr><td colspan="3" class="loading-state">無資料</td></tr>';
   updatePaginationUI('daily-prev','daily-next','daily-page-info',result.page,result.totalPages);
 }
 function renderSessionsPage(){
   var result=paginate(sessionRows,sessionPage);sessionPage=result.page;
   var rows=result.slice.map(function(s){
-    var badge=s.end_ts?'':'<span class="badge badge-green" style="font-size:.65rem">進行中</span>';
-    return '<tr><td>'+fmtTime(s.start_ts)+'<br><span style="font-size:.72rem;color:var(--muted)">'+fmtDate(s.start_ts)+'</span></td>'
+    var badge=s.end_ts?'':'<span class="badge badge-green badge-sm">進行中</span>';
+    return '<tr><td>'+fmtTime(s.start_ts)+'<br><span class="data-date">'+fmtDate(s.start_ts)+'</span></td>'
       +'<td>'+(s.end_ts?fmtTime(s.end_ts):badge)+'</td>'
       +'<td>'+(s.duration_seconds!=null?fmtDuration(s.duration_seconds):'—')+'</td></tr>';
   }).join('');
-  document.getElementById('sessions-tbody').innerHTML=rows||'<tr><td colspan="3" style="color:var(--muted)">無紀錄</td></tr>';
+  document.getElementById('sessions-tbody').innerHTML=rows||'<tr><td colspan="3" class="loading-state">無紀錄</td></tr>';
   updatePaginationUI('sessions-prev','sessions-next','sessions-page-info',result.page,result.totalPages);
 }
 document.getElementById('daily-prev').addEventListener('click',function(){dailyPage--;renderDailyPage();});

@@ -2,8 +2,8 @@ from app.webui.templates.base import _make_shell
 
 _ENV_CONTENT = r"""
 <style>
-  .stats-grid{gap:.6rem;margin-bottom:1.2rem}
-  .stat{padding:.7rem .9rem}
+  .metric-grid{gap:.6rem;margin-bottom:1.2rem}
+  .metric{padding:.7rem .9rem}
   .stat-label{font-size:.72rem;color:var(--muted);margin-bottom:.3rem}
   .stat-value-row{display:flex;align-items:baseline;justify-content:center;gap:2px}
   .stat-value{font-size:1.5rem;font-weight:700;line-height:1.2;font-family:Consolas,monospace;color:var(--teal)}
@@ -18,9 +18,9 @@ _ENV_CONTENT = r"""
   .tab-btn.active{background:var(--teal);color:var(--on-dark);border-color:var(--teal)}
   .tab-btn:hover:not(.active){background:var(--line);color:var(--ink)}
   input[type=date],input[type=month]{width:auto;padding:.3rem .6rem;border:1px solid var(--line);border-radius:0;font:700 .8rem Consolas,monospace;color:var(--ink);background:var(--inset);outline:none}
-  input[type=date]:focus,input[type=month]:focus{border-color:var(--primary)}
+  input[type=date]:focus,input[type=month]:focus{border-color:var(--teal)}
   select.ref-year{width:auto;padding:.3rem .6rem;border:1px solid var(--line);border-radius:0;font:700 .8rem Consolas,monospace;color:var(--ink);background:var(--inset);outline:none}
-  .mini-stats{display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.8rem;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)}
+  .mini-stats{display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.8rem;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--line)}
   .mini-stats span{white-space:nowrap}
   .refresh-ts{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.4rem}
   .stat-table-wrap{overflow-x:auto;margin-top:.5rem}
@@ -34,35 +34,35 @@ _ENV_CONTENT = r"""
   <h1 class="page-title">溫溼度分析</h1>
   <p class="page-desc">檢視室內溫溼度即時讀值、日／月／年趨勢圖表與統計摘要。</p>
 
-  <div class="stats-grid">
-    <div class="stat">
+  <div class="metric-grid">
+    <div class="metric">
       <div class="stat-label">目前溫度</div>
       <div class="stat-value-row"><span class="stat-value temp-val" id="s-temp">—</span><span class="stat-unit">℃</span></div>
     </div>
-    <div class="stat">
+    <div class="metric">
       <div class="stat-label">目前濕度</div>
       <div class="stat-value-row"><span class="stat-value hum-val" id="s-hum">—</span><span class="stat-unit">%</span></div>
     </div>
-    <div class="stat">
+    <div class="metric">
       <div class="stat-label">今日最高溫</div>
       <div class="stat-value-row"><span class="stat-value hi-val" id="s-temp-max">—</span><span class="stat-unit">℃</span></div>
     </div>
-    <div class="stat">
+    <div class="metric">
       <div class="stat-label">今日最低溫</div>
       <div class="stat-value-row"><span class="stat-value lo-val" id="s-temp-min">—</span><span class="stat-unit">℃</span></div>
     </div>
-    <div class="stat">
+    <div class="metric">
       <div class="stat-label">今日均溫</div>
       <div class="stat-value-row"><span class="stat-value temp-val" id="s-temp-avg">—</span><span class="stat-unit">℃</span></div>
     </div>
-    <div class="stat">
+    <div class="metric">
       <div class="stat-label">今日均濕</div>
       <div class="stat-value-row"><span class="stat-value hum-val" id="s-hum-avg">—</span><span class="stat-unit">%</span></div>
     </div>
   </div>
 
   <!-- 共用 tab 控制列 -->
-  <div class="card" style="padding:.9rem 1.3rem;margin-bottom:1.2rem">
+  <div class="card control-card">
     <div class="tab-bar">
       <button class="tab-btn active" data-scale="day"   onclick="setScale('day')">日</button>
       <button class="tab-btn"        data-scale="month" onclick="setScale('month')">月</button>
@@ -77,7 +77,7 @@ _ENV_CONTENT = r"""
   <div class="card">
     <div class="card-title">溫度趨勢 (°C)</div>
     <div class="chart-wrap" id="chart-temp">
-      <div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>
+      <div class="loading-state">載入中…</div>
     </div>
     <div class="mini-stats" id="stats-temp" style="display:none">
       <span>均值：<b id="tt-avg" class="temp-val">—</b></span>
@@ -90,7 +90,7 @@ _ENV_CONTENT = r"""
   <div class="card">
     <div class="card-title">濕度趨勢 (%)</div>
     <div class="chart-wrap" id="chart-hum">
-      <div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>
+      <div class="loading-state">載入中…</div>
     </div>
     <div class="mini-stats" id="stats-hum" style="display:none">
       <span>均值：<b id="th-avg" class="hum-val">—</b></span>
@@ -113,7 +113,7 @@ _ENV_CONTENT = r"""
           </tr>
         </thead>
         <tbody id="stats-tbody">
-          <tr><td colspan="3" style="color:var(--muted)">載入圖表後顯示</td></tr>
+          <tr><td colspan="3" class="loading-state">載入圖表後顯示</td></tr>
         </tbody>
       </table>
     </div>
@@ -181,10 +181,11 @@ function buildXLabels(pts,xScale){
 
 function renderSingleChart(pts, valKey, minKey, maxKey, color, emptyLabel){
   var xScale=function(i){return PAD.left+(pts.length>1?i/(pts.length-1)*PLOT_W:PLOT_W/2);};
+  var chartLabel=valKey==='temp'?'溫度趨勢':'濕度趨勢';
 
   var inset=chartColor('--inset'),lineColor=chartColor('--line'),muted=chartColor('--muted');
   if(!pts.length){
-    return '<svg viewBox="0 0 '+W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:280px">'
+    return '<svg viewBox="0 0 '+W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="'+chartLabel+'，此時段無資料" style="width:100%;height:auto;min-width:280px">'
       +'<rect width="'+W+'" height="'+SVG_H+'" fill="'+inset+'" stroke="'+lineColor+'"/>'
       +'<text x="'+W/2+'" y="'+SVG_H/2+'" text-anchor="middle" font-size="13" fill="'+muted+'">此時段無資料</text></svg>';
   }
@@ -204,7 +205,7 @@ function renderSingleChart(pts, valKey, minKey, maxKey, color, emptyLabel){
   var grid=buildYGrid(vMin,vMax);
   var labels=buildXLabels(pts,xScale);
 
-  return '<svg viewBox="0 0 '+W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:280px">'
+  return '<svg viewBox="0 0 '+W+' '+SVG_H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="'+chartLabel+'趨勢圖" style="width:100%;height:auto;min-width:280px">'
     +'<rect width="'+W+'" height="'+SVG_H+'" fill="'+inset+'" stroke="'+lineColor+'"/>'
     +grid+band
     +(line?'<polyline points="'+line+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>':'')
@@ -216,7 +217,7 @@ function renderStats(stats){
   if(!stats||!stats.sample_count){
     document.getElementById('stats-temp').style.display='none';
     document.getElementById('stats-hum').style.display='none';
-    tbody.innerHTML='<tr><td colspan="3" style="color:var(--muted)">無資料</td></tr>';
+    tbody.innerHTML='<tr><td colspan="3" class="loading-state">無資料</td></tr>';
     return;
   }
   document.getElementById('stats-temp').style.display='';
@@ -234,8 +235,8 @@ function renderStats(stats){
     ['樣本數', stats.sample_count+'筆', stats.sample_count+'筆'],
   ].map(function(r){
     return '<tr><td>'+r[0]+'</td>'
-      +'<td style="color:var(--teal);font-family:Consolas,monospace">'+r[1]+'</td>'
-      +'<td style="color:var(--teal);font-family:Consolas,monospace">'+r[2]+'</td></tr>';
+      +'<td class="value-cell">'+r[1]+'</td>'
+      +'<td class="value-cell">'+r[2]+'</td></tr>';
   }).join('');
 }
 
@@ -245,7 +246,7 @@ async function loadChart(){
   var tempChart=document.getElementById('chart-temp');
   var humChart=document.getElementById('chart-hum');
   var hasPreviousChart=!!(tempChart.querySelector('svg')||humChart.querySelector('svg'));
-  var loading='<div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">載入中…</div>';
+  var loading='<div class="loading-state">載入中…</div>';
   if(!hasPreviousChart){tempChart.innerHTML=loading;humChart.innerHTML=loading;}
   else{document.getElementById('chart-refresh').textContent='更新中…';}
   try{
@@ -262,7 +263,7 @@ async function loadChart(){
     if(hasPreviousChart){
       document.getElementById('chart-refresh').textContent='更新失敗，保留上次資料';
     }else{
-      var err='<div style="color:var(--red);font-size:.85rem;padding:.5rem 0">資料載入失敗</div>';
+      var err='<div class="error-state">資料載入失敗</div>';
       tempChart.innerHTML=err;humChart.innerHTML=err;
     }
     console.error('chart',e);

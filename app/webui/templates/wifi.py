@@ -45,7 +45,7 @@ _WIFI_HTML = (
     @media(max-width:480px){.field-with-action{flex-direction:column}.field-with-action button{width:100%}}
   </style>
 </head>
-<body>
+<body data-page="wifi">
   <header class="topbar">
     <div class="topbar-in">
       <div class="brand"><span class="brand-mark">EH</span><span class="brand-copy">EPAPER HOME DISPLAY<span class="brand-sub">LOCAL DEVICE / NETWORK SETUP</span></span></div>
