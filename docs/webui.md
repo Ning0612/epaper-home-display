@@ -681,9 +681,14 @@ GET /api/desk/status
   "today_session_count": 3,
   "current_segment_seconds": 1800,
   "session_start_ts": "2026-05-29T14:00:00",
-  "last_change_ts": "2026-05-29T14:00:00"
+  "last_change_ts": "2026-05-29T14:00:00",
+  "now_epoch": 1780034400,
+  "current_date": "2026-05-29",
+  "timezone": "Asia/Taipei"
 }
 ```
+
+`now_epoch`、`current_date` 與 `timezone` 由 Pi 的 `timezone` 設定產生，WebUI 以此作為圖表更新時間、日期邊界與時段文字格式，避免瀏覽器所在時區造成偏移。
 
 ### 近 24 小時時間軸
 
@@ -710,10 +715,15 @@ GET /api/desk/daily
 ```json
 {
   "daily_30d": [
-    {"date": "2026-05-29", "total_seconds": 28800}
+    {"date": "2026-05-29", "total_seconds": 28800, "session_count": 3}
+  ],
+  "daily_history": [
+    {"date": "2025-05-29", "total_seconds": 28800, "session_count": 3}
   ]
 }
 ```
+
+`daily_30d` 保留最近 30 個日曆日；`daily_history` 提供最近 366 個日曆日，供書桌頁的「最近 365 天」熱力圖與可用年份導覽使用。跨午夜時段會依設定時區切分到各日；`session_count` 是該日有重疊的書桌前時段數。
 
 ### 時段清單
 
@@ -728,7 +738,7 @@ GET /api/desk/heatmap?year=2025
 ```
 
 `year` 省略時使用 Pi 設定時區的目前年份；不可查詢未來年份。回應固定包含該年的 365 或 366 天，跨午夜的時段會按設定時區的午夜切分，進行中的時段會計算到 `as_of`。
-前端熱力圖以 8 小時書桌前時間作為滿格強度基準，`reference_seconds` 可供其他客戶端重用同一色階。
+年度模式前端以日曆年完整資料繪製；書桌頁預設則顯示最近 365 天，左右按鈕可切換到 `daily_history` 中有書桌前記錄的年份。頁面色階採 0–24 小時四級離散強度；`reference_seconds` 仍保留 8 小時基準供既有 API 客戶端使用。
 
 `days[].status` 只會是 `future`（尚未到）、`empty`（無記錄）、`recorded`（有記錄）或 `ongoing`（目前仍在桌前）。`summary` 與頂層的 `total_seconds`、`active_days` 同步，另提供 `session_count` 與 `has_ongoing`。`400` 表示查詢未來年份，`422` 表示 `year` 不在 2000–2100 範圍。
 

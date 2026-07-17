@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import HTTPException
@@ -38,24 +39,56 @@ def test_desk_template_uses_unified_analysis_terms_and_footer_timestamp():
     assert "fetch('/api/desk/daily')" in _DESK_HTML
 
 
+def test_desk_template_matches_dashboard_sections_and_canvas_contract():
+    sections = (
+        'class="card-title">01 總覽',
+        'class="card-title">02 光線感測器',
+        'class="card-title">03 近 24 小時狀態軸',
+        'class="card-title">04 近 30 天書桌前時間',
+        'class="card-title">05 年度書桌前熱力圖',
+        'class="card-title">06 每日統計',
+        'class="card-title">07 最近時段紀錄',
+    )
+    positions = [_DESK_HTML.index(section) for section in sections]
+    assert positions == sorted(positions)
+
+    for token in (
+        'id="timeline" class="desk-canvas" width="900" height="80"',
+        'id="daily-chart" class="desk-canvas" width="900" height="280"',
+        'id="heatmap-canvas" class="heatmap-canvas"',
+        'id="heatmap-prev"',
+        'id="heatmap-next"',
+        'id="heatmap-period"',
+        'function fitCanvas(canvas)',
+        'function dailyChartRows(data,status)',
+        'todayKey=dateKeyFromIso(status&&status.current_date)',
+        'function clockText(epoch)',
+        'function heatLevel(seconds,hasData)',
+        'delete heatmapCache[Number(currentYear)]',
+        'setInterval(loadDashboard,30000)',
+        'desk-error',
+        'aria-label="較早年份"',
+        'aria-label="較新年份"',
+        'ArrowLeft:-7,ArrowRight:7,ArrowUp:-1,ArrowDown:1',
+        "g.fillText(24-6*i+'h'",
+    ):
+        assert token in _DESK_HTML
+
+
 def _desk_endpoint(router, path):
     return next(route.endpoint for route in router.routes if route.path == path)
 
 
 @pytest.mark.asyncio
 async def test_desk_split_endpoints_keep_explicit_response_shapes(monkeypatch):
-    async def fake_get_sessions_for_date(*args, **kwargs):
-        return []
-
-    async def fake_get_sessions_last_n_days(*args, **kwargs):
+    async def fake_get_sessions_overlapping(*args, **kwargs):
         return []
 
     async def fake_get_recent_sessions(limit=20):
         assert limit == 20
         return [{"id": 1, "start_ts": "2026-07-14T09:00:00+08:00", "end_ts": None}]
 
-    monkeypatch.setattr("app.storage.logs.get_sessions_for_date", fake_get_sessions_for_date)
-    monkeypatch.setattr("app.storage.logs.get_sessions_last_n_days", fake_get_sessions_last_n_days)
+    monkeypatch.setattr("app.storage.logs.get_sessions_overlapping", fake_get_sessions_overlapping)
     monkeypatch.setattr("app.storage.logs.get_recent_sessions", fake_get_recent_sessions)
     monkeypatch.setattr(state, "presence", "UNOCCUPIED")
     monkeypatch.setattr(state, "light_raw", 640)
@@ -69,9 +102,67 @@ async def test_desk_split_endpoints_keep_explicit_response_shapes(monkeypatch):
 
     assert status["light_raw"] == 640
     assert "today_total_seconds" in status
+    assert "now_epoch" in status
+    assert "current_date" in status
+    assert status["timezone"] == Settings().timezone
     assert list(timeline) == ["timeline_24h"]
     assert len(daily["daily_30d"]) == 30
+    assert len(daily["daily_history"]) == 366
+    assert all("session_count" in row for row in daily["daily_30d"])
+    assert all("session_count" in row for row in daily["daily_history"])
     assert sessions["sessions"][0]["id"] == 1
+
+
+@pytest.mark.asyncio
+async def test_desk_status_and_daily_split_completed_cross_midnight_session(monkeypatch):
+    fixed_now = datetime(2025, 1, 2, 12, 0, tzinfo=ZoneInfo("Asia/Taipei"))
+    session = {
+        "id": 501,
+        "start_ts": "2025-01-01T23:30:00+08:00",
+        "end_ts": "2025-01-02T01:30:00+08:00",
+        "duration_seconds": 7200,
+    }
+
+    async def fake_get_sessions_overlapping(*args, **kwargs):
+        return [session]
+
+    monkeypatch.setattr("app.storage.logs.get_sessions_overlapping", fake_get_sessions_overlapping)
+    monkeypatch.setattr("app.webui.routes.desk.configured_now", lambda timezone_name: fixed_now)
+    monkeypatch.setattr(state, "presence", "UNOCCUPIED")
+    monkeypatch.setattr(state, "desk_session_start", None)
+
+    router = create_desk_router(Settings())
+    status = await _desk_endpoint(router, "/api/desk/status")()
+    daily = await _desk_endpoint(router, "/api/desk/daily")()
+    rows = {row["date"]: row for row in daily["daily_history"]}
+
+    assert status["today_total_seconds"] == 5400
+    assert status["today_session_count"] == 1
+    assert rows["2025-01-01"] == {"date": "2025-01-01", "total_seconds": 1800, "session_count": 1}
+    assert rows["2025-01-02"] == {"date": "2025-01-02", "total_seconds": 5400, "session_count": 1}
+
+
+@pytest.mark.asyncio
+async def test_desk_status_and_daily_split_ongoing_cross_midnight_session(monkeypatch):
+    fixed_now = datetime(2025, 1, 2, 1, 30, tzinfo=ZoneInfo("Asia/Taipei"))
+    async def fake_get_sessions_overlapping(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr("app.storage.logs.get_sessions_overlapping", fake_get_sessions_overlapping)
+    monkeypatch.setattr("app.webui.routes.desk.configured_now", lambda timezone_name: fixed_now)
+    monkeypatch.setattr(state, "presence", "OCCUPIED")
+    monkeypatch.setattr(state, "desk_session_id", 502)
+    monkeypatch.setattr(state, "desk_session_start", datetime(2025, 1, 1, 23, 30, tzinfo=ZoneInfo("Asia/Taipei")))
+
+    router = create_desk_router(Settings())
+    status = await _desk_endpoint(router, "/api/desk/status")()
+    daily = await _desk_endpoint(router, "/api/desk/daily")()
+    rows = {row["date"]: row for row in daily["daily_history"]}
+
+    assert status["today_total_seconds"] == 5400
+    assert status["today_session_count"] == 1
+    assert rows["2025-01-01"]["total_seconds"] == 1800
+    assert rows["2025-01-02"]["total_seconds"] == 5400
 
 
 @pytest.mark.asyncio
