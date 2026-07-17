@@ -60,7 +60,7 @@ Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並�
 
 - **天氣面板**：即時天氣 + 5 天預報（OpenWeatherMap），含天氣圖示與溫度
 - **室內環境**：DHT22 溫濕度 + 光線感測器（MCP3008 ADC）
-- **家庭占用偵測**：純光線感測，燈亮 → OCCUPIED，燈暗 → UNOCCUPIED；無人在場時暫停面板更新，偵測到回家時立即喚醒顯示更新
+- **家庭占用偵測**：純光線感測，燈亮 → OCCUPIED，燈暗 → UNOCCUPIED；無人在場時清除面板並暫停更新，啟動／WiFi 切回主畫面仍保留一次顯示設定入口，偵測到回家時立即喚醒更新
 - **AI 使用量顯示**：直接透過 OAuth 向 Anthropic 與 OpenAI API 輪詢 Claude / Codex 5h 及 7d 使用量，顯示於 e-Paper 面板底部
 - **HydraCup 飲水進度**：透過本機 Mosquitto MQTT broker 接收 esp32-hydracup 每日飲水量，顯示目前飲水量 / 目標量與剩餘量（協定見 `docs/hydracup-mqtt-protocol.md`）
 - **Bambu Lab 3D 印表機進度**：透過 Bambu Lab 官方雲端 MQTT（獨立於本機 Mosquitto，不需 LAN Only Mode）取得任務名稱、進度百分比與剩餘時間，顯示於儀表板（協定見 `docs/bambu-mqtt-protocol.md`）

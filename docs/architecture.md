@@ -160,6 +160,7 @@ Bambu Lab 雲端 MQTT (mqtts://us.mqtt.bambulab.com:8883) ──► app/services
 按鈕按下（立即） ───────────────────────────────────────────────┼──► display_queue ──► _display_loop ──► renderer ──► epaper
 wifi_connected 事件（AP 結束後） ───────────────────────────────┘
 presence_return 事件（UNOCCUPIED → OCCUPIED，立即）────────────┘
+presence_away 事件（轉入 UNOCCUPIED，清屏）───────────────────────┘
 ```
 
 ---
@@ -171,13 +172,13 @@ presence_return 事件（UNOCCUPIED → OCCUPIED，立即）──────�
 | 協程 | 觸發週期 | 職責 |
 |------|---------|------|
 | `_sensor_loop()` | 每 30 秒 | 讀 DHT22 + 光線感測器，更新 state |
-| `_presence_loop()` | 每 60 秒；候選到期時依設定提前醒來 | 讀光線狀態 → `PresenceDebouncer` → 桌面時段管理；偵測到回家時立即喚醒 display_queue |
-| `_display_loop()` | 牆鐘對齊（N 分鐘邊界，由 `dashboard_interval_minutes` 控制，預設每 5 分鐘）| 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖（每 `carousel_interval_refreshes` 次刷新換圖）|
+| `_presence_loop()` | 每 60 秒；候選到期時依設定提前醒來 | 讀光線狀態 → `PresenceDebouncer` → 桌面時段管理；離席時送 `presence_away` 清屏、回家時送 `presence_return` 喚醒 display_queue |
+| `_display_loop()` | 牆鐘對齊（N 分鐘邊界，由 `dashboard_interval_minutes` 控制，預設每 5 分鐘）| 監聽 display_queue；離席時清屏並暫停儀表板更新；啟動／WiFi 切回時保留一次顯示；管理圖片輪播換圖（每 `carousel_interval_refreshes` 次刷新換圖）|
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
 | `_claude_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 Anthropic API 拉取 Claude 5h/7d 使用量；token 過期時自動刷新 |
 | `_codex_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 OpenAI WHAM API 拉取 Codex 5h/7d 使用量；token 過期時自動刷新 |
 | `_notification_loop()` | 依排程 | Discord 每日統計摘要等定時通知 |
-| `_wifi_monitor_loop()` | 每 10 秒 | 讀取 `/tmp/epaper-ap-mode.json`；AP 模式時設定 `display_page = "ap_mode"`；AP 結束後送 `"wifi_connected"` 事件繞過在場偵測門禁，自動切回儀表板 |
+| `_wifi_monitor_loop()` | 每 10 秒 | 讀取 `/tmp/epaper-ap-mode.json`；AP 模式時設定 `display_page = "ap_mode"`；AP 結束後送 `"wifi_connected"` 事件，即使離席也顯示一次儀表板以保留設定入口 |
 | `server.serve()` | 持續 | FastAPI WebUI（埠 8000） |
 
 **ThreadPoolExecutor**（3 個工作執行緒）用於阻擋性硬體 I/O（DHT22 感測、SPI 傳輸、e-Paper 驅動）。
@@ -196,7 +197,8 @@ presence_return 事件（UNOCCUPIED → OCCUPIED，立即）──────�
 | 完整更新（`init`）| 每 `full_refresh_every` 次更新 | 驅動有 `init_fast()` 時才有意義；`epd7in3e` 驅動每次均為完整刷新 |
 | 回家立即更新 | 亮光（raw < 閾值）持續達 `occupied_after_seconds`（UNOCCUPIED→OCCUPIED）| `_presence_loop` 偵測到後立即觸發 |
 | AP 模式頁面 | 每 30 秒 | 靜態資訊頁，定期刷新時間戳 |
-| 人不在時 | — | `display_loop` 暫停，不做任何更新（wifi_connected 事件可繞過此限制）|
+| 離席清屏 | 穩定轉入 `UNOCCUPIED` | `presence_away` 事件觸發 `epaper.clear()`；之後停止儀表板刷新 |
+| 啟動／WiFi 顯示 | 首次啟動、`wifi_connected` 事件 | 即使尚未在席，仍顯示一次儀表板，保留設定入口 |
 
 > **注意**：`epd7in3e` 驅動無 `init_fast()` 方法，`epaper.py` 的 AttributeError fallback 會使每次更新均執行完整初始化。`full_refresh_every` 設定目前對 epd7in3e 面板效果等同於每次全刷新。
 
@@ -223,7 +225,8 @@ else:                       → UNOCCUPIED (score = 0.0)
 
 **顯示行為**：
 - OCCUPIED：正常依 `dashboard_interval_minutes` 週期於觸發秒更新（預設每 5 分鐘）
-- UNOCCUPIED：display_loop 暫停，不刷新面板
+- UNOCCUPIED：穩定離席時先清屏，之後 display_loop 暫停儀表板刷新
+- 啟動／`wifi_connected`：即使尚未在席仍顯示一次儀表板，保留設定入口
 - UNOCCUPIED → OCCUPIED：亮光防抖計時完成後，`_presence_loop` 立即送 display_queue，面板馬上更新
 
 ---

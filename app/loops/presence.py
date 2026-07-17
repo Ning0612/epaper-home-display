@@ -33,9 +33,23 @@ async def _presence_loop(
                 occupied_after_seconds=settings.sensors.light.occupied_after_seconds,
             )
 
-            # Transition OCCUPIED → UNOCCUPIED: end active session
-            if prev_presence == "OCCUPIED" and presence != "OCCUPIED":
-                if state.desk_session_id is not None and state.desk_session_start is not None:
+            # Transition into UNOCCUPIED: clear the display and end an active
+            # session when the previous stable state was OCCUPIED.
+            if prev_presence != "UNOCCUPIED" and presence == "UNOCCUPIED":
+                # Publish the stable state and wake the display before any slow
+                # session-finalization or notification I/O.
+                state.presence = presence
+                state.presence_score = score
+                try:
+                    display_queue.put_nowait("presence_away")
+                except asyncio.QueueFull:
+                    logger.warning("Display queue is full; away clear will be handled by the next display tick")
+
+                if (
+                    prev_presence == "OCCUPIED"
+                    and state.desk_session_id is not None
+                    and state.desk_session_start is not None
+                ):
                     duration = elapsed_seconds(state.desk_session_start, now)
                     try:
                         await end_desk_session(state.desk_session_id, now, duration)

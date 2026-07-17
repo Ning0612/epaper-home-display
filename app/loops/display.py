@@ -129,10 +129,12 @@ async def _display_loop(
     loop = asyncio.get_event_loop()
     # startup_wait_done: True once _wait_for_startup_data() has returned.
     #   Prevents re-calling it (with a fresh 180s timeout) on subsequent iterations.
-    # startup_pending: True until the first render succeeds.
-    #   While True: skip wall-clock alignment and bypass the presence gate.
+    # startup_pending: True until the first render or clear succeeds.
+    #   While True: skip wall-clock alignment and allow the initial dashboard render
+    #   even when presence is not yet OCCUPIED, so the settings entry remains visible.
     startup_wait_done = False
     startup_pending = True
+    screen_cleared = False
 
     while True:
         # Wait strategy:
@@ -140,7 +142,7 @@ async def _display_loop(
         #   startup_pending (data ready, render not yet done) → fall through immediately
         #   ap_mode → 30s; dashboard → wall-clock aligned.
         # event value is preserved so callers downstream can react to specific signals
-        # (e.g. "wifi_connected" bypasses the presence-check gate).
+        # (e.g. "wifi_connected" allows one dashboard render even while unoccupied).
         event: str | None = None
         if not startup_wait_done:
             await _wait_for_startup_data()
@@ -156,7 +158,8 @@ async def _display_loop(
                 pass
         else:
             # Align to N-minute wall-clock boundary (configurable via dashboard_interval_minutes).
-            # Any display_queue event (button, presence_return) fires immediately.
+            # Any display_queue event (button, presence_return, presence_away, wifi_connected)
+            # fires immediately.
             now = _DateTime.now()
             delay = _seconds_until_dashboard_tick(
                 now,
@@ -171,12 +174,25 @@ async def _display_loop(
         if state.display_page == "ap_mode":
             pass  # always render AP mode page regardless of presence
         elif state.display_page == "dashboard":
-            # Bypass presence gate for the very first render so boot-up always
-            # produces a display update regardless of occupancy state.
-            # state.presence is debounced by _presence_loop; raw light readings
-            # must not pause the panel during an unconfirmed transition.
-            if state.presence != "OCCUPIED" and event != "wifi_connected" and not startup_pending:
-                continue  # pause dashboard updates while nobody home
+            allow_unoccupied_render = startup_pending or event == "wifi_connected"
+            if state.presence != "OCCUPIED" and not allow_unoccupied_render:
+                if not screen_cleared:
+                    if state.display_busy:
+                        continue
+
+                    state.display_busy = True
+                    try:
+                        await loop.run_in_executor(executor, epaper.clear)
+                        screen_cleared = True
+                        refresh_count = 0
+                        startup_pending = False
+                        logger.info("Display cleared while unoccupied")
+                    except Exception:
+                        logger.exception("Failed to clear display while unoccupied")
+                    finally:
+                        state.display_busy = False
+                # Keep the panel clear and pause dashboard updates while nobody is home.
+                continue
             # Advance carousel AFTER the presence gate so the counter only
             # increments when a dashboard render is actually about to happen.
             _maybe_advance_carousel(settings)
@@ -207,6 +223,7 @@ async def _display_loop(
                 refresh_count += 1  # advances once epaper.display() returns without raising, even if it
                 # skipped the panel write internally (e.g. a dirty-region no-op on an unchanged frame)
 
+            screen_cleared = False
             startup_pending = False  # first render succeeded — clear boot gate
         except Exception as exc:
             logger.error("Display update failed: %s", exc)
