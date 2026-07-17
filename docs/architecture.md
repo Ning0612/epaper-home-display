@@ -62,7 +62,8 @@ epaper-home-display/
 │   │   ├── presence.py      # 占用偵測（純函數，光線 → OCCUPIED/UNOCCUPIED）
 │   │   ├── desk_session.py  # 桌面工作時段狀態機（純函數）
 │   │   ├── reminder.py      # 天氣提醒生成（純函數，用於 AI 語音提醒）
-│   │   └── hydration.py     # HydraCup MQTT payload 解析（純函數，parse_status）
+│   │   ├── hydration.py     # HydraCup MQTT payload 解析（純函數，parse_status）
+│   │   └── printer.py       # Bambu print report 解析（純函數，parse_print_status）
 │   ├── sensors/
 │   │   ├── dht22.py         # DHT22 溫濕度（Real + Mock）
 │   │   ├── light_sensor.py  # MCP3008 ADC + 光敏電阻（Real + Mock）
@@ -75,11 +76,12 @@ epaper-home-display/
 │   │   ├── claude_usage.py  # Claude OAuth API 客戶端（token 刷新、使用量解析）
 │   │   ├── codex_usage.py   # Codex OAuth API 客戶端（token 刷新、使用量解析）
 │   │   ├── wifi_monitor.py  # WiFi 狀態監測（client/ap/unknown，讀 /tmp/epaper-ap-mode.json）
-│   │   └── mqtt_client.py   # HydraCup MQTT 訂閱服務（paho-mqtt，見下方「HydraCup MQTT 資料流」）
+│   │   ├── mqtt_client.py   # HydraCup MQTT 訂閱服務（paho-mqtt，見下方「HydraCup MQTT 資料流」）
+│   │   └── printer_mqtt.py  # Bambu Lab 印表機雲端 MQTT 訂閱服務（paho-mqtt，見下方「Bambu Lab 印表機 MQTT 資料流」）
 │   ├── loops/               # asyncio 協程（由 main.py 以 gather 並行執行）
 │   │   ├── sensor.py        # 感測器讀取循環（30 秒）
 │   │   ├── presence.py      # 占用計分循環（60 秒）
-│   │   ├── display.py       # 顯示更新循環（牆鐘 :57）
+│   │   ├── display.py       # 顯示更新循環（牆鐘對齊，觸發秒由 model 推導；epd7in3e 預設 :40，每 5 分鐘）
 │   │   ├── weather.py       # 天氣更新循環（600 秒）
 │   │   ├── claude_usage.py  # Claude 使用量輪詢循環（600 秒，OAuth API 直接拉取）
 │   │   ├── codex_usage.py   # Codex 使用量輪詢循環（600 秒，OAuth API 直接拉取）
@@ -113,7 +115,8 @@ epaper-home-display/
 ├── systemd/                 # systemd 服務單元
 ├── tools/
 │   ├── claude_auth.py       # Claude OAuth 初次授權工具（在筆電執行）
-│   └── codex_auth.py        # Codex OAuth 初次授權工具（在筆電執行）
+│   ├── codex_auth.py        # Codex OAuth 初次授權工具（在筆電執行）
+│   └── bambu_auth.py        # Bambu Lab 帳號登入工具（在筆電執行，寫出 data/bambu_creds.json）
 ├── docs/                    # 文件
 ├── assets/                  # 字體、音效、圖片資源
 ├── data/                    # SQLite 資料庫與圖片（git ignored）
@@ -136,10 +139,19 @@ DHT22 ────────────────────────�
 
 ```
 esp32-hydracup ──► Mosquitto broker (Pi, :1883) ──► app/services/mqtt_client.py（paho-mqtt，獨立背景執行緒）
-    ──► app/logic/hydration.py::parse_status()（純函數）──► state.py（hydra_*）──► renderer_cards.py::_draw_card_hydra()
+    ──► app/logic/hydration.py::parse_status()（純函數）──► state.py（hydra_*）──► renderer_cards.py::_draw_card_water_printer()
 ```
 
 `MQTTService` 不是 `asyncio.gather()` 中的協程——paho-mqtt 用自己的 `loop_start()` 背景執行緒處理網路 I/O，收到訊息後透過 `asyncio.run_coroutine_threadsafe()` 把 dispatch 丟回主 event loop 更新 `state`。`.start(loop)` 在 `app/main.py` 的 `try` 區塊內、`await asyncio.gather(...)` 之前呼叫；`.stop()` 在 `finally` 區塊呼叫。完整協議規格（topic、payload schema、QoS、發布時機）見 [docs/hydracup-mqtt-protocol.md](hydracup-mqtt-protocol.md)。
+
+### Bambu Lab 印表機 MQTT 資料流
+
+```
+Bambu Lab 雲端 MQTT (mqtts://us.mqtt.bambulab.com:8883) ──► app/services/printer_mqtt.py（paho-mqtt + TLS，獨立背景執行緒）
+    ──► app/logic/printer.py::parse_print_status()（純函數，解析）──► app/services/printer_mqtt.py::_handle_report()（逐欄位合併）──► state.py（printer_*）──► renderer_cards.py::_draw_card_water_printer()
+```
+
+`BambuMQTTService` 與 `MQTTService` 同樣不是 `asyncio.gather()` 中的協程，`.start(loop)`/`.stop()` 在 `app/main.py` 緊鄰 `mqtt_service` 呼叫（同一組 `try`/`finally` 區塊）。連上後會主動發布一次 `pushall` request 要求完整狀態，之後收到的 report 逐欄位合併（缺少的欄位保留前次已知值，不會被清空）。離線判斷只看 MQTT broker 連線狀態（`printer_broker_connected`），沒有像 HydraCup 的心跳逾時機制。連到 Bambu 雲端 broker，與 Pi 上的 Mosquitto（HydraCup 用）完全獨立，不需要印表機開啟 LAN Only Mode。完整協議規格見 [docs/bambu-mqtt-protocol.md](bambu-mqtt-protocol.md)。
 
 ### 顯示更新觸發條件
 
@@ -208,7 +220,7 @@ else:                    → UNOCCUPIED (score = 0.0)
 ```
 
 **顯示行為**：
-- OCCUPIED：正常每分鐘觸發秒更新
+- OCCUPIED：正常依 `dashboard_interval_minutes` 週期於觸發秒更新（預設每 5 分鐘）
 - UNOCCUPIED：display_loop 暫停，不刷新面板
 - UNOCCUPIED → OCCUPIED：_presence_loop 立即送 display_queue，面板馬上更新
 
@@ -261,10 +273,16 @@ else:                    → UNOCCUPIED (score = 0.0)
 | `codex_7d_reset` | str \| None | Codex 7d 剩餘時間（如 `"2d 3h"`）|
 | `hydra_current_ml` | int \| None | HydraCup 今日目前喝水量（毫升）|
 | `hydra_goal_ml` | int \| None | HydraCup 今日目標飲水量（毫升）|
-| `hydra_pct` | float \| None | HydraCup 完成比例。語意上是 0.0–1.0 的分數；payload 直接提供的 `pct` 欄位限制在 -10.0～10.0 之間（超出視為無效並改用下一項 fallback），缺失時 fallback 為 `current_ml / goal_ml`（兩者各自上限 9999，故 fallback 值理論上可超出 -10.0～10.0）；顯示時 `_draw_card_hydra()` 一律 clamp 到 0%–100% |
+| `hydra_pct` | float \| None | HydraCup 完成比例。語意上是 0.0–1.0 的分數；payload 直接提供的 `pct` 欄位限制在 -10.0～10.0 之間（超出視為無效並改用下一項 fallback），缺失時 fallback 為 `current_ml / goal_ml`（兩者各自上限 9999，故 fallback 值理論上可超出 -10.0～10.0）；顯示時 `_draw_card_water_printer()` 一律 clamp 到 0%–100% |
 | `hydra_updated_at` | datetime \| None | 最後一次收到 `hydracup/status` 的時間（epaper-display 端收到時間，非裝置端時間戳）|
 | `hydra_broker_connected` | bool | epaper-display 與 MQTT broker 的連線狀態 |
 | `hydra_device_online` | bool | 由 `hydracup/availability`（含 LWT）回報的 HydraCup 裝置線上狀態 |
+| `printer_pct` | float \| None | Bambu 印表機列印進度（0.0–1.0），由 `mc_percent` 換算 |
+| `printer_remaining_min` | int \| None | 預估剩餘列印時間（分鐘），由 `mc_remaining_time` 換算 |
+| `printer_task_name` | str \| None | 目前列印任務名稱（`subtask_name`，缺失時 fallback `gcode_file`）|
+| `printer_gcode_state` | str \| None | 印表機狀態字串（如 `RUNNING`、`PAUSE`）|
+| `printer_updated_at` | datetime \| None | 最後一次成功處理 `print` report 的時間 |
+| `printer_broker_connected` | bool | epaper-display 與 Bambu 雲端 MQTT broker 的連線狀態 |
 | `display_page` | Literal["dashboard", "ap_mode"] | 目前顯示頁面 |
 | `wifi_mode` | Literal["client", "ap", "unknown"] | WiFi 模式 |
 | `ap_ssid` | str | AP 熱點 SSID（AP 模式下顯示）|
@@ -347,7 +365,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/desk` | HTML 桌面工作時段介面 |
 | `/environment` | HTML 環境溫濕度分析介面（日/月/年圖表）|
 | `/health` | 健康檢查（`{"status": "ok"}`，不需認證）|
-| `/state` | AgentState 部分欄位快照（感測器、天氣、AI 使用量、HydraCup 喝水資料）|
+| `/state` | AgentState 部分欄位快照（感測器、天氣、AI 使用量、HydraCup 喝水資料、Bambu 印表機列印進度）|
 | `/logs/env` | 環境日誌（溫濕度、光線）最近 50 筆 |
 | `/logs/presence` | 占用度日誌最近 50 筆 |
 | `/logs/events` | 系統事件日誌最近 50 筆 |
@@ -377,6 +395,9 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/settings/notifications` | 更新 Discord Webhook |
 | `/settings/general` | 更新時區 |
 | `/settings/auth` | 修改 WebUI 密碼（需提供目前密碼驗證）|
+| `/settings/mqtt` | 更新 HydraCup MQTT broker 設定（host/port/client_id/username/password/heartbeat_timeout_sec），存檔後立即斷線重連 |
+| `/settings/printer` | 更新 Bambu 印表機 `serial`，存檔後立即斷線重連（token/uid 仍需用 `tools/bambu_auth.py` 更新）|
+| `/settings/usage` | 更新 Claude/Codex 用量輪詢間隔（`claude_poll_interval_seconds` / `codex_poll_interval_seconds`，各 60–1800 秒，皆可選）|
 
 **圖片管理（Images）**
 
@@ -390,7 +411,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | GET | `/api/images/file/{id}` | 提供 display PNG 檔案 |
 | GET | `/api/images/original/{id}` | 提供原始上傳檔案 |
 | GET | `/api/images/carousel` | 讀取輪播設定 |
-| PUT | `/api/images/carousel` | 更新輪播設定（enabled/interval/mode）|
+| PUT | `/api/images/carousel` | 更新輪播設定（enabled/interval_refreshes/mode）|
 | PUT | `/api/images/carousel/advance` | 手動切換輪播圖片（僅更新狀態，不強制 e-Paper 立即刷新）|
 
 **桌面工作時段（Desk）**

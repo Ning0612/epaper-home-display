@@ -21,7 +21,7 @@ HydraCup MQTT 連到專案自己在 Raspberry Pi 上架的 Mosquitto broker（`:
 | Username | `u_{uid}`，其中 `uid` 來自 `data/bambu_creds.json`。 |
 | Password | `access_token`，來自 `data/bambu_creds.json`。 |
 | Client ID | `epaper-bambu-{serial}`。 |
-| 停用條件 | `creds_path` 指向的檔案不存在、不是 JSON object、JSON 格式錯誤，或讀不到有效的 `access_token`、`uid`、有效 serial（`printer.serial` 覆蓋值或 credentials 內的 `serial`）任一項時，`BambuMQTTService` 不建立 `mqtt.Client`、不嘗試連線，只記錄一則 INFO。 |
+| 停用條件 | `creds_path` 指向的檔案不存在、不是 JSON object、JSON 格式錯誤，或讀不到有效的 `access_token`、`uid`、有效 serial（`printer.serial` 覆蓋值或 credentials 內的 `serial`）任一項時，`BambuMQTTService` 不建立 `mqtt.Client`、不嘗試連線，共記錄兩則 INFO（`_load_credentials()` 一則說明原因，`start()` 因 client 為 `None` 再記一則）。 |
 
 設定 dataclass 定義於 `app/config.py::PrinterConfig`：
 

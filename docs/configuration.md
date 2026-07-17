@@ -78,7 +78,7 @@ display:
                                   # 支援型號：
                                   #   epd7in3e   = 7.3" 七色（黑/白/紅/黃/藍/綠/橙）
                                   #   epd7in5_V2 = 7.5" 黑白，支援快速局部刷新
-                                  #   mock       = 不寫入硬體，渲染結果儲存為 debug_frame.png
+                                  #   mock       = 不寫入硬體，僅記錄 display 呼叫（不存檔）；視覺驗證請用 scripts/preview_render.py
   use_mock: false
   dashboard_interval_minutes: 5  # Dashboard 刷新間隔（分鐘），必須是 60 的因數（1/2/3/4/5/6/10/12/15/20/30/60）
   full_refresh_every: 10          # 每 N 次更新強制完整刷新（清除鬼影）；epd7in3e 無 init_fast，每次均完整刷新
@@ -230,6 +230,7 @@ claude_usage:
 **初次授權**：在筆電執行 `python tools/claude_auth.py`，授權後將 `data/claude_creds.json` scp 到 Pi。
 支援 Claude Code 原生格式（`claudeAiOauth` 嵌套格式）與標準 snake_case 格式。
 Token 過期時自動透過 refresh_token 刷新，不需重新授權。
+`poll_interval_seconds` 可設定範圍 60–1800 秒（1–30 分鐘），也可透過 WebUI `/settings` 頁面「AI 工具用量設定」直接調整（見 [docs/webui.md](webui.md)）。不需要重啟服務；但目前正在進行中的 `asyncio.sleep()` 等待不會被中斷，新值要等這輪等待結束、進入下一輪輪詢週期才會套用。
 
 ### Codex 使用量
 
@@ -242,6 +243,32 @@ codex_usage:
 **初次授權**：在筆電執行 `python tools/codex_auth.py`，授權後將 `data/codex_creds.json` scp 到 Pi。
 Access token 約 1 小時後過期，服務會自動透過 refresh_token 更新，無需手動介入。
 僅在 refresh_token 失效或 Pi log 出現 `re-run tools/codex_auth.py` 警告時，才需重新執行 `codex_auth.py` 並重新 scp。
+`poll_interval_seconds` 可設定範圍 60–1800 秒（1–30 分鐘），也可透過 WebUI `/settings` 頁面「AI 工具用量設定」直接調整（見 [docs/webui.md](webui.md)）。不需要重啟服務；但目前正在進行中的 `asyncio.sleep()` 等待不會被中斷，新值要等這輪等待結束、進入下一輪輪詢週期才會套用。
+
+---
+
+## Bambu Lab 3D 印表機
+
+Dashboard 左下角的 Printer 卡片顯示 [Bambu Lab](https://bambulab.com/) 3D 印表機透過雲端 MQTT 推送的列印進度。連線目標固定為 Bambu 雲端 broker（`us.mqtt.bambulab.com:8883`），與 HydraCup 使用的 Pi 上 Mosquitto broker（`mqtt.*` 設定）完全獨立、互不影響。完整協議規格見 [docs/bambu-mqtt-protocol.md](bambu-mqtt-protocol.md)。
+
+```yaml
+printer:
+  serial: ""                              # 印表機序號，留空則使用 data/bambu_creds.json 裡 tools/bambu_auth.py 自動偵測到的序號
+  creds_path: "data/bambu_creds.json"     # Bambu 雲端帳號 token 儲存路徑（.gitignored，不要 commit）
+```
+
+**初次授權**：在筆電執行 `python tools/bambu_auth.py`（互動式登入 Bambu Lab 帳號，可能需要信箱驗證碼），完成後將 `data/bambu_creds.json` scp 到 Pi：
+
+```bash
+./.venv/Scripts/python.exe tools/bambu_auth.py
+scp data/bambu_creds.json pi@epaper-display.local:~/epaper-home-display/data/
+```
+
+Token 有效期約 3 個月，**沒有實作自動 refresh**。過期後重新執行 `tools/bambu_auth.py` 並重新 scp 即可。
+
+**可透過 WebUI 設定**（`/settings` 頁面「Bambu 印表機設定」區塊，或直接呼叫 `PUT /settings/printer`，見 [docs/webui.md](webui.md)）：只能調整 `serial`，儲存後立即讓執行中的服務用新設定斷線重連，不需重啟。帳號 token/uid 仍必須用 `tools/bambu_auth.py` 更新。
+
+若 `creds_path` 指向的檔案不存在、格式錯誤，或缺少有效的 `access_token`/`uid`/serial，服務會停用此整合、不嘗試連線（記錄 INFO log 說明原因），不影響其餘功能。
 
 ---
 
@@ -269,7 +296,7 @@ sudo mosquitto_passwd -b /etc/mosquitto/passwd epaper-home-display <password>
 sudo systemctl restart mosquitto
 ```
 
-**heartbeat_timeout_sec 說明**：epaper-display 被動訂閱 `hydracup/status`，不會主動輪詢。若距離上次收到訊息超過此秒數，或 `hydracup/availability` 回報裝置離線，Water 卡片會改用灰階樣式呈現既有數值（不清空），提示資料可能已過期。
+**heartbeat_timeout_sec 說明**：epaper-display 被動訂閱 `hydracup/status`，不會主動輪詢。若距離上次收到訊息超過此秒數、`hydracup/availability` 回報裝置離線，或 epaper-display 與 MQTT broker 的連線本身中斷，Water 卡片會改用灰階樣式，並隱藏數值（顯示 `--/--ml`），提示資料可能已過期。
 
 ---
 
@@ -398,7 +425,13 @@ mqtt:
   password: ""
   heartbeat_timeout_sec: 180
 
+printer:
+  serial: ""
+  creds_path: "data/bambu_creds.json"
+
 codex_usage:
   creds_path: "data/codex_creds.json"
   poll_interval_seconds: 600
 ```
+
+> 上方為精簡範例，逐行註解請參考各章節說明或直接查看 repo 根目錄的 `config.example.yaml`。

@@ -14,7 +14,7 @@ async def _run() -> None:
         print("ERROR: weather.api_key not set in config.yaml")
         sys.exit(1)
 
-    print(f"Fetching weather for city_id={settings.weather.city_id} ...")
+    print(f"Fetching weather for lat={settings.weather.lat}, lon={settings.weather.lon} ...")
     service = WeatherService(settings.weather)
     current, forecast = await service.fetch()
 

@@ -44,7 +44,7 @@
 
 ![儀表板預覽](docs/images/preview_dashboard.png)
 
-主畫面，每分鐘自動更新。左側顯示日期時間（時鐘右方以圖示顯示室內溫濕度）、天氣（即時 + 4 天預報）；左下方為 Claude / Codex AI 使用量進度條（附重置時間）與飲水進度；右側為圖片輪播區。
+主畫面，依 `dashboard_interval_minutes` 設定的間隔自動更新（預設每 5 分鐘）。左側顯示日期時間（時鐘右方以圖示顯示室內溫濕度）、天氣（即時 + 4 天預報）；左下方為 Claude / Codex AI 使用量進度條（附重置時間）、HydraCup 飲水進度與 Bambu Lab 3D 印表機列印進度；右側為圖片輪播區。
 
 ### WiFi 設定模式（AP Mode）
 
@@ -143,6 +143,16 @@ scp data/claude_creds.json pi@epaper-display.local:~/epaper-home-display/data/
 scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 ```
 
+**（選用）啟用 Bambu Lab 3D 印表機進度**：在筆電執行互動式登入工具，再將憑證 scp 到 Pi：
+
+```bash
+# 在筆電執行（互動輸入 Bambu Lab 帳密，可能需信箱驗證碼）
+python tools/bambu_auth.py   # 產生 data/bambu_creds.json
+
+# 複製到 Pi
+scp data/bambu_creds.json pi@epaper-display.local:~/epaper-home-display/data/
+```
+
 ---
 
 ## 文件索引
@@ -155,7 +165,10 @@ scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 | [docs/deploy-and-test.md](docs/deploy-and-test.md) | Pi 首次部署、日常更新、SSH 金鑰設定、硬體測試 |
 | [docs/hardware-wiring.md](docs/hardware-wiring.md) | 完整硬體接線圖與 GPIO 腳位說明 |
 | [docs/webui.md](docs/webui.md) | WebUI 設定介面完整使用說明與 REST API 參考 |
-| [tools/README.md](tools/README.md) | Claude / Codex OAuth 憑證設定工具說明 |
+| [docs/hydracup-mqtt-protocol.md](docs/hydracup-mqtt-protocol.md) | HydraCup MQTT 協議規格（topic、payload、QoS）|
+| [docs/bambu-mqtt-protocol.md](docs/bambu-mqtt-protocol.md) | Bambu Lab 印表機雲端 MQTT 協議規格 |
+| [docs/hydracup-integration-handoff.md](docs/hydracup-integration-handoff.md) | HydraCup 端（esp32-hydracup repo）整合交接文件 |
+| [tools/README.md](tools/README.md) | Claude / Codex / Bambu Lab 認證設定工具說明 |
 | [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) | 第三方元件授權聲明（weather icons / Waveshare driver / DejaVu fonts）|
 
 ---
@@ -168,7 +181,7 @@ scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 編輯程式碼                   app/main.py（asyncio 9 協程）
 跑單元測試（mock）              ├── _sensor_loop()         → DHT22, 光線（每 30 秒）
 git push                        ├── _presence_loop()       → 占用計分（每 60 秒）
-                                ├── _display_loop()        → e-Paper 更新（牆鐘 :57）
+                                ├── _display_loop()        → e-Paper 更新（牆鐘對齊，由 model 推導觸發秒；epd7in3e 預設 :40，每 5 分鐘）
                                 ├── _weather_loop()        → OpenWeatherMap（每 600 秒）
                                 ├── _claude_usage_loop()   → Claude 使用量（每 600 秒）
                                 ├── _codex_usage_loop()    → Codex 使用量（每 600 秒）

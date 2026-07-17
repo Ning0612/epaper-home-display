@@ -45,6 +45,7 @@ GitHub Actions 會在 push、pull request 與手動 workflow dispatch 時執行
 `.github/workflows/ci.yml`：
 
 - 安裝 `requirements.txt`
+- 執行 `ruff check .`（lint）
 - 執行 `pytest`
 
 CI 使用 mock 硬體測試，不需要 Raspberry Pi、GPIO、SPI 或 e-Paper 實機。
@@ -110,27 +111,39 @@ display:
 | `MockLightSensor.read_raw()` | `500` — 中等亮度 |
 | `MockLightSensor.is_bright()` | `True` |
 | `MockButton` | 不觸發任何 GPIO 事件 |
-| `MockEpaper.display()` | 儲存 Pillow Image 到 `debug_frame.png`（可視覺檢查）|
+| `MockEpaper.display()` | 僅記錄一則 log（`display #N full_refresh=...`），不寫入任何檔案 |
 
 ---
 
 ## 測試覆蓋範圍
 
-| 測試檔案 | 涵蓋模組 | 測試數量 |
-|---------|---------|---------|
-| `test_presence.py` | `app/logic/presence.py` | 6+ 個測試案例 |
-| `test_reminder.py` | `app/logic/reminder.py` | 各提醒觸發條件 |
-| `test_voice_config.py` | `app/services/voice.py`（設定解析）| 語音設定驗證 |
-| `test_renderer.py` | `app/display/renderer.py` | 圖像渲染（Pillow mock）|
-| `test_state.py` | `app/state.py` | 狀態初始化與更新 |
-| `test_desk_session.py` | `app/logic/desk_session.py` | 桌面工作時段狀態機 |
-| `test_image_processor.py` | `app/display/image_processor.py` | 圖片裁切與 dithering（六色量化）|
-| `test_carousel.py` | `app/loops/display.py`（輪播邏輯）| 圖片輪播換圖行為 |
-| `test_weather_service.py` | `app/services/weather.py` | API 回應解析（aiohttp mock）|
+| 測試檔案 | 涵蓋模組 |
+|---------|---------|
+| `test_presence.py` | `app/logic/presence.py` |
+| `test_reminder.py` | `app/logic/reminder.py` |
+| `test_voice_config.py` | `app/services/voice.py`（設定解析）|
+| `test_renderer.py` | `app/display/renderer.py`（含 AP 模式頁面渲染）|
+| `test_state.py` | `app/state.py` |
+| `test_desk_session.py` | `app/logic/desk_session.py` |
+| `test_image_processor.py` | `app/display/image_processor.py`（圖片裁切與 dithering，六色量化）|
+| `test_carousel.py` | `app/loops/display.py`（輪播邏輯）|
+| `test_weather_service.py` | `app/services/weather.py`（API 回應解析，aiohttp mock）|
+| `test_hydration.py` | `app/logic/hydration.py`（HydraCup payload 解析）|
+| `test_mqtt_client.py` | `app/services/mqtt_client.py`（HydraCup MQTT）|
+| `test_printer.py` | `app/logic/printer.py`（Bambu print 狀態解析）|
+| `test_printer_mqtt.py` | `app/services/printer_mqtt.py`（Bambu 印表機 MQTT）|
+| `test_dirty_region.py` | `app/display/dirty_region.py`（局部刷新矩形計算）|
+| `test_epaper.py` | `app/display/epaper.py`（e-Paper 驅動包裝）|
+| `test_codex_usage.py` | `app/services/codex_usage.py` |
+| `test_discord.py` | `app/services/discord.py` |
+| `test_webui_auth.py` | `app/webui/routes/auth.py`、`app/webui/middleware.py` |
+| `test_webui_wifi.py` | `app/webui/routes/wifi.py` |
+| `test_webui_desk.py` | `app/webui/routes/desk.py` |
+| `test_webui_templates.py` | `app/webui/templates/*` |
 
 > **注意**：`tests/conftest.py` 為全域測試前置設定，強制設定 `RPI_MOCK=1` 環境變數，確保所有測試均使用 mock 硬體，不需也不應在 Pi 以外的環境安裝 GPIO 套件。
 
-> **測試覆蓋缺口**：以下模組目前尚無直接測試，邊界條件未受回歸保護：`app/services/wifi_monitor.py`（AP 狀態檔損壞、nmcli 失敗）、`app/display/renderer_apmode.py`、`app/webui/routes/wifi.py`（未認證 WiFi API 行為）。有意新增測試覆蓋時可優先補上這些模組。
+> **測試覆蓋缺口**：`app/services/wifi_monitor.py`（AP 狀態檔損壞、nmcli 失敗）目前尚無直接測試，邊界條件未受回歸保護。有意新增測試覆蓋時可優先補上此模組。
 
 ---
 
@@ -207,7 +220,7 @@ def render_dashboard(state: AgentState, settings: Settings, now: datetime | None
 
 各卡片繪製函數在 `app/display/renderer_cards.py`，版面常數在 `renderer_constants.py`，工具函數（天氣圖示、進度條等）在 `renderer_utils.py`。
 
-使用 `MockEpaper` 可將渲染結果儲存為 `debug_frame.png` 進行視覺驗證。
+`MockEpaper` 本身不輸出檔案，只記錄 log；渲染結果視覺驗證請用 `./.venv/Scripts/python.exe -m scripts.preview_render`（產出 `docs/images/preview_dashboard.png` 等 PNG，見 CLAUDE.md「Display Preview Rule」）。
 
 ---
 

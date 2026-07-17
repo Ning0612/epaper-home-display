@@ -71,7 +71,7 @@ Payload（JSON）：
 {"online": false}
 ```
 
-離線訊息透過 MQTT **LWT（Last Will and Testament）** 機制設定：HydraCup 連線時向 broker 註冊 will（`willQos=1, willRetain=true`），若裝置異常斷線（斷電、WiFi 掉線、未正常呼叫 disconnect），broker 會自動代發此訊息（真正的 QoS 1），epaper-display 不需要額外的逾時偵測就能得知裝置離線。
+離線訊息透過 MQTT **LWT（Last Will and Testament）** 機制設定：HydraCup 連線時向 broker 註冊 will（`willQos=1, willRetain=true`），若裝置異常斷線（斷電、WiFi 掉線、未正常呼叫 disconnect），broker 會自動代發此訊息（真正的 QoS 1），讓 epaper-display 能即時得知裝置離線，不需等到逾時才發現。但 LWT 本身也可能遺失（例如 broker 端異常），因此下方「過期判斷」的 `heartbeat_timeout_sec` 逾時機制仍會保留作為後備判定，兩者互補而非取代關係。
 
 正常上線時，HydraCup 應在 `connect()` 成功後主動發布一次 `{"online": true}`（retained，實際 QoS 0，見上方說明）覆蓋上一次的 LWT 離線訊息。
 
@@ -86,13 +86,14 @@ Payload（JSON）：
 
 ## epaper-display 端的過期判斷
 
-epaper-display 不主動輪詢，而是被動等待訊息。為了避免長時間沒有心跳時仍把舊資料當作「即時」顯示，dashboard 的 Water 卡片會在以下情況改用灰階樣式（而非清空數值）：
+epaper-display 不主動輪詢，而是被動等待訊息。為了避免長時間沒有心跳時仍把舊資料當作「即時」顯示，dashboard 的 Water 卡片會在以下情況改用灰階樣式，並把數值隱藏為 `--/--ml`（不會顯示最後已知的舊數值）：
 
 - 距離上次收到 `hydracup/status` 的時間超過 `settings.mqtt.heartbeat_timeout_sec`（預設 180 秒，建議設為心跳間隔的 3 倍）。
 - `hydracup/availability` 回報 `online: false`。
+- epaper-display 與 MQTT broker 的連線本身中斷（`hydra_broker_connected` 為 `False`）。
 - 從未收到過任何 `hydracup/status`（`current_ml` 為 `None`）。
 
-對應設定：`config.yaml` 的 `mqtt.heartbeat_timeout_sec`，實作見 `app/display/renderer_cards.py::_draw_card_hydra()`。
+對應設定：`config.yaml` 的 `mqtt.heartbeat_timeout_sec`，實作見 `app/display/renderer_cards.py::_draw_card_water_printer()`。
 
 ## Broker 端部署（Pi 上手動執行）
 

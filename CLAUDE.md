@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**ePaper Home Display** running on Raspberry Pi Zero 2W with a Waveshare 7.3" e-Paper display (epd7in3e, 7-color ACeP), DHT22 sensor, light sensor, button, and buzzer/USB speaker.
+**ePaper Home Display** running on Raspberry Pi Zero 2W with a Waveshare 7.3" e-Paper display (epd7in3e, 7-color ACeP), DHT22 sensor, light sensor, button, and USB speaker.
 
 Originally a course final project that integrated with a separate agent ("Agent 1") over MQTT for doorbell/face-recognition security alerts. That integration has been removed from `main` — the historical final-project state is preserved on the `archive/final-project` branch. `main` now covers standalone functionality (local sensors, e-Paper, weather, WebUI, image carousel, Claude/Codex usage display) plus a new, unrelated MQTT integration with [esp32-hydracup](https://github.com/Ning0612/esp32-hydracup) (a smart water cup) for displaying daily water-drinking progress — see [docs/hydracup-mqtt-protocol.md](docs/hydracup-mqtt-protocol.md) — and a second, independent Bambu Lab cloud MQTT integration for live 3D-printer progress — see [docs/bambu-mqtt-protocol.md](docs/bambu-mqtt-protocol.md).
 
@@ -80,7 +80,7 @@ ssh pi@epaper-display.local 'systemctl list-timers epaper-auto-update.timer --no
 ### Hardware Tests (Pi)
 
 ```bash
-ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_epaper'
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_epaper'
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_dht22'
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_light'
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_button'
@@ -101,7 +101,9 @@ Hardware access is strictly separated from business logic:
 | Hardware drivers | `app/sensors/`, `app/display/`, `app/services/voice.py` | GPIO, SPI, I2C access only here |
 | Network services | `app/services/` (weather, MQTT, Discord, usage polling) | External I/O only; writes to `state.py`, never decides display behavior |
 | Business logic | `app/logic/` | No hardware/network imports; receives data via function args |
+| Orchestration loops | `app/loops/` | asyncio loop bodies gathered in `app/main.py`; call into sensors/display/services/logic, never contain business rules themselves |
 | State | `app/state.py` | Single source of truth for shared mutable state |
+| Persistence | `app/storage/` (`db.py`, `logs.py`, `_log_*.py`) | SQLite writes only; called from loops/services after logic decides what happened |
 | WebUI | `app/webui/server.py` | Monitoring/config only, no decision logic |
 
 ### Key Data Flows
@@ -120,7 +122,7 @@ light_raw ≥ bright_threshold → UNOCCUPIED (score = 0.0)
 **HydraCup MQTT → State → Display:**
 ```
 esp32-hydracup → Mosquitto broker (Pi, :1883) → app/services/mqtt_client.py (paho-mqtt, background thread)
-  → app/logic/hydration.py (parse_status, pure) → app/state.py (hydra_*) → renderer_cards.py::_draw_card_hydra()
+  → app/logic/hydration.py (parse_status, pure) → app/state.py (hydra_*) → renderer_cards.py::_draw_card_water_printer()
 ```
 `MQTTService.start()`/`.stop()` are wired in `app/main.py` around the `asyncio.gather()` call — paho-mqtt runs its own background thread (`loop_start()`), so it is not itself a gathered coroutine. Full protocol spec: [docs/hydracup-mqtt-protocol.md](docs/hydracup-mqtt-protocol.md).
 

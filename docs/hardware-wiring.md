@@ -9,11 +9,11 @@
 
 ```
          3V3  1 ● ○  2  5V
-   (DHT22) 4  3 ● ○  4  5V
-           -  5 ○ ○  6  GND ← 多元件共地
+              3 ● ○  4  5V
+              5 ○ ○  6  GND ← 多元件共地
        DHT22  7 ● ○  8
          GND  9 ○ ○  10
-              11 ○ ○  12  ← Pin 11 = GPIO 17（電子紙 RST，勿用）
+              11 ○ ○  12  ← Pin 11 = GPIO 17（電子紙 RST，勿用）；Pin 12 = GPIO 18（電子紙 PWR，勿用）
   B3 (GPIO 27) 13 ● ○  14 GND  ← B3 保留接腳（未綁定功能）
   B4 (GPIO 22) 15 ● ○  16
               17 ○ ○  18  ← 電子紙 BUSY (GPIO 24)
@@ -57,6 +57,7 @@ Driver HAT 透過排針佔用以下 GPIO，**這些腳位不可給其他元件�
 | DC | Pin 22 | GPIO 25 |
 | **RST** | **Pin 11** | **GPIO 17 ← 按鈕不可用此腳** |
 | BUSY | Pin 18 | GPIO 24 |
+| **PWR** | **Pin 12** | **GPIO 18 ← 驅動開關面板電源，按鈕不可用此腳** |
 
 ### 1-3. 啟用 SPI
 
@@ -101,19 +102,17 @@ GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_epaper
 '
 ```
 
-預期輸出：
+腳本依 `config.yaml` 的 `display.model` 動態測試目前設定的面板（`epd7in3e` 或 `epd7in5_V2`），預期輸出：
 ```
-Initialising e-Paper 7.3" (E) ...
-  init OK
+Configured display.model = 'epd7in3e' (color)
 Clearing display ...
   clear OK
 Drawing test image ...
   display OK
-  sleep OK
 PASS
 ```
 
-畫面顯示：白底 + 黑色外框矩形 + 中央文字 `ePaper Home Display Test OK`（確認 SPI 通訊與顯示驅動正常運作即可，無色塊測試）。
+畫面顯示：白底 + 黑色外框矩形 + 中央文字 `ePaper Home Display Test OK (epd7in3e)`（文字帶型號後綴）。彩色面板（`epd7in3e`）文字為紅色，並額外顯示紅/黃/藍/綠 4 色色塊；黑白面板（`epd7in5_V2`）文字為黑色，無色塊。
 
 ---
 
@@ -187,6 +186,8 @@ MCP3008 是 10-bit SPI ADC，將類比光敏電阻訊號轉為數位值。
 > **注意**：GPIO 17（Pin 11）已被電子紙 Driver HAT 佔用（RST 信號），不可作為按鈕使用。
 >
 > **AP 模式**：裝置處於 WiFi AP 模式時，所有按鈕按下均被靜默忽略（不觸發任何動作）。
+>
+> **`scripts/test_button.py` 測試對象**：此腳本目前固定測試 GPIO 27（B3），並非主力按鈕 B1。執行下方測試指令時請按下 **B3**（Pin 13），而非 B1。此腳本直接用 `RPi.GPIO`（非 gpiozero），不需要也不會讀取 `GPIOZERO_PIN_FACTORY`；實際服務中的 `app/sensors/button.py::MultiButton` 才是用 gpiozero，需要該環境變數（見上方 1-6 節）。
 
 ---
 
@@ -214,8 +215,8 @@ ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scr
 # 3. 光線感測器
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_light'
 
-# 4. 按鈕
-ssh pi@epaper-display.local 'cd ~/epaper-home-display && GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_button'
+# 4. 按鈕（腳本固定測試 B3／GPIO 27，跑起來後請按 B3，不是 B1；此腳本直接用 RPi.GPIO，不吃 GPIOZERO_PIN_FACTORY）
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_button'
 
 # 5. 喇叭
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_speaker'

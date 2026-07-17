@@ -89,11 +89,39 @@ ssh pi@epaper-display.local
 
 訪問 `/environment` 可查看室內溫濕度的歷史趨勢圖表。支援日（5 分鐘槽平均）、月（每日聚合）、年（每月聚合）三種時間尺度，頁面頂端顯示今日即時讀值與當日極值（min/max/avg）。
 
+### HydraCup MQTT 設定
+
+| 欄位 | 說明 |
+|------|------|
+| **狀態卡片** | 顯示 Broker 連線狀態、HydraCup 裝置上線狀態、最後更新時間 |
+| **Broker Host / Port** | Mosquitto broker 位址與埠 |
+| **Client ID** | MQTT client ID |
+| **Username / Password** | Broker 登入帳密；密碼欄位留白＝不變更既有密碼 |
+| **心跳逾時秒數** | 距離上次收到 HydraCup 資料超過此秒數視為過期（10–3600 秒）|
+
+儲存後立即讓執行中的 MQTT 連線用新設定斷線重連，不需重啟服務。完整協議規格見 [docs/hydracup-mqtt-protocol.md](hydracup-mqtt-protocol.md)。
+
+### Bambu 印表機設定
+
+| 欄位 | 說明 |
+|------|------|
+| **狀態卡片** | 顯示連線狀態、目前列印狀態（`gcode_state`）、最後更新時間 |
+| **Serial** | 印表機序號；留空則使用 `data/bambu_creds.json` 裡自動偵測到的序號 |
+
+帳號登入、token 取得與 `data/bambu_creds.json` 建立**無法在此頁面設定**，需在筆電執行 `python tools/bambu_auth.py` 登入後，把產生的 `data/bambu_creds.json` 複製到 Pi。儲存 Serial 後立即讓執行中的 MQTT 連線斷線重連。完整協議規格見 [docs/bambu-mqtt-protocol.md](bambu-mqtt-protocol.md)。
+
 ---
 
-### AI 使用量設定（僅 YAML）
+### AI 使用量設定
 
-Claude / Codex 使用量透過服務內建的 OAuth pull 循環自動更新，**WebUI 中無對應設定頁**。相關設定（`claude_usage` / `codex_usage`）只能透過 `config.yaml` 或 `config.local.yaml` 調整。初次授權流程：
+| 欄位 | 說明 |
+|------|------|
+| **Claude 刷新間隔（分鐘）** | Claude 用量輪詢間隔，範圍 1–30 分鐘 |
+| **Codex 刷新間隔（分鐘）** | Codex 用量輪詢間隔，範圍 1–30 分鐘 |
+
+不需要重啟服務；最晚在目前這輪刷新結束後（依原本間隔）套用新值。
+
+OAuth token 的初次授權仍只能透過 CLI 完成，WebUI 沒有對應頁面：
 
 ```bash
 # 在筆電執行（產生 credentials 後 scp 到 Pi）
@@ -141,7 +169,7 @@ GET /health
 GET /state
 ```
 
-回傳 `AgentState` 的**部分欄位** JSON 快照，包含感測器讀值、占用狀態、天氣快取、AI 使用量與 HydraCup 喝水資料。
+回傳 `AgentState` 的**部分欄位** JSON 快照，包含感測器讀值、占用狀態、天氣快取、AI 使用量、HydraCup 喝水資料與 Bambu 印表機列印進度。
 
 **回應範例：**
 ```json
@@ -172,11 +200,17 @@ GET /state
   "hydra_updated_at": "2026-05-29T09:55:00",
   "hydra_broker_connected": true,
   "hydra_device_online": true,
+  "printer_pct": 0.42,
+  "printer_remaining_min": 83,
+  "printer_task_name": "benchy_v2.3mf",
+  "printer_gcode_state": "RUNNING",
+  "printer_updated_at": "2026-05-29T09:58:00",
+  "printer_broker_connected": true,
   "started_at": "2026-05-29T08:00:00"
 }
 ```
 
-> **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。重置時間欄位：5h 為 `HH:MM` 格式，7d 為 `"Xd Xh"` 剩餘時間字串（API 未回傳時為 `"--:--"`）。`display_page` 值為 `"dashboard"` 或 `"ap_mode"`。
+> **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。重置時間欄位：5h 為 `HH:MM` 格式，7d 為 `"Xd Xh"` 剩餘時間字串（API 未回傳時為 `"--:--"`）。`display_page` 值為 `"dashboard"` 或 `"ap_mode"`。`printer_*` 欄位採逐欄位合併語義，缺少的欄位保留前次已知值，見 [docs/bambu-mqtt-protocol.md](bambu-mqtt-protocol.md)。
 
 ---
 
@@ -445,6 +479,46 @@ Content-Type: application/json
 
 ---
 
+### 更新 Bambu 印表機設定
+
+```
+PUT /settings/printer
+Content-Type: application/json
+
+{
+  "serial": "01P00A000000000"
+}
+```
+
+| 欄位 | 類型 | 範圍 | 說明 |
+|------|------|------|------|
+| `serial` | string | 空字串或 1–32 字元，僅限英數字、`_`、`-` | 印表機序號；留空則使用 `data/bambu_creds.json` 內自動偵測到的序號 |
+
+只能更新 `serial`；帳號 token、uid 需用 `tools/bambu_auth.py` 更新 `data/bambu_creds.json`，此端點不處理。**儲存後會立即讓執行中的 `BambuMQTTService` 用新設定斷線重連**（不需重啟服務）。若即時重連失敗，端點仍回傳 `{"ok": true}`（設定已正確持久化），連線是否成功由 `GET /state` 的 `printer_broker_connected` 反映。
+
+---
+
+### 更新 AI 用量輪詢間隔
+
+```
+PUT /settings/usage
+Content-Type: application/json
+
+{
+  "claude_poll_interval_seconds": 600,
+  "codex_poll_interval_seconds": 600
+}
+```
+
+| 欄位 | 類型 | 範圍 | 說明 |
+|------|------|------|------|
+| `claude_poll_interval_seconds` | int | 60–1800（1–30 分鐘）| Claude 用量輪詢間隔（秒）|
+| `codex_poll_interval_seconds` | int | 60–1800（1–30 分鐘）| Codex 用量輪詢間隔（秒）|
+
+所有欄位均可選，僅更新提供的欄位。不需要重啟服務；但目前正在進行中的等待不會被中斷，新值要等這輪等待結束、進入下一輪輪詢週期才會套用。
+
+---
+
 ### 修改密碼
 
 ```
@@ -654,10 +728,12 @@ PUT carousel 請求體：
 ```json
 {
   "enabled": true,
-  "interval_minutes": 30,
+  "interval_refreshes": 10,
   "mode": "sequential"
 }
 ```
+
+`interval_refreshes` 單位是 dashboard 刷新次數（非分鐘）：每 N 次 dashboard 刷新換一張圖。
 
 `mode` 可為 `"sequential"`（順序）或 `"random"`（隨機）。
 
@@ -773,7 +849,8 @@ GET /api/desk/heatmap?year=2025
 **優先度**：`config.local.yaml` > `config.yaml` > 程式碼預設值
 
 **生效時機**：
-- **立即生效（記憶體更新）**：天氣（含地點）、顯示器、在場偵測、語音、Discord 通知、時區、密碼。下次觸發渲染或排程執行時即採用新值，無需重啟。
+- **立即生效（記憶體更新）**：天氣（含地點）、顯示器、在場偵測、語音、Discord 通知、時區、密碼、AI 用量輪詢間隔。下次觸發渲染或排程執行時即採用新值，無需重啟。
+- **立即生效（斷線重連）**：HydraCup MQTT、Bambu 印表機設定。儲存後立即讓執行中的 MQTT client 用新設定斷線重連，不需重啟服務。
 
 ---
 

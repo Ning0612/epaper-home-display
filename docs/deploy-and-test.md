@@ -105,6 +105,16 @@ ssh pi@epaper-display.local 'cp ~/epaper-home-display/config.example.yaml ~/epap
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m pytest --tb=short'
 ```
 
+### 一鍵完成 sudoers + systemd 安裝與啟用
+
+以上 5 步只完成到「服務可以手動啟動」；要讓 `epaper-home-display.service`／`epaper-wifi-check.service`／`epaper-auto-update.timer` 開機自動啟動，還需要安裝 sudoers 規則與 systemd 單元檔（需要 sudo，Claude 無法透過 SSH 代執行）。`scripts/setup.sh` 是冪等的一鍵腳本，涵蓋這整段手動流程（sudoers、複製全部 4 個 systemd 單元檔、`daemon-reload`、`enable`、啟動所有服務），建議直接在 Pi 終端機執行：
+
+```bash
+bash ~/epaper-home-display/scripts/setup.sh
+```
+
+下方第六節「自動更新機制」與第八節手動安裝步驟為此腳本的手動拆解版本，供腳本失敗時逐步除錯用。`scripts/setup-wifi-manager.sh` 只涵蓋 WiFi 相關 sudoers 與 systemd 單元的子集，功能已被 `setup.sh` 完整涵蓋，一般部署不需要單獨執行它。
+
 ---
 
 ## 四、部署更新到 Pi
@@ -158,8 +168,8 @@ ssh pi@epaper-display.local 'journalctl -t epaper-auto-update -n 50 --no-pager'
 各硬體模組獨立測試，確認硬體接線與驅動正常：
 
 ```bash
-# e-Paper 顯示器
-ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_epaper'
+# e-Paper 顯示器（Waveshare driver 用 gpiozero，Bookworm/Trixie 需帶 GPIOZERO_PIN_FACTORY=lgpio，見 hardware-wiring.md 1-6 節）
+ssh pi@epaper-display.local 'cd ~/epaper-home-display && GPIOZERO_PIN_FACTORY=lgpio .venv/bin/python -m scripts.test_epaper'
 
 # DHT22 溫濕度感測器
 ssh pi@epaper-display.local 'cd ~/epaper-home-display && .venv/bin/python -m scripts.test_dht22'
@@ -185,20 +195,29 @@ Pi 上有 systemd timer 每 5 分鐘自動檢查 `origin/main` 是否有新 comm
 
 ### 首次設定（Pi 首次部署後執行一次）
 
+建議直接執行 `bash ~/epaper-home-display/scripts/setup.sh`（見上方第三節），一次完成 sudoers 規則安裝，以及全部 4 個 systemd 單元檔（`epaper-wifi-check.service`、`epaper-home-display.service`、`epaper-auto-update.service`、`epaper-auto-update.timer`）複製。其中 `epaper-wifi-check.service`、`epaper-home-display.service`、`epaper-auto-update.timer` 會被 `enable`（開機自動啟動）；`epaper-auto-update.service` 是被 timer 觸發的 oneshot 服務，不會、也不需要單獨 enable。以下為手動拆解版本，供腳本失敗時逐步除錯：
+
 ```bash
-# 1. 腳本加執行權限
-ssh pi@epaper-display.local 'chmod +x ~/epaper-home-display/scripts/auto_update.sh'
+# 1. 腳本加執行權限（epaper-wifi-check.service 直接執行 wifi_manager.sh，epaper-auto-update.service 直接執行 auto_update.sh，兩者在 git 中都不是可執行檔，缺此步驟會 Permission denied）
+ssh pi@epaper-display.local 'chmod +x ~/epaper-home-display/scripts/*.sh'
 
-# 2. sudoers：允許 pi 免密重啟服務（在 Pi 上執行）
-# echo "pi ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart epaper-home-display.service" | sudo tee /etc/sudoers.d/epaper-restart && sudo chmod 440 /etc/sudoers.d/epaper-restart
+# 2. sudoers：允許 pi 免密重啟服務（在 Pi 上執行，實際權限規則見 scripts/setup.sh）
+# sudo tee /etc/sudoers.d/epaper-service > /dev/null << 'EOF'
+# pi ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart epaper-home-display.service
+# pi ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart epaper-wifi-check.service
+# EOF
+# sudo chmod 440 /etc/sudoers.d/epaper-service
 
-# 3. 安裝並啟用 timer（在 Pi 上執行）
-# sudo cp ~/epaper-home-display/systemd/epaper-auto-update.service /etc/systemd/system/
-# sudo cp ~/epaper-home-display/systemd/epaper-auto-update.timer /etc/systemd/system/
-# sudo systemctl daemon-reload && sudo systemctl enable --now epaper-auto-update.timer
+# 3. 安裝並啟用主服務、WiFi 檢查服務與自動更新 timer（在 Pi 上執行）
+# sudo cp ~/epaper-home-display/systemd/epaper-wifi-check.service   /etc/systemd/system/
+# sudo cp ~/epaper-home-display/systemd/epaper-home-display.service /etc/systemd/system/
+# sudo cp ~/epaper-home-display/systemd/epaper-auto-update.service  /etc/systemd/system/
+# sudo cp ~/epaper-home-display/systemd/epaper-auto-update.timer    /etc/systemd/system/
+# sudo systemctl daemon-reload
+# sudo systemctl enable --now epaper-wifi-check.service epaper-home-display.service epaper-auto-update.timer
 ```
 
-> Step 2–3 需要 sudo，請在 Pi 終端機直接執行（無法透過 Claude SSH 代執行）。
+> Step 2–3 需要 sudo，請在 Pi 終端機直接執行（無法透過 Claude SSH 代執行）。`epaper-home-display.service` 依賴 `epaper-wifi-check.service`（`After=`/`Wants=`），兩者需一併安裝。
 
 ### 監控
 

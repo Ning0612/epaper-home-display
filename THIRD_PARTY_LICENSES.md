@@ -61,11 +61,13 @@ Installed via `pip install -r requirements.txt`; not bundled in this repository.
 | fastapi | ≥0.115 | MIT | Web framework |
 | uvicorn[standard] | ≥0.30 | BSD-3-Clause | ASGI server |
 | pyyaml | ≥6.0 | MIT | Config parsing |
-| pillow | ≥10.4 | HPND (permissive) | Image rendering |
-| aiohttp | ≥3.9 | Apache-2.0 | Async HTTP client |
+| pillow | ≥10.4 | MIT-CMU（本專案套件中繼資料標示；歷史上常標為 HPND，現行版本已改為 MIT-CMU） | Image rendering |
+| aiohttp | ≥3.9 | Apache-2.0 AND MIT（本專案套件中繼資料標示，dual-component） | Async HTTP client |
 | aiosqlite | ≥0.20 | MIT | Async SQLite |
 | passlib[bcrypt] | ≥1.7.4 | BSD-2-Clause (passlib) + Apache-2.0 (bcrypt) | Password hashing |
 | python-multipart | ≥0.0.9 | Apache-2.0 | File upload parsing |
+| paho-mqtt | ≥2.1 | EPL-2.0 OR BSD-3-Clause（dual-licensed，本專案套件中繼資料標示） | MQTT client (HydraCup + Bambu Lab printer integrations) |
+| tzdata | ≥2024.1（僅 Windows，`platform_system == "Windows"` 條件相依） | Apache-2.0 | Windows 無系統 IANA 時區資料庫，補上供 `zoneinfo` 使用；Pi 用系統內建 tzdata |
 
 ### 3.2 Pi-only Hardware Packages
 
@@ -150,8 +152,12 @@ bundled; their respective terms of service apply independently.
 | Weather Icons (modified) | ✅ `.svg` `.png` | OFL-1.1 | Bundled |
 | Waveshare e-Paper driver | ✅ `.py` | MIT | Bundled |
 | DejaVu fonts | ❌ gitignored | Bitstream Vera | Install separately (`apt`) |
-| fastapi, uvicorn, PyYAML, Pillow … | ❌ pip | MIT / Apache-2.0 / BSD | Install via pip |
+| fastapi, uvicorn, PyYAML … | ❌ pip | MIT / Apache-2.0 / BSD | Install via pip |
+| Pillow | ❌ pip | MIT-CMU | Install via pip |
+| aiohttp | ❌ pip | Apache-2.0 AND MIT | Install via pip |
 | passlib + bcrypt | ❌ pip | BSD-2-Clause + Apache-2.0 | Install via pip |
+| paho-mqtt | ❌ pip | EPL-2.0 OR BSD-3-Clause | Install via pip |
+| tzdata | ❌ pip（僅 Windows，`platform_system == "Windows"`） | Apache-2.0 | Install via pip |
 | espeak-ng | ❌ system | GPL-3.0+ | subprocess — separate process |
 | alsa-utils (aplay / amixer) | ❌ system | GPL-2.0+ | subprocess — separate process |
 | NetworkManager (nmcli) | ❌ system | LGPL-2.1+ | subprocess — separate process |
