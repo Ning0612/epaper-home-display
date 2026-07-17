@@ -365,7 +365,7 @@ function syncHeatmapControls(){
   previous.disabled=heatmapYears.length===0;next.disabled=heatmapYears.length===0;
 }
 function selectHeatmapYear(year){
-  var value=String(year||'');heatmapYear=/^\d{4}$/.test(value)?Number(value):null;syncHeatmapControls();renderHeatmap();
+  var value=String(year||'');heatmapYear=/^\d{4}$/.test(value)?Number(value):null;syncHeatmapControls();drawHeatmap();
 }
 function changeHeatmapYear(direction){
   if(!heatmapYears.length)return;

@@ -76,6 +76,7 @@ def test_desk_template_matches_dashboard_sections_and_canvas_contract():
         'function clockText(epoch)',
         'function heatLevel(seconds,hasData)',
         'delete heatmapCache[Number(currentYear)]',
+        "syncHeatmapControls();drawHeatmap();",
         'setInterval(loadDashboard,30000)',
         'desk-error',
         'aria-label="較早年份"',
@@ -85,6 +86,7 @@ def test_desk_template_matches_dashboard_sections_and_canvas_contract():
     ):
         assert token in _DESK_HTML
     assert 'heatmap-summary' not in _DESK_HTML
+    assert 'syncHeatmapControls();renderHeatmap()' not in _DESK_HTML
 
 
 def _desk_endpoint(router, path):
