@@ -34,6 +34,11 @@ def test_desk_template_uses_unified_analysis_terms_and_footer_timestamp():
     assert "年度在席熱力圖" not in _DESK_HTML
     assert _DESK_HTML.count('id="s-light"') == 1
     assert _DESK_HTML.count('id="s-thresh"') == 1
+    assert '<div class="desk-heading">' in _DESK_HTML
+    assert '<h1 class="page-title">書桌前分析</h1>' in _DESK_HTML
+    assert '.desk-heading .page-title{flex:0 0 auto;margin:0;padding:0;border:0;font-weight:700}' in _DESK_HTML
+    assert 'body[data-page="desk"] .card-title::before' not in _DESK_HTML
+    assert '.card-title::before{counter-increment:card;content:counter(card,decimal-leading-zero)' in _DESK_HTML
     assert "fetch('/api/desk/status')" in _DESK_HTML
     assert "fetch('/api/desk/timeline')" in _DESK_HTML
     assert "fetch('/api/desk/daily')" in _DESK_HTML
@@ -41,16 +46,17 @@ def test_desk_template_uses_unified_analysis_terms_and_footer_timestamp():
 
 def test_desk_template_matches_dashboard_sections_and_canvas_contract():
     sections = (
-        'class="card-title">01 總覽',
-        'class="card-title">02 光線感測器',
-        'class="card-title">03 近 24 小時狀態軸',
-        'class="card-title">04 近 30 天書桌前時間',
-        'class="card-title">05 年度書桌前熱力圖',
-        'class="card-title">06 每日統計',
-        'class="card-title">07 最近時段紀錄',
+        'class="card-title">總覽',
+        'class="card-title">光線感測器',
+        'class="card-title">近 24 小時狀態軸',
+        'class="card-title">近 30 天書桌前時間',
+        'class="card-title">年度書桌前熱力圖',
+        'class="card-title">每日統計',
+        'class="card-title">最近時段紀錄',
     )
     positions = [_DESK_HTML.index(section) for section in sections]
     assert positions == sorted(positions)
+    assert all(f'class="card-title">{index:02d} ' not in _DESK_HTML for index in range(1, 8))
 
     for token in (
         'id="timeline" class="desk-canvas" width="900" height="80"',

@@ -69,7 +69,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .main-content{min-height:calc(100vh - 96px)}
 .page-wrap{max-width:1040px;margin:auto;padding:1.45rem 1rem 3.2rem;counter-reset:card}
 .page-wrap.narrow{max-width:720px}
-.page-title{margin:0 0 1.35rem;padding-bottom:1rem;border-bottom:1px solid var(--line);font-size:clamp(2rem,6vw,4rem);line-height:.92;letter-spacing:-.06em;font-weight:400}
+.page-title{margin:0 0 1.35rem;padding-bottom:1rem;border-bottom:1px solid var(--line);font-size:clamp(2rem,6vw,4rem);line-height:.92;letter-spacing:-.06em;font-weight:700}
 .page-title::before{display:block;margin-bottom:.45rem;color:var(--teal);font:700 .72rem/1 Consolas,monospace;letter-spacing:.14em;text-transform:uppercase}
 body[data-page="desk"] .page-title::before{content:'01 / desk'}
 body[data-page="environment"] .page-title::before{content:'02 / environment'}

@@ -17,6 +17,7 @@ def test_authenticated_pages_share_editorial_shell():
         assert '<header class="topbar">' in html
         assert 'class="page-title"' in html
         assert 'class="page-desc"' in html
+        assert '.page-title{margin:0 0 1.35rem;padding-bottom:1rem;border-bottom:1px solid var(--line);font-size:clamp(2rem,6vw,4rem);line-height:.92;letter-spacing:-.06em;font-weight:700}' in html
         assert 'class="theme-toggle"' in html
         assert 'class="site-footer"' in html
 

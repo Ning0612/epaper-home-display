@@ -5,7 +5,9 @@ _DESK_CONTENT = r"""
 <style>
   :root{--heat-0:#e7e3d6;--heat-1:#c9e1d7;--heat-2:#8fc4b4;--heat-3:#4b9b8e;--heat-4:#0b716a}
   :root[data-theme="dark"]{--heat-0:#24312c;--heat-1:#1e4f47;--heat-2:#1d7568;--heat-3:#1fae9c;--heat-4:#8ad7c5}
-  .page-desc{max-width:640px}
+  .desk-heading{display:flex;align-items:baseline;gap:1.25rem;margin-bottom:1.35rem;padding-bottom:1rem;border-bottom:1px solid var(--line)}
+  .desk-heading .page-title{flex:0 0 auto;margin:0;padding:0;border:0;font-weight:700}
+  .desk-heading .page-desc{flex:1;max-width:none;margin:0;line-height:1.5}
   .desk-error{display:block}
   .desk-error.is-hidden{display:none}
   .desk-summary-grid{margin-bottom:0}
@@ -48,12 +50,15 @@ _DESK_CONTENT = r"""
   .data-date{color:var(--muted);font-size:.72rem}
   .desk-table .empty-row td{text-align:center;color:var(--muted);padding:1rem}
   .desk-tip{position:fixed;pointer-events:none;display:none;z-index:10002;max-width:240px;padding:.45rem .65rem;background:var(--ink-soft);color:var(--on-dark);font:700 .72rem/1.45 Consolas,monospace;border:1px solid var(--mint);box-shadow:5px 5px 0 var(--line)}
+  @media(max-width:640px){.desk-heading{display:block}.desk-heading .page-desc{margin-top:.65rem}}
   @media(max-width:480px){.sensor-readings{align-items:flex-start;flex-direction:column;gap:.25rem}.metric-grid .metric:last-child{grid-column:auto}}
 </style>
 
 <div class="page-wrap">
-  <h1 class="page-title">書桌前分析</h1>
-  <p class="page-desc">以光感測器記錄桌前狀態。資料每 30 秒更新一次，分析最近 24 小時、30 天與 1 年變化。</p>
+  <div class="desk-heading">
+    <h1 class="page-title">書桌前分析</h1>
+    <p class="page-desc">以光感測器記錄桌前狀態。資料每 30 秒更新一次，分析最近 24 小時、30 天與 1 年變化。</p>
+  </div>
 
   <div class="message error desk-error is-hidden" id="desk-error" aria-live="polite"></div>
   <div class="loading-state" id="desk-loading" aria-live="polite" hidden>載入中…</div>
@@ -67,7 +72,7 @@ _DESK_CONTENT = r"""
   </div>
 
   <section class="card">
-    <div class="card-title">01 總覽</div>
+    <div class="card-title">總覽</div>
     <div class="metric-grid">
       <div class="metric" id="state-box"><label>目前狀態</label><span id="s-presence" class="pill">—</span></div>
       <div class="metric"><label>今日累計</label><span id="s-today">—</span></div>
@@ -80,7 +85,7 @@ _DESK_CONTENT = r"""
   </section>
 
   <section class="card">
-    <div class="card-title">02 光線感測器</div>
+    <div class="card-title">光線感測器</div>
     <div class="sensor-meter" role="progressbar" aria-label="目前光線數值" aria-valuemin="0" aria-valuemax="1023" aria-valuenow="0">
       <div class="sensor-fill" id="sensor-fill"></div>
       <span class="threshold-mark" id="threshold-marker" aria-hidden="true"></span>
@@ -90,7 +95,7 @@ _DESK_CONTENT = r"""
   </section>
 
   <section class="card">
-    <div class="card-title">03 近 24 小時狀態軸</div>
+    <div class="card-title">近 24 小時狀態軸</div>
     <div class="legend-row" aria-label="狀態顏色圖例">
       <span><i class="key on"></i>在桌前</span><span><i class="key off"></i>離開</span><span><i class="key unknown"></i>資料不足</span>
     </div>
@@ -98,7 +103,7 @@ _DESK_CONTENT = r"""
   </section>
 
   <section class="card">
-    <div class="card-title">04 近 30 天書桌前時間</div>
+    <div class="card-title">近 30 天書桌前時間</div>
     <div class="summary-grid">
       <div class="metric"><label>平均</label><span id="avg30">—</span></div>
       <div class="metric"><label>最高一天</label><span id="max30">—</span></div>
@@ -108,7 +113,7 @@ _DESK_CONTENT = r"""
   </section>
 
   <section class="card">
-    <div class="card-title">05 年度書桌前熱力圖</div>
+    <div class="card-title">年度書桌前熱力圖</div>
     <div class="pagination heatmap-controls" role="group" aria-label="熱力圖年份切換">
       <button type="button" class="ghost" id="heatmap-prev" aria-label="較早年份">&#8249;</button>
       <span class="heatmap-period" id="heatmap-period" aria-live="polite">最近 365 天</span>
@@ -125,7 +130,7 @@ _DESK_CONTENT = r"""
   </section>
 
   <section class="card">
-    <div class="card-title">06 每日統計</div>
+    <div class="card-title">每日統計</div>
     <div class="table-wrap">
       <table class="desk-table" id="daily-table">
         <thead><tr><th>日期</th><th>書桌前</th><th>比例</th><th>切換次數</th></tr></thead>
@@ -140,7 +145,7 @@ _DESK_CONTENT = r"""
   </section>
 
   <section class="card">
-    <div class="card-title">07 最近時段紀錄</div>
+    <div class="card-title">最近時段紀錄</div>
     <div class="table-wrap">
       <table class="desk-table" id="sessions-table">
         <thead><tr><th>開始</th><th>結束</th><th>持續時間</th></tr></thead>
