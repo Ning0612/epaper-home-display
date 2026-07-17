@@ -67,6 +67,9 @@ def test_desk_template_matches_dashboard_sections_and_canvas_contract():
         'id="heatmap-prev"',
         'id="heatmap-next"',
         'id="heatmap-period"',
+        "renderHeatmapGrid(rows,dateKeyFromDate(start),365,'最近 365 天')",
+        "renderHeatmapGrid(rows,year+'0101',dayCount,year+' 年')",
+        "var days=payload&&payload.days||[],year=Number(payload&&payload.year),dayCount=(new Date(year,1,29,12).getMonth()===1)?366:365",
         'function fitCanvas(canvas)',
         'function dailyChartRows(data,status)',
         'todayKey=dateKeyFromIso(status&&status.current_date)',
@@ -81,6 +84,7 @@ def test_desk_template_matches_dashboard_sections_and_canvas_contract():
         "g.fillText(24-6*i+'h'",
     ):
         assert token in _DESK_HTML
+    assert 'heatmap-summary' not in _DESK_HTML
 
 
 def _desk_endpoint(router, path):

@@ -41,7 +41,6 @@ _DESK_CONTENT = r"""
   .heatmap-legend .key.heat-2{background:var(--heat-2)}
   .heatmap-legend .key.heat-3{background:var(--heat-3)}
   .heatmap-legend .key.heat-4{background:var(--heat-4)}
-  .heatmap-summary{margin:.6rem 0 0}
   .table-wrap{overflow-x:auto;border:1px solid var(--line)}
   .desk-table{width:100%;border-collapse:collapse;background:var(--inset);font:400 .78rem Consolas,monospace}
   .desk-table th,.desk-table td{padding:.62rem .65rem;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
@@ -126,7 +125,6 @@ _DESK_CONTENT = r"""
       </div>
     </div>
     <p class="info desk-info">每個色塊代表一天；顏色越深，當天在桌前的時間越長。灰色代表尚無資料。</p>
-    <p class="field-note heatmap-summary" id="heatmap-summary" aria-live="polite"></p>
   </section>
 
   <section class="card">
@@ -403,7 +401,6 @@ function renderHeatmapGrid(rows,startKey,dayCount,label){
     heatmapCells.push({x:x,y:y,w:cell,h:cell,date:key,total_seconds:seconds,hasData:hasData,status:status});
   }
   canvas.setAttribute('aria-label',label+'每日書桌前時間熱力圖');g.fillStyle=chartColor('--ink');g.fillText(label,left,h-3);
-  document.getElementById('heatmap-summary').textContent=label+'；色階以 24 小時為滿格，資料日 '+heatmapCells.filter(function(item){return item.hasData;}).length+' 天';
   document.getElementById('heatmap-period').textContent=label;
 }
 function drawRecentHeatmap(){
@@ -414,7 +411,7 @@ function drawRecentHeatmap(){
   renderHeatmapGrid(rows,dateKeyFromDate(start),365,'最近 365 天');
 }
 function drawAnnualHeatmap(payload){
-  var days=payload&&payload.days||[],year=Number(payload&&payload.year),dayCount=days.length||((new Date(year,1,29,12).getMonth()===1)?366:365);
+  var days=payload&&payload.days||[],year=Number(payload&&payload.year),dayCount=(new Date(year,1,29,12).getMonth()===1)?366:365;
   var rows=days.map(function(item){return {date:item.date,total_seconds:item.total_seconds,session_count:item.session_count,status:item.status};});
   renderHeatmapGrid(rows,year+'0101',dayCount,year+' 年');
 }
@@ -422,7 +419,7 @@ function drawHeatmap(){
   syncHeatmapControls();
   if(heatmapYear===null){drawRecentHeatmap();return;}
   if(heatmapCache[heatmapYear]){drawAnnualHeatmap(heatmapCache[heatmapYear]);return;}
-  document.getElementById('heatmap-summary').textContent='年度資料載入中…';loadAnnualHeatmap(heatmapYear);
+  loadAnnualHeatmap(heatmapYear);
 }
 async function loadAnnualHeatmap(year){
   var sequence=++heatmapRequestSeq;
@@ -434,7 +431,6 @@ async function loadAnnualHeatmap(year){
     heatmapCache[year]=payload;drawAnnualHeatmap(payload);
   }catch(error){
     if(sequence!==heatmapRequestSeq)return;
-    document.getElementById('heatmap-summary').textContent='年度資料載入失敗，請稍後再試';
     showDeskError('年度熱力圖載入失敗：'+error.message);
   }
 }
@@ -476,7 +472,7 @@ function showHeatmapDay(canvas,index,announce){
   var cell=heatmapCells[index];if(!cell)return;canvas._selectedIndex=index;
   var rect=canvas.getBoundingClientRect(),x=rect.left+cell.x+cell.w/2,y=rect.top+cell.y+cell.h/2;
   var text=cell.status==='future'?dateText(cell.date)+' · 尚未到':dateText(cell.date)+' · '+(cell.hasData?fmtDuration(cell.total_seconds):'尚無資料');
-  if(announce)document.getElementById('heatmap-summary').textContent=text;showTip({clientX:x,clientY:y},text);
+  if(announce)canvas.setAttribute('aria-label',text+'；熱力圖');showTip({clientX:x,clientY:y},text);
 }
 
 function showDeskError(message){var box=document.getElementById('desk-error');box.textContent=message;box.classList.remove('is-hidden');}
