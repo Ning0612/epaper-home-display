@@ -5,9 +5,9 @@ _DESK_CONTENT = r"""
 <style>
   :root{--heat-0:#e7e3d6;--heat-1:#c9e1d7;--heat-2:#8fc4b4;--heat-3:#4b9b8e;--heat-4:#0b716a}
   :root[data-theme="dark"]{--heat-0:#24312c;--heat-1:#1e4f47;--heat-2:#1d7568;--heat-3:#1fae9c;--heat-4:#8ad7c5}
-  .desk-heading{display:flex;align-items:baseline;gap:1.25rem;margin-bottom:1.35rem;padding-bottom:1rem;border-bottom:1px solid var(--line)}
-  .desk-heading .page-title{flex:0 0 auto;margin:0;padding:0;border:0;font-weight:700}
-  .desk-heading .page-desc{flex:1;max-width:none;margin:0;line-height:1.5}
+  .desk-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;margin:.4rem 0 1.25rem}
+  .desk-heading .page-title{flex:0 0 auto;margin:.45rem 0 0;padding:0;border:0;font-weight:700}
+  .desk-heading .page-desc{flex:0 1 30rem;max-width:30rem;margin:0;line-height:1.55}
   .desk-error{display:block}
   .desk-error.is-hidden{display:none}
   .desk-summary-grid{margin-bottom:0}
@@ -50,7 +50,7 @@ _DESK_CONTENT = r"""
   .data-date{color:var(--muted);font-size:.72rem}
   .desk-table .empty-row td{text-align:center;color:var(--muted);padding:1rem}
   .desk-tip{position:fixed;pointer-events:none;display:none;z-index:10002;max-width:240px;padding:.45rem .65rem;background:var(--ink-soft);color:var(--on-dark);font:700 .72rem/1.45 Consolas,monospace;border:1px solid var(--mint);box-shadow:5px 5px 0 var(--line)}
-  @media(max-width:640px){.desk-heading{display:block}.desk-heading .page-desc{margin-top:.65rem}}
+  @media(max-width:720px){.desk-heading{display:block}.desk-heading .page-desc{margin-top:.65rem}}
   @media(max-width:480px){.sensor-readings{align-items:flex-start;flex-direction:column;gap:.25rem}.metric-grid .metric:last-child{grid-column:auto}}
 </style>
 

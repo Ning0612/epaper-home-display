@@ -36,7 +36,9 @@ def test_desk_template_uses_unified_analysis_terms_and_footer_timestamp():
     assert _DESK_HTML.count('id="s-thresh"') == 1
     assert '<div class="desk-heading">' in _DESK_HTML
     assert '<h1 class="page-title">書桌前分析</h1>' in _DESK_HTML
-    assert '.desk-heading .page-title{flex:0 0 auto;margin:0;padding:0;border:0;font-weight:700}' in _DESK_HTML
+    assert '.desk-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;margin:.4rem 0 1.25rem}' in _DESK_HTML
+    assert '.desk-heading .page-title{flex:0 0 auto;margin:.45rem 0 0;padding:0;border:0;font-weight:700}' in _DESK_HTML
+    assert '.desk-heading .page-desc{flex:0 1 30rem;max-width:30rem;margin:0;line-height:1.55}' in _DESK_HTML
     assert 'body[data-page="desk"] .card-title::before' not in _DESK_HTML
     assert '.card-title::before{counter-increment:card;content:counter(card,decimal-leading-zero)' in _DESK_HTML
     assert "fetch('/api/desk/status')" in _DESK_HTML
