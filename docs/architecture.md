@@ -59,7 +59,7 @@ epaper-home-display/
 │   │                            # 注意：硬體面板為七色 ACeP，但驅動的 Orange slot 目前映射至 Black，
 │   │                            # 因此自訂圖片量化只使用六個有效色（黑/白/紅/黃/藍/綠）
 │   ├── logic/
-│   │   ├── presence.py      # 占用偵測（純函數，光線 → OCCUPIED/UNOCCUPIED）
+│   │   ├── presence.py      # 占用偵測與防抖（純邏輯，光線 → OCCUPIED/UNOCCUPIED）
 │   │   ├── desk_session.py  # 桌面工作時段狀態機（純函數）
 │   │   ├── reminder.py      # 天氣提醒生成（純函數，用於 AI 語音提醒）
 │   │   ├── hydration.py     # HydraCup MQTT payload 解析（純函數，parse_status）
@@ -80,7 +80,7 @@ epaper-home-display/
 │   │   └── printer_mqtt.py  # Bambu Lab 印表機雲端 MQTT 訂閱服務（paho-mqtt，見下方「Bambu Lab 印表機 MQTT 資料流」）
 │   ├── loops/               # asyncio 協程（由 main.py 以 gather 並行執行）
 │   │   ├── sensor.py        # 感測器讀取循環（30 秒）
-│   │   ├── presence.py      # 占用計分循環（60 秒）
+│   │   ├── presence.py      # 占用計分循環（60 秒；候選到期時依設定提前醒來）
 │   │   ├── display.py       # 顯示更新循環（牆鐘對齊，觸發秒由 model 推導；epd7in3e 預設 :40，每 5 分鐘）
 │   │   ├── weather.py       # 天氣更新循環（600 秒）
 │   │   ├── claude_usage.py  # Claude 使用量輪詢循環（600 秒，OAuth API 直接拉取）
@@ -171,7 +171,7 @@ presence_return 事件（UNOCCUPIED → OCCUPIED，立即）──────�
 | 協程 | 觸發週期 | 職責 |
 |------|---------|------|
 | `_sensor_loop()` | 每 30 秒 | 讀 DHT22 + 光線感測器，更新 state |
-| `_presence_loop()` | 每 60 秒 | 讀光線狀態 → `compute_presence()` → 桌面時段管理；偵測到回家時立即喚醒 display_queue |
+| `_presence_loop()` | 每 60 秒；候選到期時依設定提前醒來 | 讀光線狀態 → `PresenceDebouncer` → 桌面時段管理；偵測到回家時立即喚醒 display_queue |
 | `_display_loop()` | 牆鐘對齊（N 分鐘邊界，由 `dashboard_interval_minutes` 控制，預設每 5 分鐘）| 監聽 display_queue；無人在場時暫停更新；管理圖片輪播換圖（每 `carousel_interval_refreshes` 次刷新換圖）|
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
 | `_claude_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 Anthropic API 拉取 Claude 5h/7d 使用量；token 過期時自動刷新 |
@@ -194,7 +194,7 @@ presence_return 事件（UNOCCUPIED → OCCUPIED，立即）──────�
 |---------|------|------|
 | 一般更新 | 牆鐘 N 分鐘邊界（僅 OCCUPIED）| 在邊界前 `(60 - trigger_second)` 秒觸發；trigger_second 由 model 推導（epd7in3e→40, epd7in5_V2→57）|
 | 完整更新（`init`）| 每 `full_refresh_every` 次更新 | 驅動有 `init_fast()` 時才有意義；`epd7in3e` 驅動每次均為完整刷新 |
-| 回家立即更新 | 光線變暗（UNOCCUPIED→OCCUPIED）| `_presence_loop` 偵測到後立即觸發 |
+| 回家立即更新 | 亮光（raw < 閾值）持續達 `occupied_after_seconds`（UNOCCUPIED→OCCUPIED）| `_presence_loop` 偵測到後立即觸發 |
 | AP 模式頁面 | 每 30 秒 | 靜態資訊頁，定期刷新時間戳 |
 | 人不在時 | — | `display_loop` 暫停，不做任何更新（wifi_connected 事件可繞過此限制）|
 
@@ -208,21 +208,23 @@ presence_return 事件（UNOCCUPIED → OCCUPIED，立即）──────�
 
 ## 在場偵測邏輯
 
-`app/logic/presence.py` 中的純函數 `compute_presence()`：
+`app/logic/presence.py` 中的純函數 `compute_presence()` 與 `PresenceDebouncer`：
 
 ```
-使用場景：電腦桌/辦公桌前，室內燈讓環境光讀值偏低；白天自然光高表示無人在家
+本電路的 ADC 極性：raw < 閾值是實際亮光，raw >= 閾值是實際暗光
 
-if not light_is_bright:  → OCCUPIED  (score = 1.0)
-else:                    → UNOCCUPIED (score = 0.0)
+if raw < bright_threshold:  → OCCUPIED  (score = 1.0)
+else:                       → UNOCCUPIED (score = 0.0)
 
 光線閾值由 sensors.light.bright_threshold 控制（預設 500 / ADC 0–1023）
+暗光持續 `unoccupied_after_seconds`（預設 180 秒）才切換為 UNOCCUPIED；亮光持續
+`occupied_after_seconds`（預設 30 秒）才切換為 OCCUPIED。候選狀態反轉時重設計時器。
 ```
 
 **顯示行為**：
 - OCCUPIED：正常依 `dashboard_interval_minutes` 週期於觸發秒更新（預設每 5 分鐘）
 - UNOCCUPIED：display_loop 暫停，不刷新面板
-- UNOCCUPIED → OCCUPIED：_presence_loop 立即送 display_queue，面板馬上更新
+- UNOCCUPIED → OCCUPIED：亮光防抖計時完成後，`_presence_loop` 立即送 display_queue，面板馬上更新
 
 ---
 
@@ -248,7 +250,7 @@ else:                    → UNOCCUPIED (score = 0.0)
 | `temperature` | float \| None | DHT22 溫度（°C）|
 | `humidity` | float \| None | DHT22 濕度（%）|
 | `light_raw` | int \| None | 光線感測器原始值（0–1023）|
-| `light_is_bright` | bool | 是否超過亮度閾值 |
+| `light_is_bright` | bool | 既有欄位名稱；`true` 代表 raw 已達閾值（本電路實際暗光） |
 | `presence` | str | "OCCUPIED" / "UNOCCUPIED" / "UNKNOWN" |
 | `presence_score` | float | 占用計分（0.0 或 1.0）|
 | `desk_session_id` | int \| None | 當前桌面工作時段 DB ID |
@@ -390,7 +392,7 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 | `/settings/location` | 更新天氣位置（`lat`, `lon`）|
 | `/settings/weather` | 更新天氣設定 |
 | `/settings/display` | 更新 e-Paper 參數 |
-| `/settings/presence` | 更新光線閾值（`bright_threshold`）|
+| `/settings/presence` | 更新光線閾值與在席防抖持續時間（`bright_threshold`、`unoccupied_after_seconds`、`occupied_after_seconds`）|
 | `/settings/voice` | 更新語音設定 |
 | `/settings/notifications` | 更新 Discord Webhook |
 | `/settings/general` | 更新時區 |

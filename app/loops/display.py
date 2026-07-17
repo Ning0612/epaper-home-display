@@ -173,6 +173,8 @@ async def _display_loop(
         elif state.display_page == "dashboard":
             # Bypass presence gate for the very first render so boot-up always
             # produces a display update regardless of occupancy state.
+            # state.presence is debounced by _presence_loop; raw light readings
+            # must not pause the panel during an unconfirmed transition.
             if state.presence != "OCCUPIED" and event != "wifi_connected" and not startup_pending:
                 continue  # pause dashboard updates while nobody home
             # Advance carousel AFTER the presence gate so the counter only

@@ -108,8 +108,8 @@ display:
 | 模組 | Mock 回傳 |
 |------|---------|
 | `MockDHT22.read()` | `(26.0, 60.0)` — 溫度 26°C，濕度 60% |
-| `MockLightSensor.read_raw()` | `500` — 中等亮度 |
-| `MockLightSensor.is_bright()` | `True` |
+| `MockLightSensor.read_raw()` | `600` — raw ≥ 閾值，本電路實際暗光 |
+| `MockLightSensor.is_bright()` | `True`（legacy 閾值旗標） |
 | `MockButton` | 不觸發任何 GPIO 事件 |
 | `MockEpaper.display()` | 僅記錄一則 log（`display #N full_refresh=...`），不寫入任何檔案 |
 

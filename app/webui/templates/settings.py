@@ -161,13 +161,21 @@ _SETTINGS_CONTENT = r"""
           </div>
         </div>
         <div class="light-scale">
-          <span>0 暗</span><span>1023 亮</span>
+          <span>0 亮</span><span>1023 暗</span>
         </div>
       </div>
       <div class="card">
         <div class="f">
           <label>光線閾值 <span class="hint">（0–1023，ADC 原始值，低於此值判定為在場）</span></label>
           <input type="number" id="p-bright" min="0" max="1023" oninput="updThresh(this.value)">
+        </div>
+        <div class="f">
+          <label>持續暗光多久算離開 <span class="hint">（秒，0–86400；raw &ge; 閾值）</span></label>
+          <input type="number" id="p-unoccupied-after" min="0" max="86400">
+        </div>
+        <div class="f">
+          <label>持續亮光多久恢復在席 <span class="hint">（秒，0–86400；raw &lt; 閾值）</span></label>
+          <input type="number" id="p-occupied-after" min="0" max="86400">
         </div>
         <div class="btn-row"><button class="btn-p" onclick="savePresence()">儲存</button></div>
       </div>
@@ -506,13 +514,13 @@ async function _fetchLight(){
     var dispRaw=Math.min(Math.max(raw,0),1023);
     var inp=document.getElementById('p-bright');
     var thresh=inp.value!==''?+inp.value:500;
-    var bright=typeof d.light_is_bright==='boolean'?d.light_is_bright:dispRaw>=thresh;
+    var dark=typeof d.light_is_bright==='boolean'?d.light_is_bright:dispRaw>=thresh;
     document.getElementById('lp-val').textContent=raw;
     document.getElementById('lp-lux').textContent=(dispRaw*0.098).toFixed(1);
     document.getElementById('lp-bar').style.width=(dispRaw/1023*100).toFixed(2)+'%';
-    document.getElementById('lp-bar').style.background=bright?'var(--muted)':'var(--teal)';
+    document.getElementById('lp-bar').style.background=dark?'var(--muted)':'var(--teal)';
     document.getElementById('lp-thresh-line').style.left=(thresh/1023*100).toFixed(2)+'%';
-    if(!bright){
+    if(!dark){
       dot.className='status-dot on';
       badge.textContent='亮燈（在場）';
       badge.className='status-badge on';
@@ -562,6 +570,8 @@ async function loadCfg(){
     _applyModelVisibility(MODEL_PRESETS[d.model||'epd7in3e']);
     var sl=(c.sensors||{}).light||{};
     document.getElementById('p-bright').value=sl.bright_threshold??500;
+    document.getElementById('p-unoccupied-after').value=sl.unoccupied_after_seconds??180;
+    document.getElementById('p-occupied-after').value=sl.occupied_after_seconds??30;
     var v=c.voice||{};
     document.getElementById('v-en').checked=v.enabled!==false;
     document.getElementById('v-player').value=v.player||'aplay';
@@ -682,7 +692,11 @@ async function saveDisplay(){
 }
 async function savePresence(){
   try{
-    await put('/settings/presence',{bright_threshold:+document.getElementById('p-bright').value});
+    await put('/settings/presence',{
+      bright_threshold:+document.getElementById('p-bright').value,
+      unoccupied_after_seconds:+document.getElementById('p-unoccupied-after').value,
+      occupied_after_seconds:+document.getElementById('p-occupied-after').value
+    });
     toast('✓ 在場偵測已儲存',true);
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }

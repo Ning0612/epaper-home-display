@@ -55,7 +55,9 @@ sensors:
     spi_bus: 0        # SPI bus，固定為 0
     spi_device: 1     # SPI device（CE1），CE0 已被 e-Paper 佔用
     adc_channel: 0    # MCP3008 通道，0–7
-    bright_threshold: 500  # 10-bit 閾值（0–1023），超過此值視為「亮」
+    bright_threshold: 500  # 10-bit 閾值（0–1023）；本電路 raw >= 此值是暗光
+    unoccupied_after_seconds: 180  # 暗光（raw >= 閾值）持續多久算離開
+    occupied_after_seconds: 30     # 亮光（raw < 閾值）持續多久恢復在席
     use_mock: false
 ```
 
@@ -168,24 +170,28 @@ timezone: "Asia/Taipei"   # 用於顯示時間和日誌時間戳
 
 ## 在場偵測
 
-在場偵測邏輯為純光源：環境光低於閾值 → OCCUPIED，高於閾值 → UNOCCUPIED。
-
-適用場景：室內書桌/辦公桌，室內燈光使環境光讀值偏低，無人時白天外部自然光讀值偏高。
+在場偵測使用光敏電路的 ADC 值。此電路的讀值極性與一般直覺相反：
+raw < 閾值是實際亮光（在席），raw >= 閾值是實際暗光（離開）。
 
 光線閾值設定位於 `sensors.light.bright_threshold`（可透過 WebUI 設定頁或直接修改 YAML）：
 
 ```yaml
 sensors:
   light:
-    bright_threshold: 500   # ADC 原始值（0–1023），低於此值視為在場
+    bright_threshold: 500   # ADC 原始值（0–1023）
+    unoccupied_after_seconds: 180  # 暗光（raw >= 閾值）持續 180 秒才算離開
+    occupied_after_seconds: 30     # 亮光（raw < 閾值）持續 30 秒才恢復在席
 ```
 
 | 情境 | 結果 |
 |------|------|
-| 光線讀值 < bright_threshold | OCCUPIED |
-| 光線讀值 ≥ bright_threshold | UNOCCUPIED |
+| 光線讀值 < bright_threshold（實際亮光） | OCCUPIED |
+| 光線讀值 ≥ bright_threshold（實際暗光） | UNOCCUPIED |
 
-**顯示行為**：人不在時 e-Paper 暫停更新；偵測到剛回家（光線變暗）時立即觸發一次更新，後續恢復固定觸發秒節奏。
+狀態切換會防抖：暗光持續 `unoccupied_after_seconds` 才切換為 UNOCCUPIED，亮光持續
+`occupied_after_seconds` 才切換為 OCCUPIED；候選期間維持原本的穩定狀態。預設分別為 180 秒與 30 秒。
+
+**顯示行為**：人不在時 e-Paper 暫停更新；偵測到亮光持續達到在席門檻時立即觸發一次更新，後續恢復固定觸發秒節奏。
 
 ---
 
@@ -358,6 +364,8 @@ sensors:
     spi_device: 1
     adc_channel: 0
     bright_threshold: 500
+    unoccupied_after_seconds: 180
+    occupied_after_seconds: 30
     use_mock: false
   button:
     gpio_pins: [5, 6, 27, 22]  # B1 dashboard；B2–B4 保留接腳，未綁定功能

@@ -10,7 +10,10 @@ class AgentState:
     temperature: float | None = None
     humidity: float | None = None
     light_raw: int | None = None
+    # Legacy field name: True means raw >= threshold, which is actual dark light
+    # for this sensor circuit.
     light_is_bright: bool = False
+    light_state_since: datetime | None = None
 
     presence: Literal["OCCUPIED", "UNOCCUPIED", "UNKNOWN"] = "UNKNOWN"
     presence_score: float = 0.0

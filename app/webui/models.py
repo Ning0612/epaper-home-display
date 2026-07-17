@@ -29,6 +29,8 @@ class _DisplayBody(BaseModel):
 
 class _PresenceBody(BaseModel):
     bright_threshold: int | None = None
+    unoccupied_after_seconds: int | None = None
+    occupied_after_seconds: int | None = None
 
 
 class _VoiceBody(BaseModel):

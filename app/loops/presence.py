@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from app.logic.presence import compute_presence
+from app.logic.presence import PresenceDebouncer
 from app.logic.reminder import generate_reminder
 from app.timezone import configured_now, elapsed_seconds
 from app.services.notification_manager import NotificationManager
@@ -16,11 +16,22 @@ logger = logging.getLogger(__name__)
 async def _presence_loop(
     display_queue: asyncio.Queue, notification_manager: NotificationManager, settings
 ) -> None:
+    debouncer = PresenceDebouncer(state=state.presence)
     while True:
+        sleep_seconds = 60
         try:
-            score, presence = compute_presence(state.light_is_bright)
             now = configured_now(settings.timezone)
             prev_presence = state.presence
+            synced_external_state = debouncer.state != prev_presence
+            if synced_external_state:
+                debouncer.reset(prev_presence)
+            score, presence = debouncer.update(
+                state.light_is_bright if state.light_raw is not None else None,
+                now,
+                observed_since=None if synced_external_state else state.light_state_since,
+                unoccupied_after_seconds=settings.sensors.light.unoccupied_after_seconds,
+                occupied_after_seconds=settings.sensors.light.occupied_after_seconds,
+            )
 
             # Transition OCCUPIED → UNOCCUPIED: end active session
             if prev_presence == "OCCUPIED" and presence != "OCCUPIED":
@@ -61,6 +72,12 @@ async def _presence_loop(
                 state.temperature,
                 state.humidity,
             )
+            remaining = debouncer.seconds_until_transition(
+                now,
+                unoccupied_after_seconds=settings.sensors.light.unoccupied_after_seconds,
+                occupied_after_seconds=settings.sensors.light.occupied_after_seconds,
+            )
+            sleep_seconds = min(60, max(1, remaining)) if remaining is not None else 60
         except Exception as exc:
             logger.error("Presence loop error: %s", exc)
-        await asyncio.sleep(60)
+        await asyncio.sleep(sleep_seconds)

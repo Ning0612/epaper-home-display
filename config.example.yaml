@@ -14,6 +14,8 @@ sensors:
     spi_device: 1          # CE1 (CE0 is occupied by e-Paper display)
     adc_channel: 0
     bright_threshold: 500  # MCP3008 10-bit (0–1023)
+    unoccupied_after_seconds: 180  # 暗光（raw >= 閾值）持續多久算離開
+    occupied_after_seconds: 30     # 亮光（raw < 閾值）持續多久恢復在席
     use_mock: false
   button:
     gpio_pins: [5, 6, 27, 22]  # [B1 dashboard；B2-B4 為硬體保留接腳，目前軟體未綁定功能]

@@ -8,6 +8,9 @@ from app.config import LightConfig
 logger = logging.getLogger(__name__)
 
 _LUX_SCALE = 0.098  # rough lux approximation: raw_value * scale
+# This photoresistor circuit is inverted: raw values at/above the threshold
+# represent actual dark light.  The legacy ``is_bright``/state flag names are
+# retained for compatibility with the existing API.
 
 
 class LightSensor(Protocol):
@@ -20,7 +23,7 @@ class LightSensor(Protocol):
         ...
 
     def is_bright(self, threshold: int) -> bool:
-        """Return True when raw reading is at or above threshold."""
+        """Return the legacy threshold flag (raw reading at or above threshold)."""
         ...
 
 

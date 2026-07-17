@@ -29,7 +29,17 @@ class LightConfig:
     spi_device: int = 1          # CE1; CE0 is reserved for e-Paper display
     adc_channel: int = 0
     bright_threshold: int = 500
+    unoccupied_after_seconds: int = 180
+    occupied_after_seconds: int = 30
     use_mock: bool = False
+
+    def __post_init__(self) -> None:
+        if isinstance(self.bright_threshold, bool) or not isinstance(self.bright_threshold, int) or not (0 <= self.bright_threshold <= 1023):
+            raise ValueError("sensors.light.bright_threshold must be an integer from 0 to 1023")
+        for field_name in ("unoccupied_after_seconds", "occupied_after_seconds"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 86400):
+                raise ValueError(f"sensors.light.{field_name} must be an integer from 0 to 86400")
 
 
 @dataclass

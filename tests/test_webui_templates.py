@@ -36,6 +36,18 @@ def test_pages_use_shared_visual_primitives_for_feedback_and_controls():
     assert "setAttribute('aria-expanded','false')" in _SETTINGS_HTML
 
 
+def test_presence_settings_expose_debounce_durations():
+    assert 'id="p-unoccupied-after"' in _SETTINGS_HTML
+    assert 'id="p-occupied-after"' in _SETTINGS_HTML
+    assert 'sl.unoccupied_after_seconds??180' in _SETTINGS_HTML
+    assert 'sl.occupied_after_seconds??30' in _SETTINGS_HTML
+    assert 'unoccupied_after_seconds:+document.getElementById' in _SETTINGS_HTML
+    assert 'occupied_after_seconds:+document.getElementById' in _SETTINGS_HTML
+    assert '持續暗光多久算離開' in _SETTINGS_HTML
+    assert '持續亮光多久恢復在席' in _SETTINGS_HTML
+    assert '<span>0 亮</span><span>1023 暗</span>' in _SETTINGS_HTML
+
+
 def test_image_workflow_uses_class_based_view_switching():
     assert 'id="view-crop" class="is-hidden"' in _IMAGES_HTML
     assert 'id="view-preview" class="is-hidden"' in _IMAGES_HTML

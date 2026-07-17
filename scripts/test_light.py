@@ -23,8 +23,8 @@ def main() -> None:
             r = spi.xfer2([1, (8 + channel) << 4, 0])
             raw = ((r[1] & 3) << 8) + r[2]
             lux = round(raw * 0.098, 1)
-            bright = raw >= 500
-            print(f"  [{i+1}/5] raw={raw}  ~{lux} lux  bright={bright}")
+            dark = raw >= 500
+            print(f"  [{i+1}/5] raw={raw}  ~{lux} lux  dark={dark}")
             time.sleep(1)
     finally:
         spi.close()

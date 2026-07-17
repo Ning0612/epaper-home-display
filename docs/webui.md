@@ -55,9 +55,12 @@ ssh pi@epaper-display.local
 
 | 欄位 | 說明 |
 |------|------|
-| **光線閾值** | ADC 原始值（0–1023），低於此值視為在場（預設 500）|
+| **光線閾值** | ADC 原始值（0–1023）；本電路低於此值是實際亮光、視為在場（預設 500）|
+| **離開判定持續時間** | 暗光（raw ≥ 閾值）持續多久才判定離開，單位秒（預設 180）|
+| **恢復在席持續時間** | 亮光（raw < 閾值）持續多久才恢復在席，單位秒（預設 30）|
 
-占用偵測邏輯為純光線感測：光線 < 閾值 → OCCUPIED，光線 ≥ 閾值 → UNOCCUPIED。
+占用偵測邏輯為：raw < 閾值（實際亮光）→ OCCUPIED；raw ≥ 閾值（實際暗光）→ UNOCCUPIED。
+狀態切換會套用上述持續時間防抖，候選期間維持原本狀態。
 
 ### 語音設定
 
@@ -178,8 +181,8 @@ GET /state
   "humidity": 61.0,
   "light_raw": 680,
   "light_is_bright": true,
-  "presence": "OCCUPIED",
-  "presence_score": 1.0,
+  "presence": "UNOCCUPIED",
+  "presence_score": 0.0,
   "weather_current": {"main": "Clear", "temp": 28.0},
   "weather_forecast": [...],
   "weather_fetched_at": "2026-05-29T10:00:00",
@@ -209,6 +212,8 @@ GET /state
   "started_at": "2026-05-29T08:00:00"
 }
 ```
+
+`light_is_bright` 是既有 API 欄位名稱；在此硬體電路中 `true` 代表 raw 已達閾值（實際暗光）。
 
 > **注意**：使用量欄位為 `0.0–1.0` 浮點數（例如 42% 儲存為 `0.42`）。重置時間欄位：5h 為 `HH:MM` 格式，7d 為 `"Xd Xh"` 剩餘時間字串（API 未回傳時為 `"--:--"`）。`display_page` 值為 `"dashboard"` 或 `"ap_mode"`。`printer_*` 欄位採逐欄位合併語義，缺少的欄位保留前次已知值，見 [docs/bambu-mqtt-protocol.md](bambu-mqtt-protocol.md)。
 
@@ -279,7 +284,7 @@ GET /settings/config
 {
   "weather": {"api_key_set": true, "lat": 25.05, "lon": 121.53, "units": "metric", "fetch_interval_seconds": 600},
   "display": {"model": "epd7in3e", "dashboard_interval_minutes": 5, "full_refresh_every": 10},
-  "sensors": {"light": {"bright_threshold": 500}, ...},
+  "sensors": {"light": {"bright_threshold": 500, "unoccupied_after_seconds": 180, "occupied_after_seconds": 30}, ...},
   "discord": {"webhook_set": false},
   "mqtt": {"broker_host": "localhost", "broker_port": 1883, "client_id": "epaper-home-display", "username": "epaper-home-display", "password_set": true, "heartbeat_timeout_sec": 180},
   "webui": {"host": "0.0.0.0", "port": 8000},
@@ -406,13 +411,17 @@ PUT /settings/presence
 Content-Type: application/json
 
 {
-  "bright_threshold": 500
+  "bright_threshold": 500,
+  "unoccupied_after_seconds": 180,
+  "occupied_after_seconds": 30
 }
 ```
 
 | 欄位 | 類型 | 範圍 | 說明 |
 |------|------|------|------|
-| `bright_threshold` | int | 0–1023 | 光線 ADC 值低於此值判定為在場 |
+| `bright_threshold` | int | 0–1023 | ADC 值低於此值（實際亮光）判定為在場 |
+| `unoccupied_after_seconds` | int | 0–86400 | ADC 值達到或高於閾值（實際暗光）持續多久判定離開 |
+| `occupied_after_seconds` | int | 0–86400 | ADC 值低於閾值（實際亮光）持續多久恢復在席 |
 
 ---
 

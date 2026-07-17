@@ -235,6 +235,9 @@ def create_settings_router(
         patch = body.model_dump(exclude_none=True)
         if "bright_threshold" in patch and not (0 <= patch["bright_threshold"] <= 1023):
             raise HTTPException(400, detail="bright_threshold must be 0–1023")
+        for key in ("unoccupied_after_seconds", "occupied_after_seconds"):
+            if key in patch and not (0 <= patch[key] <= 86400):
+                raise HTTPException(400, detail=f"{key} must be 0–86400")
         if not patch:
             return {"ok": True}
 
