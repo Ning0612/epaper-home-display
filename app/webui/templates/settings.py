@@ -1,6 +1,7 @@
 from app.webui.templates.base import _make_shell
 
-_SETTINGS_EXTRA_HEAD = ""
+_SETTINGS_EXTRA_HEAD = r"""<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>"""
 
 _SETTINGS_CONTENT = r"""
 <style>
@@ -24,6 +25,8 @@ _SETTINGS_CONTENT = r"""
   .c-sub{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.9rem}
   .c-sub-row{display:flex;align-items:center;justify-content:space-between;gap:.8rem}
   #map{height:300px;border-radius:0;border:1px solid var(--line);margin-top:.4rem}
+  #map .leaflet-control-attribution{font-size:.65rem}
+  .map-status{min-height:1.1em;margin-top:.4rem}
   .coord{display:flex;gap:1rem;margin-top:.6rem;font-size:.83rem;color:var(--muted)}
   .coord b{color:var(--ink)}
   .optional-control{margin-top:.9rem}
@@ -84,12 +87,14 @@ _SETTINGS_CONTENT = r"""
       </div>
       <div class="card">
         <div class="c-sub">地點</div>
-        <p class="field-note">離線模式不載入外部地圖；直接輸入座標即可更新天氣位置。</p>
+        <p class="field-note">點擊地圖或拖曳標記來選取位置；地圖無法載入時仍可直接輸入經緯度。</p>
+        <div id="map" role="region" aria-label="天氣查詢位置地圖"></div>
+        <p id="map-status" class="field-note map-status" role="status"></p>
         <div class="row2">
           <div class="f"><label for="location-lat">緯度</label><input type="number" id="location-lat" min="-90" max="90" step="0.00001" value="__LAT__"></div>
           <div class="f"><label for="location-lon">經度</label><input type="number" id="location-lon" min="-180" max="180" step="0.00001" value="__LON__"></div>
         </div>
-        <div class="coord"><span>目前座標 <b id="v-lat">__LAT__</b> / <b id="v-lon">__LON__</b></span></div>
+        <div class="coord" role="status" aria-live="polite"><span>目前座標 <b id="v-lat">__LAT__</b> / <b id="v-lon">__LON__</b></span></div>
         <div class="btn-row"><button class="btn-p" onclick="saveLocation()">儲存位置</button></div>
       </div>
     </div>
@@ -439,6 +444,8 @@ _SETTINGS_CONTENT = r"""
 
 <script>
 var mapLat=__LAT__, mapLon=__LON__;
+var lmap=null, lmk=null;
+var locationEdited=false;
 var _presTimer=null;
 
 var MODEL_PRESETS={
@@ -471,6 +478,10 @@ function toggle(name){
     item.classList.add('open');
     var activeHead=item.querySelector('.acc-head');
     if(activeHead)activeHead.setAttribute('aria-expanded','true');
+    if(name==='weather'){
+      if(!lmap)initMap();
+      else setTimeout(function(){lmap.invalidateSize();},50);
+    }
     if(name==='wifi') loadWifi();
     if(name==='mqtt') loadMqttStatus();
     if(name==='printer') loadPrinterStatus();
@@ -538,14 +549,48 @@ function toast(msg,ok){
   clearTimeout(t._t); t._t=setTimeout(function(){t.className=''},3000);
 }
 
+function setLocation(lat,lon,moveMap){
+  mapLat=+Number(lat).toFixed(5);mapLon=+Number(lon).toFixed(5);
+  document.getElementById('location-lat').value=mapLat;
+  document.getElementById('location-lon').value=mapLon;
+  document.getElementById('v-lat').textContent=mapLat;
+  document.getElementById('v-lon').textContent=mapLon;
+  if(lmk)lmk.setLatLng([mapLat,mapLon]);
+  if(moveMap&&lmap)lmap.setView([mapLat,mapLon]);
+}
+
+function markLocationEdited(){locationEdited=true;}
+
 function syncLocation(){
-  var lat=+document.getElementById('location-lat').value;
-  var lon=+document.getElementById('location-lon').value;
-  if(Number.isFinite(lat)&&Number.isFinite(lon)){
-    mapLat=+lat.toFixed(5);mapLon=+lon.toFixed(5);
-    document.getElementById('v-lat').textContent=mapLat;
-    document.getElementById('v-lon').textContent=mapLon;
+  var latText=document.getElementById('location-lat').value;
+  var lonText=document.getElementById('location-lon').value;
+  if(latText.trim()===''||lonText.trim()==='')return false;
+  var lat=Number(latText);
+  var lon=Number(lonText);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180)return false;
+  setLocation(lat,lon,true);
+  return true;
+}
+
+function setMapStatus(message){
+  var status=document.getElementById('map-status');
+  if(status)status.textContent=message;
+}
+
+function initMap(){
+  var el=document.getElementById('map');
+  if(lmap||!el)return;
+  if(typeof L==='undefined'){
+    el.innerHTML='<p style="padding:1rem;color:var(--muted);font-size:.85rem">地圖無法載入（需要網路連線），請直接輸入經緯度。</p>';
+    return;
   }
+  lmap=L.map('map').setView([mapLat,mapLon],10);
+  var tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(lmap);
+  tiles.on('tileerror',function(){setMapStatus('地圖圖磚無法載入，請使用下方座標欄位。');});
+  lmk=L.marker([mapLat,mapLon],{draggable:true}).addTo(lmap);
+  lmk.on('dragend',function(e){var ll=e.target.getLatLng();locationEdited=true;setLocation(ll.lat,ll.lng,false);});
+  lmap.on('click',function(e){locationEdited=true;setLocation(e.latlng.lat,e.latlng.lng,false);});
+  setTimeout(function(){lmap.invalidateSize();},0);
 }
 
 async function loadCfg(){
@@ -556,12 +601,8 @@ async function loadCfg(){
     document.getElementById('w-key').placeholder=w.api_key_set?'（已設定，重新輸入以更新）':'輸入 API Key';
     document.getElementById('w-units').value=w.units||'metric';
     document.getElementById('w-interval').value=w.fetch_interval_seconds??600;
-    if(w.lat!=null && w.lon!=null){
-      mapLat=w.lat; mapLon=w.lon;
-      document.getElementById('location-lat').value=mapLat;
-      document.getElementById('location-lon').value=mapLon;
-      document.getElementById('v-lat').textContent=mapLat;
-      document.getElementById('v-lon').textContent=mapLon;
+    if(w.lat!=null && w.lon!=null && !locationEdited){
+      setLocation(w.lat,w.lon,true);
     }
     var d=c.display||{};
     document.getElementById('d-model').value=d.model||'epd7in3e';
@@ -663,7 +704,10 @@ async function put(path,data){
 }
 
 async function saveLocation(){
-  try{syncLocation();await put('/settings/location',{lat:mapLat,lon:mapLon});toast('位置已儲存',true);}
+  try{
+    if(!syncLocation()){toast('請輸入有效的經緯度',false);return;}
+    await put('/settings/location',{lat:mapLat,lon:mapLon});toast('位置已儲存',true);
+  }
   catch(e){toast('儲存失敗：'+e.message,false);}
 }
 async function saveWeather(){
@@ -827,10 +871,14 @@ async function saveAuth(){
   }catch(e){toast('更改失敗：'+e.message,false);}
 }
 
-loadCfg();
 loadMqttStatus();
 loadPrinterStatus();
+document.getElementById('location-lat').addEventListener('input',markLocationEdited);
+document.getElementById('location-lon').addEventListener('input',markLocationEdited);
+document.getElementById('location-lat').addEventListener('change',syncLocation);
+document.getElementById('location-lon').addEventListener('change',syncLocation);
 syncLocation();
+loadCfg().then(initMap);
 </script>
 """
 

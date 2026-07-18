@@ -48,6 +48,22 @@ def test_presence_settings_expose_debounce_durations():
     assert '<span>0 亮</span><span>1023 暗</span>' in _SETTINGS_HTML
 
 
+def test_weather_location_supports_map_picker():
+    assert 'leaflet@1.9.4/dist/leaflet.css' in _SETTINGS_HTML
+    assert 'leaflet@1.9.4/dist/leaflet.js' in _SETTINGS_HTML
+    assert '<div id="map"' in _SETTINGS_HTML
+    assert '點擊地圖或拖曳標記來選取位置' in _SETTINGS_HTML
+    assert 'function initMap()' in _SETTINGS_HTML
+    assert "L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png'" in _SETTINGS_HTML
+    assert "lmk.on('dragend'" in _SETTINGS_HTML
+    assert "lmap.on('click'" in _SETTINGS_HTML
+    assert "document.getElementById('location-lat').value=mapLat" in _SETTINGS_HTML
+    assert "document.getElementById('location-lon').value=mapLon" in _SETTINGS_HTML
+    assert "latText.trim()===''||lonText.trim()===''" in _SETTINGS_HTML
+    assert 'var locationEdited=false' in _SETTINGS_HTML
+    assert 'w.lat!=null && w.lon!=null && !locationEdited' in _SETTINGS_HTML
+
+
 def test_image_workflow_uses_class_based_view_switching():
     assert 'id="view-crop" class="is-hidden"' in _IMAGES_HTML
     assert 'id="view-preview" class="is-hidden"' in _IMAGES_HTML

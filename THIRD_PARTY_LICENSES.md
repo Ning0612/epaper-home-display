@@ -32,7 +32,18 @@ Included as-is to avoid a runtime dependency on a package not published on PyPI.
 
 ---
 
-## 2. Fonts (not bundled — install separately)
+## 2. CDN-loaded WebUI Assets
+
+### 2.1 Leaflet
+
+**Source**: [Leaflet 1.9.4](https://unpkg.com/leaflet@1.9.4/dist/)
+**License**: BSD-2-Clause
+**Usage**: Interactive weather-location map in the WebUI settings page. The
+map uses [OpenStreetMap tiles](https://www.openstreetmap.org/copyright) and
+shows the required attribution in the map control. Direct coordinate input
+remains available when the CDN or tile service is unreachable.
+
+## 3. Fonts (not bundled — install separately)
 
 ### DejaVu Sans / DejaVu Sans Bold
 
@@ -50,7 +61,7 @@ cp /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf assets/fonts/
 
 ---
 
-## 3. Python Runtime Dependencies
+## 4. Python Runtime Dependencies
 
 Installed via `pip install -r requirements.txt`; not bundled in this repository.
 
@@ -89,7 +100,7 @@ Install on Raspberry Pi only (not in `requirements.txt` for laptop dev):
 
 ---
 
-## 4. External Runtime System Tools (not bundled)
+## 5. External Runtime System Tools (not bundled)
 
 All tools below are invoked as **separate OS processes** via `subprocess` or
 `asyncio.create_subprocess_exec()`. No source code is bundled or modified.
@@ -105,7 +116,7 @@ is unaffected by calling these tools.
 > programs, provide or reference the upstream distro source packages.
 > The recommended deployment is to have users install tools via `apt` themselves.
 
-### 4.1 TTS & Audio
+### 5.1 TTS & Audio
 
 | Tool | Package | License | Usage in project |
 |------|---------|---------|-----------------|
@@ -121,7 +132,7 @@ Install on Pi:
 sudo apt install espeak-ng alsa-utils
 ```
 
-### 4.2 WiFi Management
+### 5.2 WiFi Management
 
 | Tool | Package | License | Usage in project |
 |------|---------|---------|-----------------|
@@ -131,7 +142,7 @@ sudo apt install espeak-ng alsa-utils
 
 ---
 
-## 5. External APIs and Data Services
+## 6. External APIs and Data Services
 
 These are remote network services used at runtime. No source code or data is
 bundled; their respective terms of service apply independently.
@@ -151,6 +162,7 @@ bundled; their respective terms of service apply independently.
 |-----------|--------|---------|-------------------|
 | Weather Icons (modified) | ✅ `.svg` `.png` | OFL-1.1 | Bundled |
 | Waveshare e-Paper driver | ✅ `.py` | MIT | Bundled |
+| Leaflet 1.9.4 | ❌ CDN | BSD-2-Clause | WebUI map picker |
 | DejaVu fonts | ❌ gitignored | Bitstream Vera | Install separately (`apt`) |
 | fastapi, uvicorn, PyYAML … | ❌ pip | MIT / Apache-2.0 / BSD | Install via pip |
 | Pillow | ❌ pip | MIT-CMU | Install via pip |
