@@ -678,7 +678,7 @@ file: <binary>
 {"id": "uuid", "orig_w": 3000, "orig_h": 2000}
 ```
 
-### 預覽裁切效果
+### 預覽圖片 Fit 效果
 
 ```
 POST /api/images/preview
@@ -687,9 +687,16 @@ Content-Type: application/json
 {
   "id": "uuid",
   "crop": {"x": 0, "y": 0, "w": 800, "h": 480},
+  "fit": "crop",
   "transform": {"rotate": 0, "flip_x": false, "flip_y": false}
 }
 ```
+
+`fit` 可為：
+
+- `crop`：使用 `crop` 選取區域，填滿 280×448（預設，保持既有行為）。
+- `contain`：完整保留圖片比例，不足處以白色留白；`crop` 僅為相容性欄位，不使用。
+- `stretch`：忽略比例，直接拉伸至 280×448；`crop` 僅為相容性欄位，不使用。
 
 回傳 Floyd-Steinberg dithering 後的 PNG 預覽圖（不寫入 DB）。
 
@@ -701,11 +708,12 @@ Content-Type: application/json
 
 {
   "crop": {"x": 0, "y": 0, "w": 800, "h": 480},
+  "fit": "crop",
   "transform": {"rotate": 0, "flip_x": false, "flip_y": false}
 }
 ```
 
-產生 280×448 display PNG（dashboard 圖片區塊尺寸），寫入 DB 並更新輪播狀態（設為目前顯示圖片）。不會強制觸發 e-Paper 立即刷新，新圖片會在下次排定的 dashboard 渲染時顯示。
+`fit` 的行為與預覽端點相同。產生 280×448 display PNG（dashboard 圖片區塊尺寸），寫入 DB 並更新輪播狀態（設為目前顯示圖片）。不會強制觸發 e-Paper 立即刷新，新圖片會在下次排定的 dashboard 渲染時顯示。
 
 **回應：**
 ```json

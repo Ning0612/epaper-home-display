@@ -1,3 +1,6 @@
+import pytest
+
+from app.webui.models import _ConfirmBody, _CropBody, _PreviewBody
 from app.webui.templates.desk import _DESK_HTML
 from app.webui.templates.environment import _ENV_HTML
 from app.webui.templates.images import _IMAGES_HTML
@@ -82,6 +85,24 @@ def test_image_workflow_uses_class_based_view_switching():
     assert "classList.toggle('is-hidden', v !== name)" in _IMAGES_HTML
     assert 'role="dialog" aria-modal="true"' in _IMAGES_HTML
     assert 'role="button"' in _IMAGES_HTML
+
+
+def test_image_workflow_exposes_fit_modes_to_preview_and_confirm():
+    assert '<select id="fit-mode" onchange="changeFitMode(this.value)">' in _IMAGES_HTML
+    assert '<option value="crop">裁切（填滿畫面）</option>' in _IMAGES_HTML
+    assert '<option value="contain">contain（完整顯示）</option>' in _IMAGES_HTML
+    assert '<option value="stretch">stretch（拉伸填滿）</option>' in _IMAGES_HTML
+    assert 'body: JSON.stringify({ id: uploadId, crop: previewState.crop' in _IMAGES_HTML
+    assert 'body: JSON.stringify({ crop, fit: fitMode' in _IMAGES_HTML
+    assert 'previewState.uploadId !== uploadId || previewState.revision !== editRevision' in _IMAGES_HTML
+
+
+def test_image_api_fit_defaults_to_crop_and_rejects_unknown_modes():
+    crop = _CropBody(x=0, y=0, w=280, h=448)
+    assert _PreviewBody(id="upload", crop=crop).fit == "crop"
+    assert _ConfirmBody(crop=crop, fit="contain").fit == "contain"
+    with pytest.raises(ValueError):
+        _PreviewBody(id="upload", crop=crop, fit="streth")
 
 
 def test_environment_charts_have_accessible_names():

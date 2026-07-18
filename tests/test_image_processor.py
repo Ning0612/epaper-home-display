@@ -151,6 +151,43 @@ class TestMakeDisplayImage:
         finally:
             os.unlink(path)
 
+    def test_contain_preserves_aspect_ratio_with_white_padding(self):
+        path = _make_tmp_image(size=(400, 200), color=(0, 0, 0))
+        try:
+            result = make_display_image(path, fit="contain")
+            assert result.size == (_TARGET_W, _TARGET_H)
+            assert result.getpixel((0, 0)) == (255, 255, 255)
+            assert result.getpixel((_TARGET_W // 2, _TARGET_H // 2)) == (0, 0, 0)
+        finally:
+            os.unlink(path)
+
+    def test_stretch_fills_target_without_padding(self):
+        path = _make_tmp_image(size=(400, 200), color=(0, 0, 0))
+        try:
+            result = make_display_image(path, fit="stretch")
+            assert result.size == (_TARGET_W, _TARGET_H)
+            assert result.getpixel((0, 0)) == (0, 0, 0)
+        finally:
+            os.unlink(path)
+
+    def test_contain_rotates_before_calculating_padding(self):
+        path = _make_tmp_image(size=(400, 200), color=(0, 0, 0))
+        try:
+            result = make_display_image(path, transform={"rotate": 90}, fit="contain")
+            assert result.size == (_TARGET_W, _TARGET_H)
+            assert result.getpixel((0, _TARGET_H // 2)) == (255, 255, 255)
+            assert result.getpixel((_TARGET_W // 2, _TARGET_H // 2)) == (0, 0, 0)
+        finally:
+            os.unlink(path)
+
+    def test_invalid_fit_raises(self):
+        path = _make_tmp_image()
+        try:
+            with pytest.raises(ValueError, match="fit must be"):
+                make_display_image(path, fit="streth")
+        finally:
+            os.unlink(path)
+
 
 class TestTransform:
     def test_rotate_90_returns_correct_size(self):
@@ -271,6 +308,15 @@ class TestMakePreviewBytes:
         try:
             data = make_preview_bytes(path, crop={"x": 50, "y": 50, "w": 300, "h": 480})
             assert len(data) > 0
+        finally:
+            os.unlink(path)
+
+    def test_with_contain_fit(self):
+        path = _make_tmp_image(size=(400, 200))
+        try:
+            data = make_preview_bytes(path, fit="contain")
+            img = Image.open(io.BytesIO(data))
+            assert img.size == (_TARGET_W, _TARGET_H)
         finally:
             os.unlink(path)
 

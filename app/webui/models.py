@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
@@ -106,11 +107,13 @@ class _PreviewBody(BaseModel):
     id: str
     crop: _CropBody
     transform: _TransformBody = _TransformBody()
+    fit: Literal["crop", "contain", "stretch"] = "crop"
 
 
 class _ConfirmBody(BaseModel):
     crop: _CropBody
     transform: _TransformBody = _TransformBody()
+    fit: Literal["crop", "contain", "stretch"] = "crop"
 
 
 class _CarouselBody(BaseModel):

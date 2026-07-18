@@ -161,7 +161,9 @@ def create_images_router(
         try:
             from app.display.image_processor import make_preview_bytes
             panel_type = "bw" if settings.display.model == "epd7in5_V2" else "color"
-            png_bytes = await asyncio.to_thread(make_preview_bytes, src, crop, tf, panel_type)
+            png_bytes = await asyncio.to_thread(
+                make_preview_bytes, src, crop, tf, panel_type, body.fit
+            )
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except Exception as exc:
@@ -196,7 +198,7 @@ def create_images_router(
         # Generate dithered display PNG in a thread
         try:
             from app.display.image_processor import make_display_image
-            result_img = await asyncio.to_thread(make_display_image, src, crop, tf)
+            result_img = await asyncio.to_thread(make_display_image, src, crop, tf, body.fit)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except Exception as exc:

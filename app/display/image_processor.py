@@ -46,6 +46,7 @@ def quantize_to_bw_palette(img: Image.Image) -> Image.Image:
     return img.convert("RGB").quantize(palette=pal).convert("RGB")
 
 _ALLOWED_FORMATS = frozenset({"JPEG", "PNG", "WEBP", "GIF", "BMP", "TIFF"})
+_FIT_MODES = frozenset({"crop", "contain", "stretch"})
 _UPLOAD_CHUNK = 65_536  # 64 KB
 
 
@@ -53,10 +54,15 @@ def make_display_image(
     source_path: str,
     crop: dict | None = None,
     transform: dict | None = None,
+    fit: str = "crop",
 ) -> Image.Image:
-    """Load image, apply transforms + crop, then resize to 280×448 RGB.
+    """Load image, apply transforms and fit it into a 280×448 RGB image.
 
     Transform canonical order: flipX → flipY → rotate CW (must match canvas render order).
+    ``crop`` is used only for ``fit="crop"``. ``contain`` preserves the transformed
+    image's aspect ratio and pads with white; ``stretch`` resizes directly to the
+    target dimensions. A missing crop in crop mode keeps the legacy full-image resize
+    behavior for direct callers.
     The driver's getbuffer() handles six-color palette quantization internally.
 
     Returns:
@@ -64,8 +70,11 @@ def make_display_image(
 
     Raises:
         OSError: File cannot be opened or is not a valid image.
-        ValueError: Crop region is invalid or format is not allowed.
+        ValueError: Crop region, fit mode, or format is invalid.
     """
+    if not isinstance(fit, str) or fit not in _FIT_MODES:
+        raise ValueError("fit must be 'crop', 'contain', or 'stretch'")
+
     with Image.open(source_path) as img:
         img.load()
 
@@ -86,7 +95,7 @@ def make_display_image(
             elif rot == 270:
                 img = img.transpose(Image.Transpose.ROTATE_90)    # 270 CW = 90 CCW
 
-        if crop is not None:
+        if fit == "crop" and crop is not None:
             try:
                 x, y, w, h = (int(crop[k]) for k in ("x", "y", "w", "h"))
             except OverflowError as exc:
@@ -112,8 +121,15 @@ def make_display_image(
                 img = canvas
 
         img = img.convert("RGB")
-        img = img.resize((_TARGET_W, _TARGET_H), Image.Resampling.LANCZOS)
-        return img
+        if fit == "contain":
+            scale = min(_TARGET_W / img.width, _TARGET_H / img.height)
+            size = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
+            fitted = img.resize(size, Image.Resampling.LANCZOS)
+            canvas = Image.new("RGB", (_TARGET_W, _TARGET_H), (255, 255, 255))
+            canvas.paste(fitted, ((_TARGET_W - size[0]) // 2, (_TARGET_H - size[1]) // 2))
+            return canvas
+
+        return img.resize((_TARGET_W, _TARGET_H), Image.Resampling.LANCZOS)
 
 
 def make_preview_bytes(
@@ -121,13 +137,14 @@ def make_preview_bytes(
     crop: dict | None = None,
     transform: dict | None = None,
     panel_type: str = "color",
+    fit: str = "crop",
 ) -> bytes:
     """Return dithered display image as PNG bytes for HTTP preview response.
 
     panel_type="color": 6-color e-paper palette (epd7in3e)
     panel_type="bw":    black-and-white palette (epd7in5_V2)
     """
-    result = make_display_image(source_path, crop, transform)
+    result = make_display_image(source_path, crop, transform, fit)
     result = quantize_to_bw_palette(result) if panel_type == "bw" else quantize_to_epaper_palette(result)
     buf = io.BytesIO()
     result.save(buf, format="PNG")

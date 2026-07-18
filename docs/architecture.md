@@ -55,7 +55,7 @@ epaper-home-display/
 │   │   ├── renderer_apmode.py  # WiFi AP 熱點引導頁面渲染
 │   │   ├── renderer_constants.py  # 解析度、顏色（RGB）、版面常數
 │   │   ├── renderer_utils.py    # 天氣圖示、進度條等工具函數
-│   │   └── image_processor.py  # 圖片裁切、旋轉/翻轉、Floyd-Steinberg dithering（六色量化）
+│   │   └── image_processor.py  # 圖片 Fit、旋轉/翻轉、Floyd-Steinberg dithering（六色量化）
 │   │                            # 注意：硬體面板為七色 ACeP，但驅動的 Orange slot 目前映射至 Black，
 │   │                            # 因此自訂圖片量化只使用六個有效色（黑/白/紅/黃/藍/綠）
 │   ├── logic/
@@ -108,7 +108,7 @@ epaper-home-display/
 │           ├── wifi.py      # AP 熱點入口（首次設定公開；已設定裝置需 session + CSRF）
 │           ├── desk.py      # 桌面工作時段 REST API
 │           ├── environment.py  # 環境溫濕度分析（/environment、/api/env/*）
-│           └── images.py    # 圖片上傳/裁切/確認/輪播管理
+│           └── images.py    # 圖片上傳/Fit/確認/輪播管理
 ├── tests/                   # pytest 單元測試（mock 硬體）
 ├── scripts/                 # Pi 硬體獨立測試腳本
 ├── lib/waveshare_epd/       # Waveshare 驅動（已內建：epdconfig.py + epd7in3e.py + epd7in5_V2.py）
@@ -410,8 +410,8 @@ FastAPI 服務執行於埠 `8000`，完整 API 說明見 [docs/webui.md](webui.m
 |------|------|------|
 | GET | `/api/images` | 列出所有已確認圖片 |
 | POST | `/api/images/upload` | 上傳圖片（返回 id 與原始尺寸）|
-| POST | `/api/images/preview` | 產生裁切+dithering 預覽（返回 PNG）|
-| POST | `/api/images/{id}/confirm` | 確認裁切設定，生成 display PNG 並更新輪播 |
+| POST | `/api/images/preview` | 依 crop / contain / stretch 產生 dithering 預覽（返回 PNG）|
+| POST | `/api/images/{id}/confirm` | 確認圖片 Fit 設定，生成 display PNG 並更新輪播 |
 | DELETE | `/api/images/{id}` | 刪除圖片 |
 | GET | `/api/images/file/{id}` | 提供 display PNG 檔案 |
 | GET | `/api/images/original/{id}` | 提供原始上傳檔案 |

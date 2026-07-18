@@ -21,6 +21,10 @@ _IMAGES_CONTENT = r"""
   .drop-zone-note{font-size:.73rem;color:var(--muted)}
   .carousel-fields{margin-top:.8rem}
   .crop-title-note{color:var(--muted);font-size:.75rem;font-weight:400;letter-spacing:0;text-transform:none}
+  .fit-control{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin:0 0 1rem;padding:.7rem .8rem;background:var(--surface-2);border-left:3px solid var(--teal)}
+  .fit-control label{font-size:.78rem;font-weight:700;color:var(--ink);white-space:nowrap}
+  .fit-control select{width:auto;min-width:11rem}
+  .fit-note{font-size:.74rem;color:var(--muted);flex:1 1 15rem}
   .crop-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
   #crop-canvas{max-width:100%;cursor:crosshair;border-radius:0;display:block;touch-action:none}
   .crop-hint{font-size:.78rem;color:var(--muted);text-align:center}
@@ -89,17 +93,26 @@ _IMAGES_CONTENT = r"""
 
   <div id="view-crop" class="is-hidden">
     <div class="card">
-      <div class="card-title">裁切圖片 <span class="crop-title-note">— 拖曳選框定位，拖曳角點調整大小（固定 5:8 比例）</span></div>
+      <div class="card-title">套用圖片 <span class="crop-title-note">— 選擇圖片 Fit 方式與方向</span></div>
+      <div class="fit-control">
+        <label for="fit-mode">Fit 方式</label>
+        <select id="fit-mode" onchange="changeFitMode(this.value)">
+          <option value="crop">裁切（填滿畫面）</option>
+          <option value="contain">contain（完整顯示）</option>
+          <option value="stretch">stretch（拉伸填滿）</option>
+        </select>
+        <span id="fit-note" class="fit-note">拖曳選框定位，固定 5:8 比例；超出部分以白色填補。</span>
+      </div>
       <div class="crop-wrap">
         <canvas id="crop-canvas"></canvas>
-        <div class="crop-hint">選框比例鎖定為電子紙圖片卡尺寸（280×448）；可拖曳至圖片外側白邊，超出部分顯示為白色</div>
+        <div id="crop-hint" class="crop-hint">選框比例鎖定為電子紙圖片卡尺寸（280×448）；可拖曳至圖片外側白邊，超出部分顯示為白色</div>
       </div>
       <div class="transform-bar">
         <button class="btn-tf" onclick="doRotate(-90)" title="逆時鐘旋轉 90°">↺ 逆時鐘</button>
         <button class="btn-tf" onclick="doRotate(90)"  title="順時鐘旋轉 90°">↻ 順時鐘</button>
         <button class="btn-tf" onclick="doFlip('x')"   title="水平鏡像（左右翻轉）">↔ 鏡像 X</button>
         <button class="btn-tf" onclick="doFlip('y')"   title="垂直鏡像（上下翻轉）">↕ 鏡像 Y</button>
-        <button class="btn-tf" onclick="centerCrop()"  title="將裁切框置中於畫布">⊡ 置中</button>
+        <button id="btn-center-crop" class="btn-tf" onclick="centerCrop()"  title="將裁切框置中於畫布">⊡ 置中</button>
       </div>
       <div class="btn-row">
         <button class="btn-s" onclick="cancelCrop()">取消</button>
@@ -113,7 +126,7 @@ _IMAGES_CONTENT = r"""
       <div class="card-title">確認效果</div>
       <div class="preview-grid">
         <div class="preview-panel">
-          <div class="preview-label">裁切預覽</div>
+          <div id="crop-mini-label" class="preview-label">裁切預覽</div>
           <canvas id="crop-mini"></canvas>
         </div>
         <div class="preview-panel">
@@ -146,6 +159,8 @@ let cropRect = null;
 let drag = null;
 let srcImg = null;
 let transform = {rotate: 0, flipX: false, flipY: false};
+let fitMode = 'crop';
+let editRevision = 0;
 const CROP_RATIO = 280 / 448;
 const HANDLE_R = 10;
 const MIN_CROP_W = 40;
@@ -241,13 +256,47 @@ function initCropView(imgUrl, origW, origH) {
   const img = new Image();
   img.onload = () => {
     transform = {rotate: 0, flipX: false, flipY: false};
+    fitMode = 'crop';
+    editRevision = 0;
+    document.getElementById('fit-mode').value = fitMode;
     srcImg = img;
     reinitCanvas();
+    updateFitUI();
     drawCropUI();
     attachCropEvents(canvas);
   };
   img.onerror = () => toast('圖片載入失敗', 'err');
   img.src = imgUrl;
+}
+
+function changeFitMode(mode) {
+  if (!['crop', 'contain', 'stretch'].includes(mode)) mode = 'crop';
+  if (fitMode !== mode) editRevision++;
+  fitMode = mode;
+  updateFitUI();
+}
+
+function updateFitUI() {
+  const isCrop = fitMode === 'crop';
+  const note = document.getElementById('fit-note');
+  const hint = document.getElementById('crop-hint');
+  const center = document.getElementById('btn-center-crop');
+  const label = document.getElementById('crop-mini-label');
+  if (note) note.textContent = isCrop
+    ? '拖曳選框定位，固定 5:8 比例；超出部分以白色填補。'
+    : fitMode === 'contain'
+      ? '完整保留圖片比例，畫面不足處以白色留白。'
+      : '直接拉伸圖片填滿 280×448，可能改變圖片比例。';
+  if (hint) hint.textContent = isCrop
+    ? '選框比例鎖定為電子紙圖片卡尺寸（280×448）；可拖曳至圖片外側白邊，超出部分顯示為白色'
+    : '目前不使用裁切選框；旋轉與鏡像設定仍會套用。請按預覽確認實際效果。';
+  if (center) center.disabled = !isCrop;
+  if (label) label.textContent = isCrop
+    ? '裁切預覽'
+    : fitMode === 'contain' ? 'contain 預覽（含白邊）' : 'stretch 預覽';
+  const canvas = document.getElementById('crop-canvas');
+  if (canvas) canvas.style.cursor = isCrop ? 'crosshair' : 'default';
+  if (srcImg && cropRect) drawCropUI();
 }
 
 function reinitCanvas() {
@@ -304,6 +353,7 @@ function drawCropUI() {
      srcImg.naturalWidth  * canvasScale,
      srcImg.naturalHeight * canvasScale);
   ctx.restore();
+  if (fitMode !== 'crop') return;
   const lineColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
   const tealColor = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim();
   const overlayColor = getComputedStyle(document.documentElement).getPropertyValue('--crop-overlay').trim();
@@ -342,6 +392,7 @@ function redrawCrop() {
 
 function doRotate(deg) {
   transform.rotate = ((transform.rotate + deg) % 360 + 360) % 360;
+  editRevision++;
   reinitCanvas();
   drawCropUI();
 }
@@ -349,23 +400,25 @@ function doRotate(deg) {
 function doFlip(axis) {
   if (axis === 'x') transform.flipX = !transform.flipX;
   else              transform.flipY = !transform.flipY;
+  editRevision++;
   drawCropUI();
 }
 
 function centerCrop() {
   const canvas = document.getElementById('crop-canvas');
-  if (!cropRect) return;
+  if (fitMode !== 'crop' || !cropRect) return;
   cropRect = {
     x: Math.round((canvas.width  - cropRect.w) / 2),
     y: Math.round((canvas.height - cropRect.h) / 2),
     w: cropRect.w,
     h: cropRect.h
   };
+  editRevision++;
   drawCropUI();
 }
 
 function hitTest(pos) {
-  if (!cropRect) return null;
+  if (fitMode !== 'crop' || !cropRect) return null;
   const {x, y, w, h} = cropRect;
   const corners = {nw:[x,y], ne:[x+w,y], sw:[x,y+h], se:[x+w,y+h]};
   for (const [name, [hx,hy]] of Object.entries(corners)) {
@@ -386,6 +439,7 @@ function attachCropEvents(canvas) {
     const hit = hitTest(pos);
     if (hit) {
       drag = { type: hit, startX: pos.x, startY: pos.y, origCrop: {...cropRect} };
+      editRevision++;
       canvas.setPointerCapture(e.pointerId);
       e.preventDefault();
     }
@@ -445,61 +499,118 @@ function getOrigCrop() {
   };
 }
 
+function getRequestCrop() {
+  if (fitMode === 'crop') return getOrigCrop();
+  const isRotated90 = (transform.rotate % 180 !== 0);
+  return {
+    x: 0,
+    y: 0,
+    w: isRotated90 ? srcImg.naturalHeight : srcImg.naturalWidth,
+    h: isRotated90 ? srcImg.naturalWidth : srcImg.naturalHeight
+  };
+}
+
+function drawTransformedInBox(ctx, boxW, boxH, mode, tf = transform) {
+  const rotated90 = tf.rotate % 180 !== 0;
+  const sourceW = srcImg.naturalWidth;
+  const sourceH = srcImg.naturalHeight;
+  let drawW, drawH;
+  if (mode === 'stretch') {
+    drawW = rotated90 ? boxH : boxW;
+    drawH = rotated90 ? boxW : boxH;
+  } else {
+    const targetW = rotated90 ? sourceH : sourceW;
+    const targetH = rotated90 ? sourceW : sourceH;
+    const scale = Math.min(boxW / targetW, boxH / targetH);
+    drawW = sourceW * scale;
+    drawH = sourceH * scale;
+  }
+  ctx.save();
+  ctx.translate(boxW / 2, boxH / 2);
+  ctx.rotate(tf.rotate * Math.PI / 180);
+  if (tf.flipY) ctx.scale(1, -1);
+  if (tf.flipX) ctx.scale(-1, 1);
+  ctx.drawImage(srcImg, -drawW / 2, -drawH / 2, drawW, drawH);
+  ctx.restore();
+}
+
 async function requestPreview() {
   if (!uploadId || !cropRect) return;
   toast('生成 dithering 預覽中…', 'info');
-  const crop = getOrigCrop();
+  const canvas = document.getElementById('crop-canvas');
+  const previewState = {
+    uploadId,
+    revision: editRevision,
+    fit: fitMode,
+    transform: {...transform},
+    crop: getRequestCrop(),
+    cropRect: {...cropRect},
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
+    imgOffsetX,
+    imgOffsetY,
+    canvasScale
+  };
   let blob;
   try {
     const r = await fetch('/api/images/preview', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ id: uploadId, crop, transform: {rotate: transform.rotate, flip_x: transform.flipX, flip_y: transform.flipY} })
+      body: JSON.stringify({ id: uploadId, crop: previewState.crop, fit: previewState.fit, transform: {rotate: previewState.transform.rotate, flip_x: previewState.transform.flipX, flip_y: previewState.transform.flipY} })
     });
     if (!r.ok) { const e2 = await r.json().catch(()=>({})); toast(e2.detail || '預覽失敗', 'err'); return; }
     blob = await r.blob();
   } catch (e) { toast('網路錯誤', 'err'); return; }
+  if (previewState.uploadId !== uploadId || previewState.revision !== editRevision) {
+    toast('圖片設定已變更，請重新預覽', 'info');
+    return;
+  }
   const url = URL.createObjectURL(blob);
   document.getElementById('dither-preview').src = url;
-  const canvas = document.getElementById('crop-canvas');
-  const imgPxWc = Math.round(canvas.width / EXPAND);
-  const imgPxHc = Math.round(canvas.height / EXPAND);
   const mini = document.getElementById('crop-mini');
   mini.width = 140;
   mini.height = Math.round(140 / CROP_RATIO);
   const mctx = mini.getContext('2d');
   mctx.fillStyle = '#ffffff';
   mctx.fillRect(0, 0, mini.width, mini.height);
-  const {x: cx, y: cy, w: cw} = cropRect;
-  const scaleM = mini.width / cw;
-  const miniCx = (imgOffsetX + imgPxWc / 2 - cx) * scaleM;
-  const miniCy = (imgOffsetY + imgPxHc / 2 - cy) * scaleM;
-  mctx.save();
-  mctx.translate(miniCx, miniCy);
-  mctx.rotate(transform.rotate * Math.PI / 180);
-  if (transform.flipY) mctx.scale( 1, -1);
-  if (transform.flipX) mctx.scale(-1,  1);
-  const sw = srcImg.naturalWidth  * canvasScale * scaleM;
-  const sh = srcImg.naturalHeight * canvasScale * scaleM;
-  mctx.drawImage(srcImg, -sw / 2, -sh / 2, sw, sh);
-  mctx.restore();
+  if (previewState.fit === 'crop') {
+    const imgPxWc = Math.round(previewState.canvasWidth / EXPAND);
+    const imgPxHc = Math.round(previewState.canvasHeight / EXPAND);
+    const {x: cx, y: cy, w: cw} = previewState.cropRect;
+    const scaleM = mini.width / cw;
+    const miniCx = (previewState.imgOffsetX + imgPxWc / 2 - cx) * scaleM;
+    const miniCy = (previewState.imgOffsetY + imgPxHc / 2 - cy) * scaleM;
+    mctx.save();
+    mctx.translate(miniCx, miniCy);
+    mctx.rotate(previewState.transform.rotate * Math.PI / 180);
+    if (previewState.transform.flipY) mctx.scale( 1, -1);
+    if (previewState.transform.flipX) mctx.scale(-1,  1);
+    const sw = srcImg.naturalWidth  * previewState.canvasScale * scaleM;
+    const sh = srcImg.naturalHeight * previewState.canvasScale * scaleM;
+    mctx.drawImage(srcImg, -sw / 2, -sh / 2, sw, sh);
+    mctx.restore();
+  } else {
+    drawTransformedInBox(mctx, mini.width, mini.height, previewState.fit, previewState.transform);
+  }
   showView('preview');
 }
 
 async function confirmSave() {
   if (!uploadId || !cropRect) return;
   toast('儲存並套用中…', 'info');
-  const crop = getOrigCrop();
+  const crop = getRequestCrop();
   try {
     const r = await fetch('/api/images/' + uploadId + '/confirm', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ crop, transform: {rotate: transform.rotate, flip_x: transform.flipX, flip_y: transform.flipY} })
+      body: JSON.stringify({ crop, fit: fitMode, transform: {rotate: transform.rotate, flip_x: transform.flipX, flip_y: transform.flipY} })
     });
     if (!r.ok) { const e2 = await r.json().catch(()=>({})); toast(e2.detail || '儲存失敗', 'err'); return; }
   } catch (e) { toast('網路錯誤', 'err'); return; }
   toast('已儲存，已套用到電子紙', 'ok');
   transform = {rotate: 0, flipX: false, flipY: false};
+  fitMode = 'crop';
+  editRevision++;
   uploadId = null; srcImg = null; cropRect = null;
   showView('gallery');
   loadGallery();
@@ -511,6 +622,8 @@ async function cancelCrop() {
     uploadId = null;
   }
   transform = {rotate: 0, flipX: false, flipY: false};
+  fitMode = 'crop';
+  editRevision++;
   srcImg = null; cropRect = null;
   showView('gallery');
 }
