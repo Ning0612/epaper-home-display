@@ -384,8 +384,45 @@ _SETTINGS_CONTENT = r"""
     <div class="acc-body" id="acc-body-general">
       <div class="card">
         <div class="f">
-          <label>時區 <span class="hint">（例：Asia/Taipei）</span></label>
-          <input type="text" id="g-tz" placeholder="Asia/Taipei">
+          <label for="g-tz">時區</label>
+          <select id="g-tz" aria-describedby="g-tz-note" disabled>
+            <option value="" selected>載入時區設定中…</option>
+            <option value="UTC">UTC±00:00 · 協調世界時（UTC）</option>
+            <optgroup label="美洲 / Americas">
+              <option value="Pacific/Honolulu">UTC−10:00 · 檀香山（Pacific/Honolulu）</option>
+              <option value="America/Los_Angeles">UTC−08:00 / −07:00 · 洛杉磯（America/Los_Angeles）</option>
+              <option value="America/Denver">UTC−07:00 / −06:00 · 丹佛（America/Denver）</option>
+              <option value="America/Chicago">UTC−06:00 / −05:00 · 芝加哥（America/Chicago）</option>
+              <option value="America/New_York">UTC−05:00 / −04:00 · 紐約（America/New_York）</option>
+              <option value="America/Toronto">UTC−05:00 / −04:00 · 多倫多（America/Toronto）</option>
+              <option value="America/Sao_Paulo">UTC−03:00 · 聖保羅（America/Sao_Paulo）</option>
+            </optgroup>
+            <optgroup label="歐洲與非洲 / Europe & Africa">
+              <option value="Europe/London">UTC±00:00 / +01:00 · 倫敦（Europe/London）</option>
+              <option value="Europe/Paris">UTC+01:00 / +02:00 · 巴黎（Europe/Paris）</option>
+              <option value="Europe/Berlin">UTC+01:00 / +02:00 · 柏林（Europe/Berlin）</option>
+              <option value="Europe/Moscow">UTC+03:00 · 莫斯科（Europe/Moscow）</option>
+              <option value="Africa/Cairo">UTC+02:00 / +03:00 · 開羅（Africa/Cairo）</option>
+              <option value="Africa/Johannesburg">UTC+02:00 · 約翰尼斯堡（Africa/Johannesburg）</option>
+            </optgroup>
+            <optgroup label="亞洲 / Asia">
+              <option value="Asia/Dubai">UTC+04:00 · 杜拜（Asia/Dubai）</option>
+              <option value="Asia/Kolkata">UTC+05:30 · 加爾各答（Asia/Kolkata）</option>
+              <option value="Asia/Bangkok">UTC+07:00 · 曼谷（Asia/Bangkok）</option>
+              <option value="Asia/Singapore">UTC+08:00 · 新加坡（Asia/Singapore）</option>
+              <option value="Asia/Taipei">UTC+08:00 · 台北（Asia/Taipei）</option>
+              <option value="Asia/Shanghai">UTC+08:00 · 上海（Asia/Shanghai）</option>
+              <option value="Asia/Hong_Kong">UTC+08:00 · 香港（Asia/Hong_Kong）</option>
+              <option value="Asia/Tokyo">UTC+09:00 · 東京（Asia/Tokyo）</option>
+              <option value="Asia/Seoul">UTC+09:00 · 首爾（Asia/Seoul）</option>
+            </optgroup>
+            <optgroup label="大洋洲 / Oceania">
+              <option value="Australia/Perth">UTC+08:00 · 伯斯（Australia/Perth）</option>
+              <option value="Australia/Sydney">UTC+10:00 / +11:00 · 雪梨（Australia/Sydney）</option>
+              <option value="Pacific/Auckland">UTC+12:00 / +13:00 · 奧克蘭（Pacific/Auckland）</option>
+            </optgroup>
+          </select>
+          <p class="field-note" id="g-tz-note">選單顯示 UTC 偏移；儲存時使用 IANA 名稱，以正確處理夏令時間。</p>
         </div>
         <div class="btn-row"><button class="btn-p" onclick="saveGeneral()">儲存</button></div>
       </div>
@@ -446,6 +483,7 @@ _SETTINGS_CONTENT = r"""
 var mapLat=__LAT__, mapLon=__LON__;
 var lmap=null, lmk=null;
 var locationEdited=false;
+var timezoneReady=false;
 var _presTimer=null;
 
 var MODEL_PRESETS={
@@ -645,12 +683,37 @@ async function loadCfg(){
     var clampMin=function(sec){return Math.min(30, Math.max(1, Math.round((sec??600)/60)));};
     document.getElementById('us-claude').value=clampMin(cu.poll_interval_seconds);
     document.getElementById('us-codex').value=clampMin(cxu.poll_interval_seconds);
-    document.getElementById('g-tz').value=c.timezone||'Asia/Taipei';
+    setTimezoneValue(c.timezone||'Asia/Taipei');
   }catch(e){console.error('loadCfg',e)}
 }
 
 function escHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function timezoneOffsetLabel(timezone){
+  try{
+    var parts=new Intl.DateTimeFormat('en-US',{timeZone:timezone,timeZoneName:'longOffset'}).formatToParts(new Date());
+    var value=parts.filter(function(part){return part.type==='timeZoneName';})[0].value;
+    if(value==='GMT')return 'UTC±00:00';
+    var match=value.match(/^GMT([+-])(\d{1,2})(?::(\d{2}))?$/);
+    return match?'UTC'+match[1]+String(match[2]).padStart(2,'0')+':'+(match[3]||'00'):'';
+  }catch(e){return '';}
+}
+
+function setTimezoneValue(timezone){
+  var select=document.getElementById('g-tz');
+  var exists=Array.prototype.some.call(select.options,function(option){return option.value===timezone;});
+  if(!exists){
+    var option=document.createElement('option');
+    option.value=timezone;
+    var offset=timezoneOffsetLabel(timezone);
+    option.textContent=offset?offset+' · 自訂 · '+timezone:'自訂 · '+timezone;
+    select.appendChild(option);
+  }
+  select.value=timezone;
+  select.disabled=false;
+  timezoneReady=true;
 }
 
 async function loadWifi(){
@@ -849,6 +912,7 @@ async function saveUsage(){
   }catch(e){toast('儲存失敗：'+e.message,false);}
 }
 async function saveGeneral(){
+  if(!timezoneReady){toast('時區設定尚未載入，請稍候再試',false);return;}
   try{
     await put('/settings/general',{timezone:document.getElementById('g-tz').value.trim()});
     toast('✓ 一般設定已儲存',true);

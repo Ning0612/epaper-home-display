@@ -64,6 +64,18 @@ def test_weather_location_supports_map_picker():
     assert 'w.lat!=null && w.lon!=null && !locationEdited' in _SETTINGS_HTML
 
 
+def test_general_timezone_uses_select_with_iana_fallback():
+    assert '<select id="g-tz" aria-describedby="g-tz-note" disabled>' in _SETTINGS_HTML
+    assert '<input type="text" id="g-tz"' not in _SETTINGS_HTML
+    assert 'UTC+08:00' in _SETTINGS_HTML
+    assert 'Asia/Taipei' in _SETTINGS_HTML
+    assert 'var timezoneReady=false' in _SETTINGS_HTML
+    assert 'function timezoneOffsetLabel(timezone)' in _SETTINGS_HTML
+    assert 'function setTimezoneValue(timezone)' in _SETTINGS_HTML
+    assert "'自訂 · '+timezone" in _SETTINGS_HTML
+    assert "if(!timezoneReady){toast('時區設定尚未載入" in _SETTINGS_HTML
+
+
 def test_image_workflow_uses_class_based_view_switching():
     assert 'id="view-crop" class="is-hidden"' in _IMAGES_HTML
     assert 'id="view-preview" class="is-hidden"' in _IMAGES_HTML
