@@ -20,7 +20,7 @@
 ## 實體照片
 
 <p align="center">
-  <img src="docs/demo/real_setup.jpg" alt="ePaper home display real setup" width="720">
+  <img src="docs/demo/real_device_2026-07-19.jpg" alt="ePaper home display real device setup on 2026-07-19" width="720">
 </p>
 
 ## Demo 片段
@@ -40,19 +40,47 @@
 
 ## 畫面預覽
 
-### 儀表板（Dashboard）
-
-![儀表板預覽](docs/images/preview_dashboard.png)
-
-主畫面，依 `dashboard_interval_minutes` 設定的間隔自動更新（預設每 5 分鐘）。左側顯示日期時間（時鐘右方以圖示顯示室內溫濕度）、天氣（即時 + 4 天預報）；左下方為 Claude / Codex AI 使用量進度條（附重置時間）、HydraCup 飲水進度與 Bambu Lab 3D 印表機列印進度；右側為圖片輪播區。
-
-### WiFi 設定模式（AP Mode）
-
-![AP 模式預覽](docs/images/preview_apmode.png)
-
-Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並透過捕獲入口網站（`http://10.42.0.1:8000/wifi`）完成設定。完成後自動切回儀表板。
+<table>
+  <tr>
+    <th width="50%">儀表板（Dashboard）</th>
+    <th width="50%">WiFi 設定模式（AP Mode）</th>
+  </tr>
+  <tr>
+    <td valign="top">
+      <img src="docs/images/preview_dashboard.png" alt="儀表板預覽" width="100%">
+      <p>主畫面，依 <code>dashboard_interval_minutes</code> 設定的間隔自動更新（預設每 5 分鐘）。左側顯示日期時間（時鐘右方以圖示顯示室內溫濕度）、天氣（即時 + 4 天預報）；左下方為 Claude / Codex AI 使用量進度條（附重置時間）、HydraCup 飲水進度與 Bambu Lab 3D 印表機列印進度；右側為圖片輪播區。</p>
+    </td>
+    <td valign="top">
+      <img src="docs/images/preview_apmode.png" alt="AP 模式預覽" width="100%">
+      <p>Pi 無法連上 WiFi 時自動顯示此頁，引導用戶直接連接 SSID 並透過捕獲入口網站（<code>http://10.42.0.1:8000/wifi</code>）完成設定。完成後自動切回儀表板。</p>
+    </td>
+  </tr>
+</table>
 
 > 預覽圖由 `scripts/preview_render.py` 以 mock 資料生成，輸出至 `docs/images/`。
+
+### WebUI（實機畫面）
+
+以下為 Raspberry Pi 實機 WebUI 的深色主題截圖，包含圖片輪播管理、圖片裁切與電子紙預覽，以及書桌前分析、環境分析與系統設定頁面。
+
+#### 圖片輪播管理
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/webui-image-management.png" alt="WebUI 圖片輪播與已上傳圖片管理" width="100%"><br>圖片輪播與已上傳圖片管理</td>
+    <td align="center"><img src="docs/images/webui-image-fit-preview.png" alt="WebUI 電子紙圖片預覽" width="100%"><br>電子紙 Fit 預覽</td>
+  </tr>
+</table>
+
+#### 監控與系統設定
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/webui-desk-analysis.png" alt="WebUI 書桌前分析" width="100%"><br>書桌前分析</td>
+    <td align="center"><img src="docs/images/webui-environment-analysis.png" alt="WebUI 溫濕度分析" width="100%"><br>溫濕度分析</td>
+    <td align="center"><img src="docs/images/webui-settings.png" alt="WebUI 系統設定" width="100%"><br>系統設定</td>
+  </tr>
+</table>
 
 ---
 
@@ -207,17 +235,6 @@ git push                        ├── _presence_loop()       → 占用計�
 - **Python 3.11+**（開發與 Pi）
 - **Pi OS Bookworm / Trixie**（部署目標）；Windows / macOS / Linux（開發端）
 - **OpenWeatherMap API Key**（免費方案即可，每日 1000 次請求限額）
-
----
-
-## 課程資訊
-
-本專案原為期末作業，實作與驗證課程所學物聯網系統整合設計概念，涵蓋嵌入式 Linux、感測器驅動與異步服務設計。期末繳交版本保存於 `archive/final-project` 分支；`main` 分支後續移除了課程要求的 Agent 1（門鈴攝影機 + 人臉辨識，MQTT 協同）整合，僅保留獨立自主的功能。
-
-| 項目 | 說明 |
-|------|------|
-| 課程 | EE5325701 物聯網系統應用與設計實務（Design and Application in Internet of Things）|
-| 學期 | 114-2（2026 春季）|
 
 ---
 
