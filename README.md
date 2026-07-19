@@ -17,6 +17,8 @@
 
 本專案源自 114.2 臺科 EE5325701「物聯網系統應用與設計實務」期末專案；`archive/final-project` 分支保留期末繳交版本，`main` 分支是後續整理後的獨立版本。若有新的功能發想或實際使用需求，會以興趣延伸專案持續維護。
 
+同帳號的 [pico-paper-clock](https://github.com/Ning0612/pico-paper-clock) 是另一個獨立作品：基於 Pico W／MicroPython 的簡易桌前小時鐘。本專案則是整合多資訊來源的智慧家庭顯示面板，兩者各自獨立維護、互不取代。
+
 ## 實體照片
 
 <p align="center">
