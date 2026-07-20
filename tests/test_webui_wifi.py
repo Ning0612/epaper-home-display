@@ -6,6 +6,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.config import Settings
+from app.state import state
 from app.webui import middleware as auth_middleware
 from app.webui.routes import auth
 from app.webui.routes import wifi
@@ -67,6 +68,26 @@ def test_wifi_activation_reads_password_from_stdin(monkeypatch):
     assert "secret-pass" not in captured["command"]
     assert captured["input"] == "secret-pass\n"
     assert "--ask" in captured["command"]
+
+
+def test_wifi_portal_redirects_to_desk_once_client_connected(monkeypatch):
+    router = wifi.create_wifi_router(Settings())
+    route = next(r for r in router.routes if r.path == "/wifi")
+
+    monkeypatch.setattr(state, "wifi_mode", "client")
+    response = asyncio.run(route.endpoint(_request("/wifi")))
+    assert response.status_code == 303
+    assert response.headers["location"] == "/desk"
+
+
+@pytest.mark.parametrize("mode", ["ap", "unknown"])
+def test_wifi_portal_still_renders_before_client_connected(monkeypatch, mode):
+    router = wifi.create_wifi_router(Settings())
+    route = next(r for r in router.routes if r.path == "/wifi")
+
+    monkeypatch.setattr(state, "wifi_mode", mode)
+    response = asyncio.run(route.endpoint(_request("/wifi")))
+    assert response.status_code == 200
 
 
 def test_configured_device_requires_login_for_wifi_portal():

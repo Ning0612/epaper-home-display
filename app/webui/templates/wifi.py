@@ -23,8 +23,8 @@ _WIFI_HTML = (
     body{padding:0}
     .wifi-wrap{max-width:600px;margin:auto;padding:1.5rem 1rem 3.2rem}
     .wifi-card{padding:1.2rem}
-    .wifi-title{margin:.45rem 0 .3rem;font-size:clamp(2rem,7vw,3rem);line-height:.95;font-weight:400;letter-spacing:-.05em}
-    .wifi-sub{margin:0 0 1.2rem;color:var(--muted);font-size:.88rem;line-height:1.5}
+    .wifi-title{margin:.45rem 0 0;padding-bottom:.7rem;border-bottom:1px solid var(--line);font-size:clamp(2rem,7vw,3rem);line-height:.95;font-weight:400;letter-spacing:-.05em}
+    .wifi-sub{margin:.6rem 0 1.2rem;color:var(--muted);font-size:.88rem;line-height:1.5}
     .section-title{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.45rem;color:var(--muted);font:700 .72rem Consolas,monospace;letter-spacing:.03em}
     .field-with-action{display:flex;align-items:stretch;gap:.5rem}
     .field-with-action select{flex:1;min-width:0}
@@ -56,11 +56,10 @@ _WIFI_HTML = (
     </div>
   </header>
   <main class="wifi-wrap">
+    <div class="kicker">00 / network</div>
+    <h1 class="wifi-title">WiFi 設定</h1>
+    <p class="wifi-sub">掃描附近網路、選取 SSID，再輸入密碼建立連線設定。</p>
     <section class="card wifi-card">
-      <div class="kicker">00 / network</div>
-      <h1 class="wifi-title">WiFi 設定</h1>
-      <p class="wifi-sub">掃描附近網路、選取 SSID，再輸入密碼建立連線設定。</p>
-
       <div class="field">
         <div class="section-title"><span>附近的 WiFi 網路</span><span id="scan-status" aria-live="polite"></span></div>
         <div class="field-with-action">

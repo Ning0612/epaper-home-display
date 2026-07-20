@@ -7,7 +7,7 @@ import subprocess
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from starlette.requests import Request
 
@@ -35,7 +35,14 @@ def create_wifi_router(settings: "Settings") -> APIRouter:
 
     @router.get("/wifi", response_class=HTMLResponse)
     async def wifi_page(request: Request):
-        """AP mode WiFi setup portal; first-run is public, configured devices require login."""
+        """AP mode WiFi setup portal; first-run is public, configured devices require login.
+
+        Once the device is confirmed connected as a client, the portal has
+        nothing left to do here — redirect back to the dashboard rather than
+        showing a form whose scan/connect APIs will just 503.
+        """
+        if state.wifi_mode == "client":
+            return RedirectResponse(url="/desk", status_code=303)
         return HTMLResponse(_render_wifi(getattr(request.state, "csrf_token", _preauth_csrf_token())))
 
     @router.get("/api/wifi/scan")
