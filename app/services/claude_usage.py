@@ -35,7 +35,26 @@ class _UnauthorizedError(Exception):
 
 
 class _RateLimitedError(Exception):
-    pass
+    """Raised on HTTP 429. Carries the server's Retry-After hint when present."""
+
+    def __init__(self, retry_after: int | None = None) -> None:
+        super().__init__("rate limited")
+        self.retry_after = retry_after
+
+
+def _parse_retry_after(value: str | None) -> int | None:
+    """Parse a Retry-After header in delta-seconds form; None if absent/unusable.
+
+    The HTTP-date form is not handled — this endpoint sends delta-seconds, and
+    guessing wrong is worse than falling back to the configured poll interval.
+    """
+    if not value:
+        return None
+    try:
+        seconds = int(value.strip())
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds > 0 else None
 
 
 def _fmt_reset_time(iso: str) -> str:
@@ -81,6 +100,11 @@ class ClaudeUsageService:
             # Normalize camelCase (Claude Code) → snake_case (our internal format)
             access_token = raw.get("access_token") or raw.get("accessToken")
             refresh_token = raw.get("refresh_token") or raw.get("refreshToken")
+            # Both tokens are required. A `claude setup-token` credential (access
+            # token only) is rejected here on purpose: that token lacks the
+            # `user:profile` scope this endpoint needs, so it would 403 on every
+            # poll. Failing here surfaces the actionable "re-run claude_auth.py"
+            # message instead.
             if not access_token or not refresh_token:
                 return False
             self._creds = {"access_token": access_token, "refresh_token": refresh_token}
@@ -160,8 +184,12 @@ class ClaudeUsageService:
                 if resp.status == 401:
                     raise _UnauthorizedError()
                 if resp.status == 429:
-                    logger.warning("Claude usage API rate limited (429) — keeping cached data")
-                    raise _RateLimitedError()
+                    retry_after = _parse_retry_after(resp.headers.get("Retry-After"))
+                    logger.warning(
+                        "Claude usage API rate limited (429) — keeping cached data (Retry-After=%s)",
+                        retry_after if retry_after is not None else "absent",
+                    )
+                    raise _RateLimitedError(retry_after)
                 if resp.status != 200:
                     logger.warning("Claude usage API returned HTTP %s", resp.status)
                     return None
