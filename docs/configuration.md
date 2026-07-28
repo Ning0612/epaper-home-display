@@ -230,12 +230,29 @@ AI 使用量由服務內建的兩個輪詢循環自動從 API 拉取，無需外
 ```yaml
 claude_usage:
   creds_path: "data/claude_creds.json"   # OAuth token 儲存路徑（.gitignored）
-  poll_interval_seconds: 600              # 每 10 分鐘向 Anthropic API 拉取一次用量
+  poll_interval_seconds: 60               # 每 60 秒向 Anthropic API 拉取一次用量
 ```
 
-**初次授權**：在筆電執行 `python tools/claude_auth.py`，授權後將 `data/claude_creds.json` scp 到 Pi。
+**初次授權**：在筆電執行 `python tools/claude_auth.py`，會複製筆電上 Claude Code CLI 目前使用中的
+session token（`access_token` + `refresh_token`）到 `data/claude_creds.json`，再 scp 到 Pi。
 支援 Claude Code 原生格式（`claudeAiOauth` 嵌套格式）與標準 snake_case 格式。
 Token 過期時自動透過 refresh_token 刷新，不需重新授權。
+
+> **`claude setup-token` 不適用於本功能。** 它產生的獨立長效 token（效期 1 年、無 refresh_token）缺少
+> `user:profile` scope，呼叫 `/api/oauth/usage` 會回 `403 permission_error`（2026-07-29 實測）。
+> 因此 `load_credentials()` 會拒收只有 `access_token` 的憑證——與其每輪靜默 403、畫面停在 N/A，
+> 不如在載入階段就失敗，讓 log 顯示可行動的「重跑 `claude_auth.py`」訊息。
+
+**限流是帳號層級，多個工具會互相排擠**：`/api/oauth/usage` 的限流綁在帳號上，不是綁 token。
+Claude Code CLI 本身、讀取同一份 `~/.claude/.credentials.json` 的狀態列工具、以及本服務（憑證是從同一處
+複製出去、之後各自刷新而分岔的另一組 token），全部共用同一份額度。實測兩台機器會同時被 429。
+
+被限流時伺服器會在 429 回應帶上 `Retry-After`（實測 19–164 秒不等，是滑動視窗）。
+`_claude_usage_loop()` 會據此自動延長等待（取 `max(輪詢間隔, Retry-After + 5)`，上限 1 小時），
+**而不是固定睡 `poll_interval_seconds` 就重試**——後者會讓每次重試都落在冷卻期內、再換來一次 429，
+使用量永遠停在 N/A。因此 `poll_interval_seconds: 60` 代表的是「最快每 60 秒」而非保證頻率，
+實際更新會比 60 秒稀疏。若用量長時間不更新，先確認是否有其他工具也在高頻率輪詢同一支 API。
+
 `poll_interval_seconds` 可設定範圍 60–1800 秒（1–30 分鐘），也可透過 WebUI `/settings` 頁面「AI 工具用量設定」直接調整（見 [docs/webui.md](webui.md)）。不需要重啟服務；但目前正在進行中的 `asyncio.sleep()` 等待不會被中斷，新值要等這輪等待結束、進入下一輪輪詢週期才會套用。
 
 ### Codex 使用量
@@ -423,7 +440,7 @@ wifi:
 
 claude_usage:
   creds_path: "data/claude_creds.json"
-  poll_interval_seconds: 600
+  poll_interval_seconds: 60
 
 mqtt:
   broker_host: "localhost"

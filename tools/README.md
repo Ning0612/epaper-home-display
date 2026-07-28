@@ -31,13 +31,33 @@ python tools/claude_auth.py
 - `data/claude_creds.json`（會嘗試設為僅擁有者可讀寫，POSIX 環境下等同 600 權限；`chmod` 失敗時靜默忽略，不保證一定生效，Windows 筆電上也無法設定 POSIX 權限）
 - 內含 `access_token` 與 `refresh_token`
 
+### 不要用 `claude setup-token` 代替本腳本
+
+`claude setup-token` 會產生一組獨立的長效 token（效期 1 年、無 refresh_token），看起來很適合這種
+無人值守的場景，但**它不能用於本功能**：該 token 缺少 `user:profile` scope，呼叫 `/api/oauth/usage`
+會回 `403 permission_error: OAuth token does not meet scope requirement user:profile`（2026-07-29 實測）。
+
+`app/services/claude_usage.py` 的 `load_credentials()` 因此明確拒收只有 `access_token` 的憑證——
+與其接受後每輪靜默 403、畫面停在 N/A，不如在載入階段就失敗，讓 log 顯示可行動的訊息。
+
 ### 部署到 Pi
 
 ```bash
 scp data/claude_creds.json pi@epaper-display.local:~/epaper-home-display/data/
 ```
 
-Pi 上的 `_claude_usage_loop` 會在下次輪詢時自動載入憑證。Access token 過期時服務會自動以 refresh_token 刷新，**通常不需要重新執行此腳本**。
+Pi 上的 `_claude_usage_loop` 會在下次輪詢時自動載入憑證（不需重啟服務）。Access token 過期時服務會自動
+以 refresh_token 刷新，**通常不需要重新執行此腳本**。
+
+### 憑證是共用的：多個用量工具會互相排擠
+
+本腳本產生的憑證是從 `~/.claude/.credentials.json` **複製**出去的。複製後兩邊各自刷新，token 字串會
+分岔成不同的兩組，但**限流綁在帳號層級而非 token**，所以 Claude Code CLI 本身、任何讀取同一份憑證檔的
+狀態列用量工具、以及 Pi 上的本服務，全部共用同一份 `/api/oauth/usage` 額度（實測兩台機器會同時被 429）。
+
+若 Pi 上的用量長時間顯示 N/A，先盤點還有哪些工具在輪詢這支 API 與各自的頻率，而不是重新產生憑證——
+換 token 不會擴大額度。服務本身遇到 429 會依 `Retry-After` 自動退避，詳見
+[docs/configuration.md](../docs/configuration.md#claude-使用量)。
 
 ---
 

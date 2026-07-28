@@ -83,7 +83,7 @@ epaper-home-display/
 │   │   ├── presence.py      # 占用計分循環（60 秒；候選到期時依設定提前醒來）
 │   │   ├── display.py       # 顯示更新循環（牆鐘對齊，觸發秒由 model 推導；epd7in3e 預設 :40，每 5 分鐘）
 │   │   ├── weather.py       # 天氣更新循環（600 秒）
-│   │   ├── claude_usage.py  # Claude 使用量輪詢循環（600 秒，OAuth API 直接拉取）
+│   │   ├── claude_usage.py  # Claude 使用量輪詢循環（可調整 60–1800 秒，預設 60 秒，OAuth API 直接拉取）
 │   │   ├── codex_usage.py   # Codex 使用量輪詢循環（600 秒，OAuth API 直接拉取）
 │   │   ├── notification.py  # 通知排程循環
 │   │   └── button.py        # 按鈕事件處理
@@ -175,7 +175,7 @@ presence_away 事件（轉入 UNOCCUPIED，清屏）─────────�
 | `_presence_loop()` | 每 60 秒；候選到期時依設定提前醒來 | 讀光線狀態 → `PresenceDebouncer` → 桌面時段管理；離席時送 `presence_away` 清屏、回家時送 `presence_return` 喚醒 display_queue |
 | `_display_loop()` | 牆鐘對齊（N 分鐘邊界，由 `dashboard_interval_minutes` 控制，預設每 5 分鐘）| 監聽 display_queue；離席時清屏並暫停儀表板更新；啟動／WiFi 切回時保留一次顯示；管理圖片輪播換圖（每 `carousel_interval_refreshes` 次刷新換圖）|
 | `_weather_loop()` | 每 600 秒 | 非同步 fetch OpenWeatherMap → 更新 state 快取 |
-| `_claude_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 Anthropic API 拉取 Claude 5h/7d 使用量；token 過期時自動刷新 |
+| `_claude_usage_loop()` | 可調整 60–1800 秒，預設 60 秒；遇 429 依 `Retry-After` 自動延長 | OAuth Bearer token 向 Anthropic API 拉取 Claude 5h/7d 使用量；token 過期時自動刷新。限流綁帳號（與 CLI、其他用量工具共用額度），冷卻期常超過輪詢間隔，故 429 時改睡 `max(輪詢間隔, Retry-After + 5)`（上限 1 小時）|
 | `_codex_usage_loop()` | 每 600 秒 | OAuth Bearer token 向 OpenAI WHAM API 拉取 Codex 5h/7d 使用量；token 過期時自動刷新 |
 | `_notification_loop()` | 依排程 | Discord 每日統計摘要等定時通知 |
 | `_wifi_monitor_loop()` | 每 10 秒 | 讀取 `/tmp/epaper-ap-mode.json`；AP 模式時設定 `display_page = "ap_mode"`；AP 結束後送 `"wifi_connected"` 事件，即使離席也顯示一次儀表板以保留設定入口 |

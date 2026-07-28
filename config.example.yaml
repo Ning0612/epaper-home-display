@@ -80,8 +80,15 @@ wifi:
 
 claude_usage:
   creds_path: "data/claude_creds.json"   # OAuth token 儲存路徑（.gitignored，不要 commit）
-  poll_interval_seconds: 600              # 每 10 分鐘向 Anthropic API 拉取一次用量；範圍 60-1800（1-30 分鐘），可透過 WebUI /settings 的「AI 工具用量設定」調整，不需重啟服務（進行中的等待不會被中斷，下一輪才套用新值）
-  # 初次授權：在筆電執行 python tools/claude_auth.py，授權後 scp data/claude_creds.json 到 Pi
+  poll_interval_seconds: 60               # 範圍 60-1800（1-30 分鐘），可透過 WebUI /settings 的「AI 工具用量設定」調整，不需重啟服務（進行中的等待不會被中斷，下一輪才套用新值）
+  # 取得憑證：在筆電執行 python tools/claude_auth.py，再 scp data/claude_creds.json 到 Pi。
+  # 憑證含 access_token + refresh_token，過期時服務會自動刷新，正常不需重新執行。
+  # 注意：`claude setup-token` 不適用於本功能。它產生的長效 token（效期 1 年）缺少 user:profile scope，
+  # 打 /api/oauth/usage 會回 403 permission_error（2026-07-29 實測），因此 load_credentials() 會直接拒收只有
+  # access_token 的憑證，讓錯誤訊息停在「重跑 claude_auth.py」而不是每輪靜默 403。
+  # 60 秒是「最快」而非「保證」頻率：此端點限流綁在帳號層級，Claude Code CLI、狀態列用量工具與本服務共用
+  # 同一份額度。被限流時服務會依回應的 Retry-After 自動延長等待（實測冷卻 19-164 秒不等），
+  # 因此實際更新頻率會比 60 秒稀疏；若畫面上用量長時間不動，先檢查是否有其他工具也在高頻率輪詢同一支 API。
 
 mqtt:
   broker_host: "localhost"

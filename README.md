@@ -173,6 +173,10 @@ scp data/claude_creds.json pi@epaper-display.local:~/epaper-home-display/data/
 scp data/codex_creds.json  pi@epaper-display.local:~/epaper-home-display/data/
 ```
 
+> Claude 用量請用 `tools/claude_auth.py`，**不要用 `claude setup-token`**——後者產生的長效 token 缺少
+> `user:profile` scope，查用量會回 403。另外 `/api/oauth/usage` 的限流綁在帳號層級，Claude Code CLI 與
+> 其他用量顯示工具會與本服務共用同一份額度，詳見 [tools/README.md](tools/README.md)。
+
 **（選用）啟用 Bambu Lab 3D 印表機進度**：在筆電執行互動式登入工具，再將憑證 scp 到 Pi：
 
 ```bash
@@ -213,7 +217,7 @@ scp data/bambu_creds.json pi@epaper-display.local:~/epaper-home-display/data/
 git push                        ├── _presence_loop()       → 占用計分（每 60 秒）
                                 ├── _display_loop()        → e-Paper 更新（牆鐘對齊，由 model 推導觸發秒；epd7in3e 預設 :40，每 5 分鐘）
                                 ├── _weather_loop()        → OpenWeatherMap（每 600 秒）
-                                ├── _claude_usage_loop()   → Claude 使用量（每 600 秒）
+                                ├── _claude_usage_loop()   → Claude 使用量（預設每 60 秒；遇 429 依 Retry-After 延長）
                                 ├── _codex_usage_loop()    → Codex 使用量（每 600 秒）
                                 ├── _notification_loop()   → Discord 排程通知
                                 ├── _wifi_monitor_loop()   → WiFi 模式監測（每 10 秒）
